@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 1 — ER modeling: drawing the diagram</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 1 &middot; ER modeling</span>
+  <nav class="topnav">
+    <a href="index.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a aria-disabled="true">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#values"><span class="t">1.1</span>Entities, values and attributes</a></li>
+    <li><a href="#keys"><span class="t">1.2</span>Keys, weak entity sets, partial keys</a></li>
+    <li><a href="#rels"><span class="t">1.3</span>Cardinality and participation</a></li>
+    <li><a href="#notation"><span class="t">1.4</span>The notation on one page</a></li>
+    <li><a href="#exercises"><span class="t">1.5</span>Exercises</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 1 &middot; after the ER-modeling lectures</span>
+  <span class="chnum">ER modeling</span>
+  <h1>Drawing the diagram</h1>
+  <p class="chsum">Nineteen exercises, sixteen of which ask for a complete ER
+  diagram, ending with two large ones. What deserves to be an entity set and what is only a value; keys, weak
+  entity sets and partial keys; cardinality ratios, participation constraints, and
+  where an attribute belongs when it describes a pair rather than a thing.</p>
+</div>
+
+<p>An ER diagram is not a picture of a database. It is an argument about the
+part of the world the database is supposed to describe, written in a notation
+compact enough that somebody can disagree with it. Almost every mistake in this
+set is the same mistake in different clothes &mdash; a design decision made
+silently, so that nobody, including the designer, can see what was decided.</p>
+
+<p>So the discipline this set drills is not draughtsmanship. It is saying out
+loud, for every box and every line you draw, <em>what fact about the world</em>
+made you draw it that way. The problems come from the CSCI 331 problem book; the
+solutions show the route to the diagram, not just the diagram.</p>
+
+<div class="box note"><span class="bt">Plain ER only</span>
+<p>This set stays inside the basic entity-relationship model: entity sets,
+relationship sets, attributes, cardinality and participation. Subclasses,
+specialization and the <b>d</b>/<b>o</b> constraints belong to the
+<em>enhanced</em> model, EER, and get a set of their own later. If a problem here
+tempts you to draw a subclass, model it with an attribute or a separate entity set
+instead &mdash; that is the exercise.</p></div>
+
+<h2 id="values"><span class="secnum">1.1</span>Entities, values and attributes</h2>
+
+<p>An <strong>entity</strong> is a thing with an identity of its own &mdash; it
+stays the same thing even when everything recorded about it changes. A
+<strong>value</strong> has no identity: it is entirely described by what it is.
+A patient whose name, address and diagnosis all change is still that patient; a
+temperature of 38.4&deg; is nothing but 38.4&deg;, and two of them are the same
+thing. That is the whole test, and it settles most of the "should this be a box?"
+arguments before they start.</p>
+
+<p>An entity set's <strong>attributes</strong> come in four flavours that the
+notation distinguishes, because each one is a different promise to whoever
+implements the schema:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>kind</th><th>what it means</th><th>example</th></tr></thead>
+<tbody>
+<tr><td>simple</td><td>one atomic value per entity</td><td>a person's <b>name</b></td></tr>
+<tr><td>composite</td><td>a structure with named components</td><td><b>address</b> = street, city, state, zip</td></tr>
+<tr><td>multivalued</td><td>a <em>set</em> of values, possibly empty</td><td>a person's <b>home phone #</b></td></tr>
+<tr><td>derived</td><td>not stored; computed from other values</td><td><b>age</b>, from birth date and today</td></tr>
+</tbody></table></div>
+
+<div class="box note"><span class="bt">Why derived attributes are drawn at all</span>
+<p>If a derived attribute is never stored, why put it in the diagram? Because the
+diagram is a specification, and "the database must be able to answer this" is part
+of the specification. Drawing <b>age</b> dashed, with a line to <b>birth date</b>,
+records both that users will ask for age and that storing it would be a bug: it
+changes every day, and a stored copy goes stale the moment nobody updates it.</p></div>
+
+<p>A third question decides more diagrams than either of those: <strong>what is an
+attribute an attribute of?</strong> If its value is determined by a
+<em>combination</em> of entities rather than by any one of them, it is an
+attribute of the relationship and it hangs off the diamond. A price charged by a
+particular supplier for a particular medication is the standard case, and it turns
+up in five of the exercises below.</p>
+
+<h2 id="keys"><span class="secnum">1.2</span>Keys, weak entity sets, partial keys</h2>
+
+<p>An attribute <var>K</var> is a <strong>key</strong> of an entity set
+<var>S</var> if no two distinct entities in <var>S</var> have equal values of
+<var>K</var>. Note what this says: it is a constraint on every possible state of
+the database, not an observation about the rows that happen to be there today.
+Two students in your section having different birthdays does not make birthday a
+key.</p>
+
+<p>Some entity sets have no key of their own. A <strong>weak entity set</strong>
+is identified only through its relationship to an owner: its
+<strong>partial key</strong> distinguishes it among the entities that share one
+owner, and nothing more. The identifying relationship is drawn as a double
+diamond, and participation on the weak side is always total &mdash; a weak entity
+that is not owned by anything cannot be identified, so it cannot exist.</p>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -5 600 155" role="img" aria-label="Weak entity set student seat identified by classroom">
+<rect x="54.05" y="56" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="110" y="75" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">classroom</text>
+<polygon points="239.1,75 300,48 360.9,75 300,102" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="246.1,75 300,55 353.9,75 300,95" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="75" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">seated in</text>
+<rect x="430.4" y="56" width="139.2" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="435.4" y="61" width="129.2" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="75" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">student seat</text>
+<path d="M165.9 75.0L239.1 75.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="202.525" y="61" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M355.9 77.2L430.4 77.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M355.9 72.8L430.4 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="395.65" y="61" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="110" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="110" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">room #</text>
+<path d="M110.0 39.0L110.0 56.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="500" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="500" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">seat #</text>
+<path d="M500.0 39.0L500.0 56.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>A weak entity set. <b>student seat</b> has no key of its own; <b>seat #</b> is only a partial key, unique within one classroom.</figcaption></figure>
+
+<div class="box warn"><span class="bt">The classic slip</span>
+<p>"Seat 14 appears twice in the table, so <b>seat #</b> is not a key &mdash; the
+design is broken." It is not broken. Seat 14 of Kiely 170 and seat 14 of Science
+Building 137 are different seats, and the partial key is doing exactly its job:
+it is unique <em>within one classroom</em>. What identifies a seat is the pair
+(room #, seat #), and that pair is assembled by the relationship, not stored in
+the weak entity set.</p></div>
+
+<h2 id="rels"><span class="secnum">1.3</span>Cardinality and participation</h2>
+
+<p>Every binary relationship carries two independent constraints, and students
+lose marks by reading one and answering the other.</p>
+
+<ul>
+<li>The <strong>cardinality ratio</strong> &mdash; 1:1, 1:<var>M</var> or
+<var>M</var>:<var>N</var> &mdash; says <em>how many</em> entities on one side may
+be related to one entity on the other.</li>
+<li>The <strong>participation constraint</strong> says whether an entity
+<em>must</em> take part at all: total (double line) or partial (single line).</li>
+</ul>
+
+<p>They are orthogonal. "Each campus belongs to exactly one university" is two
+statements: <em>at most one</em> (the ratio) and <em>at least one</em> (total
+participation). A diagram that shows only the first has not said that a campus
+cannot float free.</p>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 90" role="img" aria-label="Cardinality ratio one to many">
+<rect x="49.5" y="26" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="110" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">university</text>
+<polygon points="245,45 300,18 355,45 300,72" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">belongs</text>
+<rect x="445" y="26" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">campus</text>
+<path d="M170.5 47.2L249.5 47.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M170.5 42.8L249.5 42.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="207.75" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M350.5 47.2L445.0 47.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M350.5 42.8L445.0 42.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="400" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>Cardinality ratio 1&nbsp;:&nbsp;M, total participation on both sides (the double lines).</figcaption></figure>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 90" role="img" aria-label="Cardinality ratio many to many">
+<rect x="54.05" y="26" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="110" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">professor</text>
+<polygon points="245,45 300,18 355,45 300,72" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">teaches</text>
+<rect x="445" y="26" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">subject</text>
+<path d="M165.9 45.0L245.0 45.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="205.475" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M355.0 45.0L445.0 45.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="400" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">N</text>
+</svg>
+<figcaption>Cardinality ratio M&nbsp;:&nbsp;N, partial participation on both sides (single lines).</figcaption></figure>
+
+<p>A relationship may also join an entity set to itself. Then the diagram would
+be ambiguous without <strong>role names</strong>, because the two lines go to the
+same box and nothing else distinguishes them.</p>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 190" role="img" aria-label="Recursive relationship is mother on entity set persons">
+<rect x="245" y="131" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">persons</text>
+<polygon points="239.1,52 300,25 360.9,52 300,79" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">is mother</text>
+<path d="M245.0 131.0L239.1 52.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M245.0 131.0L270.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M355.0 131.0L360.9 52.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M355.0 131.0L330.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="228" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<text class="lbl" x="372" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<text class="lbl" x="214" y="96" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">mother</text>
+<text class="lbl" x="389" y="96" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">child</text>
+</svg>
+<figcaption>A recursive relationship on one entity set. Read it along the role names: each <b>child</b> has one <b>mother</b>, each mother many children.</figcaption></figure>
+
+<details class="qc"><summary data-label="Check 1.1">A relationship has attributes of its own &mdash; say a <b>price</b> on the relationship between suppliers and medications. Could you move <b>price</b> onto the <b>medication</b> entity set instead?</summary><div class="sol">
+<p>Only if every supplier charges the same price for a given medication, which is
+exactly what the scenario denies. A price belongs to a (supplier, medication)
+<em>pair</em>, so it belongs to the relationship.</p>
+<p>One case is different. On a 1:<var>M</var> relationship an attribute of the
+relationship can always be moved to the entity set on the <var>M</var> side,
+because each entity there takes part at most once. That is a legitimate
+simplification &mdash; but it is a decision worth making deliberately, not by
+accident.</p>
+</div></details>
+
+<h2 id="notation"><span class="secnum">1.4</span>The notation on one page</h2>
+
+<p>Every symbol used on this page and in the exercises below. Nothing here is
+decorative &mdash; each shape states a constraint, and leaving one out is
+asserting the default, not staying silent.</p>
+
+<div class="grid3">
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Entity set">
+<rect x="35" y="16" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">student</text>
+</svg>
+<figcaption>Entity set</figcaption></figure><p><strong>Entity set</strong><br>a thing with its own identity</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Weak entity set">
+<rect x="35" y="16" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="40" y="21" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">seat</text>
+</svg>
+<figcaption>Weak entity set</figcaption></figure><p><strong>Weak entity set</strong><br>identified only through an owner</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 -2 180 74" role="img" aria-label="Relationship set">
+<polygon points="35,35 90,8 145,35 90,62" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">takes</text>
+</svg>
+<figcaption>Relationship set</figcaption></figure><p><strong>Relationship set</strong><br>an association among entities</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 -2 180 74" role="img" aria-label="Identifying relationship">
+<polygon points="35,35 90,8 145,35 90,62" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="42,35 90,15 138,35 90,55" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">in</text>
+</svg>
+<figcaption>Identifying relationship</figcaption></figure><p><strong>Identifying relationship</strong><br>supplies a weak set its identity</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Attribute">
+<ellipse cx="90" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+</svg>
+<figcaption>Attribute</figcaption></figure><p><strong>Attribute</strong><br>one atomic value per entity</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Key attribute">
+<ellipse cx="90" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id #</text>
+</svg>
+<figcaption>Key attribute</figcaption></figure><p><strong>Key attribute</strong><br>underlined; unique across the set</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Partial key">
+<ellipse cx="90" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">seat #</text>
+</svg>
+<figcaption>Partial key</figcaption></figure><p><strong>Partial key</strong><br>dashed; unique within one owner</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Multivalued attribute">
+<ellipse cx="90" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="90" cy="35" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+</svg>
+<figcaption>Multivalued attribute</figcaption></figure><p><strong>Multivalued</strong><br>a set of values, possibly empty</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 0 180 70" role="img" aria-label="Derived attribute">
+<ellipse cx="90" cy="35" rx="45" ry="17" stroke-dasharray="6 4" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="90" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">age</text>
+</svg>
+<figcaption>Derived attribute</figcaption></figure><p><strong>Derived</strong><br>computed, never stored</p></div>
+</div>
+
+<p>A double line from an entity set to a relationship is total participation; a
+single line is partial. The cardinality ratio goes on the line as 1, <var>M</var>
+or <var>N</var>. Every relationship line on this page is plain: the ratio is
+written out at each end rather than shown with an arrowhead, so a line never has
+to be read twice.</p>
+
+<h2 id="exercises"><span class="secnum">1.5</span>Exercises</h2>
+
+<p>Three short questions to warm up, then sixteen diagrams. For every diagram,
+indicate carefully all the applicable constraints &mdash; a diagram without its
+cardinality ratios and participation lines is not finished, however many boxes it
+has. Draw before you click.</p>
+
+<h3>Three to warm up</h3>
+
+<details class="prob"><summary data-label="Exercise 1.1">You are designing a database for a travel bureau. Will you model air temperature as a <strong>value</strong> or as an <strong>entity</strong>? Explain your decision.</summary><div class="sol">
+<p><strong>A value.</strong> Air temperature has no identity of its own; it is
+adequately described by a number in a certain range, and the simple arithmetic
+operations already available for numbers &mdash; comparison, addition,
+subtraction &mdash; cover the expected usage of the temperature type.</p>
+<p><strong>The method.</strong> Ask two questions of any candidate. First, does it
+have an identity that survives a change in its description? A patient renamed is
+the same patient; a temperature changed from 31&deg; to 32&deg; is simply a
+different temperature. Second, does anything need to be <em>said about</em> it
+that is not part of what it is? Nothing hangs off 31&deg;. Both answers point the
+same way, so it is a value.</p>
+<p>Change the enterprise and the answer can change with it. For a climate research
+lab a <em>reading</em> &mdash; taken at a place, at a time, by an instrument,
+flagged as suspect or not &mdash; is very much an entity. The temperature itself
+is still just one of its attributes.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.2">Give a precise description of a situation where two distinct entities of the same type have identical values of the <strong>key</strong> attribute. Provide a reasonable example. If such a situation is impossible, explain why.</summary><div class="sol">
+<p><strong>It is impossible</strong>, by definition: two distinct entities of the
+same type cannot agree on the value of the key.</p>
+<p><strong>The method.</strong> When a question asks you to produce something
+impossible, the marks are for recognising that the definition already forbids it,
+and for saying which definition. Do not search for a clever counter-example; there
+is none, and the search is the trap. The related situation that <em>is</em>
+possible &mdash; and which the question is quietly testing &mdash; is two entities
+of <em>different</em> types sharing a key value, which is no contradiction at all,
+since each key constrains only its own entity set.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.3">Give a precise description of a situation where two distinct entities of the same type have identical values of the <strong>partial key</strong> attribute. Provide a reasonable example. If such a situation is impossible, explain why.</summary><div class="sol">
+<p><strong>It is possible.</strong> The partial key value is unique only among
+those entities of a weak entity type that are related to the same entity of the
+strong (owner, governing) entity type. Hence two distinct entities that have
+different owners can agree on the value of the partial key.</p>
+<p><strong>Example.</strong> Two entities of the weak type <b>student seat</b> can
+be assigned the same seat number, if they are not in the same classroom. The
+diagram is the one in &sect;1.2 above.</p>
+<p><strong>The method.</strong> Compare the two definitions word by word.
+Uniqueness of a key is over the whole entity set; uniqueness of a partial key is
+over one owner's entities. The pair (owner's key, partial key) is unique across
+the whole weak set &mdash; which is precisely why the weak set needs the
+identifying relationship in order to be identified at all.</p>
+</div></details>
+
+<h3>One relationship at a time</h3>
+
+<details class="prob"><summary data-label="Exercise 1.4">Give a reasonable example of a <strong>recursive</strong> relationship in the entity set <b>persons</b>. Draw the ER diagram, indicating carefully the cardinality and participation constraints.</summary><div class="sol">
+<p><strong>The example.</strong> The relationship "is mother" is functional
+(many-to-one) from children to mothers, since everybody has a unique mother, but a
+mother may have many children. The participation is total on the side of the
+children and partial on the side of the mothers.</p>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 190" role="img" aria-label="Recursive relationship is mother on entity set persons">
+<rect x="245" y="131" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">persons</text>
+<polygon points="239.1,52 300,25 360.9,52 300,79" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">is mother</text>
+<path d="M245.0 131.0L239.1 52.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M245.0 131.0L270.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M355.0 131.0L360.9 52.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M355.0 131.0L330.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="228" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<text class="lbl" x="372" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<text class="lbl" x="214" y="96" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">mother</text>
+<text class="lbl" x="389" y="96" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">child</text>
+</svg>
+<figcaption>A recursive relationship on one entity set. Read it along the role names: each <b>child</b> has one <b>mother</b>, each mother many children.</figcaption></figure>
+<p><strong>The method.</strong> Three decisions, in this order.</p>
+<ol>
+<li><em>One box or two?</em> Mothers are persons and children are persons, so one
+box. Drawing <b>mother</b> and <b>child</b> as separate entity sets would claim
+they are different kinds of thing, and then a woman who is both would have to
+appear twice.</li>
+<li><em>Role names.</em> With both lines running to the same box, the diagram is
+ambiguous without them. They go on the lines, not in the diamond.</li>
+<li><em>The constraints, one side at a time.</em> Reading the <b>child</b> line:
+each person has exactly one mother &mdash; ratio 1 on the mother side, and total
+participation on the child side. Reading the <b>mother</b> line: a person may have
+any number of children including none &mdash; ratio <var>M</var>, partial
+participation.</li>
+</ol>
+<p>Total participation on the child side is the interesting claim: it says the
+database may not hold a person whose mother is unknown. For an enterprise that
+carries it through, fine &mdash; but notice it is an assertion about the world,
+and the kind that makes a system reject a real person at three in the morning.
+Exercise 1.7 is the same relationship with the opposite decision, and the wording
+is what forces the difference.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.5">Give a reasonable example of a relationship with cardinality ratio 1&nbsp;:&nbsp;<var>M</var> between any two entity sets of your choice. Draw the ER diagram, indicating carefully the cardinality and participation constraints.</summary><div class="sol">
+<p><strong>The example.</strong> The relationship between campuses and the
+universities they belong to is functional (many-to-one) from campuses to
+universities, since every campus belongs to a university, but a university may
+operate many campuses &mdash; CUNY, for instance. The participation is total on
+both sides, since every campus must be owned, and every university must have at
+least one place to operate on.</p>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 90" role="img" aria-label="Cardinality ratio one to many">
+<rect x="49.5" y="26" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="110" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">university</text>
+<polygon points="245,45 300,18 355,45 300,72" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">belongs</text>
+<rect x="445" y="26" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">campus</text>
+<path d="M170.5 47.2L249.5 47.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M170.5 42.8L249.5 42.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="207.75" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M350.5 47.2L445.0 47.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M350.5 42.8L445.0 42.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="400" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>Cardinality ratio 1&nbsp;:&nbsp;M, total participation on both sides (the double lines).</figcaption></figure>
+<p><strong>The method.</strong> Write the two sentences before you draw anything.
+"A campus belongs to at most one university" fixes the ratio. "A campus belongs to
+at least one university" fixes the participation on the campus side. Then repeat
+in the other direction: "a university has at least one campus" gives total
+participation there too, while "a university may have many campuses" is what makes
+the ratio 1&nbsp;:&nbsp;<var>M</var> rather than 1&nbsp;:&nbsp;1.</p>
+<p>Each of the four claims is separately arguable, which is the point of drawing
+them. A university between campuses &mdash; newly chartered, or having closed its
+last site &mdash; would break the total participation on the university side, and
+if the enterprise wants to record such a university, that line must become
+single.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.6">Give a reasonable example of a relationship with cardinality ratio <var>M</var>&nbsp;:&nbsp;<var>M</var> between any two entity sets of your choice. Draw the ER diagram, indicating carefully the cardinality and participation constraints.</summary><div class="sol">
+<p><strong>The example.</strong> The relationship between professors and the
+subjects they teach is many-to-many, since a professor may teach many subjects and
+a subject may be taught by many professors. Realistically, participation should be
+total on both sides. However, we may need to deal with subjects that were never
+taught, and professors that never lectured &mdash; which suggests optional
+participation on both sides.</p>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 90" role="img" aria-label="Cardinality ratio many to many">
+<rect x="54.05" y="26" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="110" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">professor</text>
+<polygon points="245,45 300,18 355,45 300,72" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">teaches</text>
+<rect x="445" y="26" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">subject</text>
+<path d="M165.9 45.0L245.0 45.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="205.475" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M355.0 45.0L445.0 45.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="400" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">N</text>
+</svg>
+<figcaption>Cardinality ratio M&nbsp;:&nbsp;N, partial participation on both sides (single lines).</figcaption></figure>
+<p><strong>The method.</strong> The ratio is the easy half: find one entity on each
+side that is related to two on the other, and <var>M</var>&nbsp;:&nbsp;<var>N</var>
+is forced. The participation is the half worth thinking about, and the answer
+above shows the thinking rather than hiding it: the ideal claim (everyone teaches,
+everything is taught) collides with the cases the database must nonetheless hold
+&mdash; the new appointment who has not yet been given a section, the subject in
+the catalogue that has not run for years. Partial participation is chosen to
+accommodate them.</p>
+<p>The general rule: total participation is a promise that the system will
+<em>refuse</em> an entity that has no partner. Make it only where you are willing
+for that refusal to happen.</p>
+</div></details>
+
+<h3>The hospital database</h3>
+
+<p>Each of the next three describes part of one hospital database. Draw carefully
+the complete ER diagram for that part, indicating all the applicable
+constraints.</p>
+
+<details class="prob"><summary data-label="Exercise 1.7">Each patient is identified by social security number. The hospital needs to know the name and age of the patient, as well as the personal information of the patient's mother, if she has ever been a patient at the hospital.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -7 600 267" role="img" aria-label="ER diagram for hospital patients with a recursive is-mother relationship">
+<rect x="245" y="47" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="66" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">patient</text>
+<ellipse cx="480" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="480" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id #</text>
+<path d="M435.0 22.0L355.0 55.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="500" cy="66" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="500" y="66" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M455.0 66.0L355.0 66.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="118" cy="66" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="118" y="66" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">birth date</text>
+<path d="M172.0 66.0L245.0 66.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="118" cy="20" rx="45" ry="17" stroke-dasharray="6 4" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="118" y="20" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">age</text>
+<path d="M148.7 32.4L245.0 54.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="239.1,205 300,178 360.9,205 300,232" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">is mother</text>
+<path d="M245.0 85.0L239.1 205.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M245.0 85.0L270.0 85.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M355.0 85.0L360.9 205.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M355.0 85.0L330.0 85.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="228" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<text class="lbl" x="373" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<text class="lbl" x="214" y="140" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">mother</text>
+<text class="lbl" x="388" y="140" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">child</text>
+</svg>
+<figcaption>Hospital patients. The mother is <em>not</em> a second entity set &mdash; she is a patient, so the relationship folds back onto <b>patient</b>.</figcaption></figure>
+<p><strong>Step 1 &mdash; how many entity sets?</strong> One. The mother's
+"personal information" is the same information a patient has, and the hospital
+only wants it <em>if she has ever been a patient</em> &mdash; so she is already in
+<b>patient</b>. A separate <b>mother</b> box would duplicate every woman who is
+both.</p>
+<p><strong>Step 2 &mdash; attributes and the key.</strong> <b>id&nbsp;#</b> is
+underlined: the problem says patients are identified by it. <b>name</b> is
+simple.</p>
+<p><strong>Step 3 &mdash; age.</strong> The hospital needs to know the age, but
+age is derived &mdash; it changes every birthday. Store <b>birth date</b> and draw
+<b>age</b> dashed, joined to the entity set like any other attribute. Writing
+<b>age</b> as a stored attribute is the single most common error on this
+question.</p>
+<p><strong>Step 4 &mdash; the relationship and its constraints.</strong> "Is
+mother" is recursive, with role names <b>mother</b> and <b>child</b>. The ratio is
+1&nbsp;:&nbsp;<var>M</var>: one mother, many children. Participation is
+<em>partial on both sides</em> &mdash; note the single lines, and note that this
+is the opposite of Exercise 1.4. The wording forces it: "if she has ever been a
+patient" concedes that most patients' mothers are not on file, so the database
+must accept a patient with no mother recorded.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.8">The hospital pharmacy buys medications from suppliers, whose names, addresses and contact phone numbers are kept on file. Each medication is identified by a generic name. A particular medication may be offered by several suppliers, though not necessarily at the same price. Additionally, suppliers are free to assign their own name (so called brand name) to each medication they sell. The pharmacy keeps track of the brand names under which various suppliers offer the medications, as well as of the prices they charge.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -1 600 301" role="img" aria-label="ER diagram of suppliers offering medications with price and brand name">
+<rect x="245" y="61" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="80" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">supplier</text>
+<ellipse cx="130" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M130.0 47.0L250.0 61.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="300" cy="26" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="300" y="26" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M300.0 43.0L300.0 61.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="475" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="475" cy="30" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="475" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M475.0 47.0L350.0 61.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="245,180 300,153 355,180 300,207" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">offer</text>
+<path d="M300.0 99.0L300.0 153.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="286" y="126" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="239.5" y="249" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="268" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">medication</text>
+<path d="M300.0 207.0L300.0 249.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="286" y="228" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="480" cy="148" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="480" y="148" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">price</text>
+<path d="M340.1 172.7L435.0 148.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="485" cy="212" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="485" y="212" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">brand name</text>
+<path d="M340.1 187.3L431.0 212.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="480" cy="268" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="480" y="268" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">gen. name</text>
+<path d="M360.5 268.0L429.9 268.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>The pharmacy. <b>price</b> and <b>brand name</b> hang off the <em>relationship</em>, not off either entity set &mdash; that is the whole point of the diagram.</figcaption></figure>
+<p><strong>Step 1 &mdash; two entity sets.</strong> <b>supplier</b> and
+<b>medication</b>, with <b>gen. name</b> underlined as the key of the latter, as
+the problem states.</p>
+<p><strong>Step 2 &mdash; the plural in "phone numbers".</strong> Contact phone
+numbers, plural, with nothing said about how many: a multivalued attribute, drawn
+as a double ellipse. This is the whole of the phrase's content, and it is easy to
+read past.</p>
+<p><strong>Step 3 &mdash; the ratio.</strong> A medication may be offered by
+several suppliers, and a supplier plainly sells several medications:
+<var>M</var>&nbsp;:&nbsp;<var>N</var>.</p>
+<p><strong>Step 4 &mdash; and now the real question.</strong> Where do
+<b>price</b> and <b>brand name</b> go? Not on <b>medication</b>: the same
+medication has a different price from each supplier, so a single price attribute
+could not hold them. Not on <b>supplier</b>: a supplier has one price
+<em>per medication</em>, not one price. Each value is determined by the
+<em>pair</em>, so both are attributes of the relationship <b>offer</b>, and they
+hang off the diamond.</p>
+<p>That is the general test, and it is worth memorising: an attribute belongs to
+the relationship exactly when its value depends on the combination of entities
+rather than on any one of them. Every <var>M</var>&nbsp;:&nbsp;<var>N</var>
+relationship in a real schema should prompt the question.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.9">The hospital operates a number of off-site out-patient facilities, each identified by a short name. The administration needs to know the address of each facility and their emergency contact phone numbers. The hospital also has a number of ambulance cars, dedicated to the transport of out-patients. For each car, the hospital records its license plate number and the date its registration expires. Every car is managed by one out-patient facility, to which it is assigned on a long-term basis. The date of the assignment is kept on file.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -1 600 301" role="img" aria-label="ER diagram of out-patient facilities and assigned cars">
+<rect x="245" y="61" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="80" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">facility</text>
+<ellipse cx="130" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M130.0 47.0L252.0 61.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="300" cy="26" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="300" y="26" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M300.0 43.0L300.0 61.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="478" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="478" cy="30" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="478" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M478.0 47.0L348.0 61.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="243.2,180 300,153 356.8,180 300,207" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">assigned</text>
+<path d="M300.0 99.0L300.0 153.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="286" y="126" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="245" y="249" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="268" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">car</text>
+<path d="M297.8 206.0L297.8 249.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M302.2 206.0L302.2 249.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="284" y="228" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="480" cy="180" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="480" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">date</text>
+<path d="M356.8 180.0L435.0 180.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="115" cy="268" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="115" y="268" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">exp. date</text>
+<path d="M165.1 268.0L245.0 268.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="482" cy="268" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="482" y="268" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">license #</text>
+<path d="M355.0 268.0L431.9 268.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Out-patient facilities and the ambulance cars assigned to them. The double line says every car must be assigned to some facility.</figcaption></figure>
+<p><strong>Step 1 &mdash; the keys are given.</strong> "Each identified by a short
+name" underlines <b>name</b> on <b>facility</b>; a car is identified by its
+<b>license&nbsp;#</b>. Take keys from the wording whenever the wording supplies
+them.</p>
+<p><strong>Step 2 &mdash; "phone numbers", again plural.</strong> Multivalued,
+double ellipse. The same phrase as in Exercise 1.8, doing the same job.</p>
+<p><strong>Step 3 &mdash; the two constraints on <b>assigned</b>, separately.</strong>
+"Every car is managed by <em>one</em> facility" is the cardinality ratio:
+1&nbsp;:&nbsp;<var>M</var>, one facility to many cars. "<em>Every</em> car is
+managed" is participation: total on the car side, drawn as a double line. Two
+different words in one sentence, two different marks. Nothing says a facility must
+have a car, so its participation stays partial.</p>
+<p><strong>Step 4 &mdash; the assignment date.</strong> The date belongs to the
+assignment, not to the car and not to the facility, so it hangs off the diamond.
+Because the ratio is 1&nbsp;:&nbsp;<var>M</var> it could legitimately be moved
+onto <b>car</b> instead &mdash; each car is assigned at most once, so there is
+room for exactly one date there. Leaving it on the relationship is the more honest
+diagram: it says the date is a fact about the assignment, which is what it is.</p>
+</div></details>
+
+<h3>Rotund Trend</h3>
+
+<p>Rotund Trend is a respectable pizza restaurant chain with several outlets in
+the town. The next three exercises each model one part of its database.</p>
+
+<details class="prob"><summary data-label="Exercise 1.10">Each restaurant location is identified by name, which is always an interesting phrase, carefully chosen to capture customer attention. In addition to the name, the company archives the address of each restaurant, and the addresses of all (if any) convenient parking garages, recommended to walk-in customers.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 160" role="img" aria-label="ER diagram of Rotund Trend restaurant outlets">
+<rect x="205" y="91" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="260" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">outlet</text>
+<ellipse cx="180" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="180" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M180.0 62.0L230.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="330" cy="42" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="330" y="42" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M330.0 59.0L295.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="450" cy="110" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="450" cy="110" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="450" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">parking</text>
+<path d="M405.0 110.0L315.0 110.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Rotund Trend outlets. <b>parking</b> is multivalued &mdash; a location may recommend several garages, or none at all.</figcaption></figure>
+<p><strong>Step 1 &mdash; one entity set, and the key.</strong> <b>outlet</b>,
+with <b>name</b> underlined. The business about interesting phrases is flavour;
+"identified by name" is the content.</p>
+<p><strong>Step 2 &mdash; the phrase that carries the whole exercise.</strong>
+"the addresses of all (if any) convenient parking garages". <em>All</em> makes it
+a set; <em>if any</em> makes the set possibly empty. That is precisely the
+definition of a multivalued attribute, so <b>parking</b> is a double ellipse.</p>
+<p><strong>Step 3 &mdash; what you should <em>not</em> do.</strong> Garages have
+no attributes here beyond their address and nothing is ever said about them, so
+promoting <b>parking</b> to its own entity set with a relationship buys nothing
+and asserts more than the problem says &mdash; in particular it would let two
+outlets share one garage entity, a claim the text never makes. Model what you were
+told, and no more.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.11">Rotund Trend owns a number of delivery cars. Cars are identified by license plate number, and each car is characterized by manufacturer's name, production year, and delivery capacity. Each car is serviced by a number of dealers, chosen according to their perceived expertise. An individual dealer may receive service contracts for several cars from the delivery fleet. However, a contact person is designated by the dealer for each individual car with the service contract, to guarantee that Rotund Trend has a reliable source of information about the history of each of its cars. The database records names and addresses of all dealers, one phone number per dealer, as well as the name of contact persons for individual cars.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 655 245" role="img" aria-label="ER diagram of cars and dealers joined by a service contract relationship">
+<rect x="75" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="130" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">car</text>
+<polygon points="255,120 340,88 425,120 340,152" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="340" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:12.5px;font-weight:600;">service contract</text>
+<rect x="480" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="535" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">dealer</text>
+<path d="M185.0 122.2L260.8 122.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M185.0 117.8L260.8 117.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="220" y="104" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M425.0 120.0L480.0 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="452.5" y="104" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="85" cy="48" rx="73.5" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="85" y="48" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">license plate #</text>
+<path d="M85.0 65.0L110.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="240" cy="52" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="240" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">capacity</text>
+<path d="M240.0 69.0L160.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="72" cy="198" rx="61.8" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="72" y="198" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">manufacturer</text>
+<path d="M72.0 181.0L108.0 139.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="215" cy="200" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">year</text>
+<path d="M215.0 183.0L158.0 139.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="365" cy="205" rx="69.6" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="365" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">contact person</text>
+<path d="M340.0 152.0L365.0 188.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="505" cy="50" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="505" y="50" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M505.0 67.0L515.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="52" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M600.0 69.0L558.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="560" cy="198" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="560" y="198" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M560.0 181.0L535.0 139.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Rotund Trend delivery cars and the dealers that service them. <b>contact person</b> is designated per car per dealer, so it belongs to the relationship.</figcaption></figure>
+<p><strong>Step 1 &mdash; the two entity sets and their keys.</strong> <b>car</b>,
+keyed by <b>license plate&nbsp;#</b> as stated, with <b>manufacturer</b>,
+<b>year</b> and <b>capacity</b>. <b>dealer</b>, keyed by <b>name</b>, with
+<b>address</b> and one <b>phone&nbsp;#</b> &mdash; "one phone number per dealer"
+is there specifically to tell you this one is <em>not</em> multivalued, in
+contrast with the hospital problems.</p>
+<p><strong>Step 2 &mdash; the ratio.</strong> "Each car is serviced by a number of
+dealers" and "an individual dealer may receive contracts for several cars" are the
+two halves of <var>M</var>&nbsp;:&nbsp;<var>N</var>, stated one after the other.
+Participation is total on the car side &mdash; every car in the fleet is serviced
+&mdash; and partial on the dealer side, since nothing says a dealer on file must
+currently hold a contract.</p>
+<p><strong>Step 3 &mdash; where the contact person goes.</strong> This is the
+exercise. The contact person is designated "by the dealer for each individual
+car": change either the dealer or the car and you get a different contact person.
+So it is determined by the pair, and it is an attribute of <b>service
+contract</b>. Putting it on <b>dealer</b> would allow one contact person per
+dealer, which contradicts the text; putting it on <b>car</b> would allow one per
+car, which contradicts it in the other direction.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.12">Rotund Trend stores information about its customers. Respecting fully the privacy of its customers, Rotund Trend identifies them by internal customer code, assigned to them upon their first walk-in visit. The company needs to know the (preferred) name and address of each customer. The company practices customer sponsorship &mdash; each customer (if they so desire) is welcome to designate one of other customers as their sponsor, with the understanding that the sponsor deserves credit for recommending Rotund Trend to the sponsored customer. The management records the amount of discount credit that has been given away to all individual instances of sponsorship.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 644 240" role="img" aria-label="ER diagram of a recursive customer sponsorship relationship">
+<rect x="135" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">customer</text>
+<polygon points="395,120 450,93 505,120 450,147" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="450" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">sponsor</text>
+<ellipse cx="80" cy="120" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="80" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">code</text>
+<path d="M125.0 120.0L135.0 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="140" cy="52" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="140" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M140.0 69.0L168.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="270" cy="50" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="270" y="50" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M270.0 67.0L222.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M245.0 110.0L340.0 110.0L340.0 66.0L450.0 66.0L450.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M245.0 130.0L340.0 130.0L340.0 174.0L450.0 174.0L450.0 147.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="395" y="56" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">sponsoring</text>
+<text class="lbl" x="393" y="186" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:500;">sponsored</text>
+<text class="lbl" x="466" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<text class="lbl" x="466" y="152" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="572" cy="120" rx="61.8" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="572" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">credit given</text>
+<path d="M505.0 120.0L510.2 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Customer sponsorship. One entity set, two roles, and the discount credit recorded against each individual act of sponsoring.</figcaption></figure>
+<p><strong>Step 1 &mdash; one entity set.</strong> Sponsors are customers, so
+<b>sponsor</b> is a recursive relationship on <b>customer</b>, exactly as "is
+mother" was recursive on persons. <b>code</b> is the key.</p>
+<p><strong>Step 2 &mdash; the role names.</strong> <b>sponsoring</b> and
+<b>sponsored</b>. Without them the diagram cannot say which end is which, and the
+1 and the <var>M</var> become meaningless.</p>
+<p><strong>Step 3 &mdash; the ratio, from one phrase.</strong> "designate
+<em>one</em> of other customers as their sponsor" &mdash; at most one sponsor per
+customer, so 1 on the sponsoring side, <var>M</var> on the sponsored side. A
+customer may sponsor many.</p>
+<p><strong>Step 4 &mdash; participation.</strong> Partial on both sides, and the
+parenthesis "(if they so desire)" is what tells you. Sponsorship is optional; a
+customer with no sponsor must be storable, and so must a customer who has never
+sponsored anyone.</p>
+<p><strong>Step 5 &mdash; the credit.</strong> "given away to all individual
+instances of sponsorship" &mdash; an instance of sponsorship <em>is</em> a
+relationship instance, so <b>credit given</b> is an attribute of <b>sponsor</b>.
+The problem could hardly say so more explicitly, and it is still the step most
+often missed.</p>
+</div></details>
+
+<h3>The course schedule</h3>
+
+<p>Dangerous Professor is making the course schedule for the entire Department of
+Computer Science, as her service duty. Instructors are identified by social
+security number and courses by course number.</p>
+
+<details class="prob"><summary data-label="Exercise 1.13">Based on the instructors' recommendations and those of the Chair (who urges all instructors to be prepared to teach as many different courses as possible), the Professor records the eligibility of individual instructors to teach specific courses. She identifies each course by number, and writes down its name and number of credit hours. Whenever an instructor is able to teach a certain course, the Professor makes a note of it, recording also the number of sections of that course that the instructor has ever taught for the Department in the past, as well as the year when they taught one such section for the first time. Additionally, every instructor is welcome to name one classroom as their favorite, and the Professor is willing to bear their preference in mind. Each classroom has a College-wide unique room number, and the Professor keeps track of the capacity of each classroom.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 678 395" role="img" aria-label="ER diagram of instructors, courses and classrooms">
+<ellipse cx="110" cy="38" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="110" y="38" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecNum</text>
+<rect x="49.5" y="93" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="110" y="112" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">instructor</text>
+<path d="M110.0 55.0L110.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="275,50 330,23 385,50 330,77" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="330" y="50" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">likes</text>
+<path d="M170.5 98.8L275.0 50.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="234.44" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="444.05" y="93" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="112" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">classroom</text>
+<ellipse cx="500" cy="38" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="500" y="38" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">roomNumber</text>
+<path d="M500.0 55.0L500.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M385.0 50.0L462.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="410" y="86" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="622" cy="112" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="622" y="112" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">capacity</text>
+<path d="M575.8 112.0L556.0 112.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="269.1,235 330,208 390.9,235 330,262" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="330" y="235" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">can teach</text>
+<path d="M110.0 131.0L110.0 235.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M110.0 235.0L269.1 235.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="200.75" y="220" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="95" y="301" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="150" y="320" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">course</text>
+<path d="M295.2 246.6L200.0 301.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="238.25" y="264.05" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="520" cy="213" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="520" y="213" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">year</text>
+<path d="M374.5 227.7L475.0 213.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="528" cy="272" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="528" y="272" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;"># sections</text>
+<path d="M372.0 243.4L474.0 272.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="70" cy="368" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="368" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M70.0 351.0L120.0 339.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="185" cy="368" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="185" y="368" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">number</text>
+<path d="M185.0 351.0L160.0 339.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="300" cy="356" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="300" y="356" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">hours</text>
+<path d="M300.0 339.0L194.7 339.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>The course schedule, part one: who may teach what, and who prefers which room. <b>year</b> and <b>#&nbsp;sections</b> describe an instructor&rsquo;s history with one course, so they sit on <b>can teach</b>.</figcaption></figure>
+<p><strong>Step 1 &mdash; three entity sets, three keys.</strong>
+<b>instructor</b> keyed by <b>socSecNum</b>, <b>course</b> by <b>number</b>,
+<b>classroom</b> by <b>roomNumber</b>. Every one of the three keys is stated in
+the text; none of them is your invention.</p>
+<p><strong>Step 2 &mdash; eligibility is a relationship, not an attribute.</strong>
+"Whether instructor <var>i</var> can teach course <var>c</var>" is a fact about a
+pair, and many instructors relate to many courses:
+<var>M</var>&nbsp;:&nbsp;<var>N</var>, drawn as <b>can teach</b>. Participation is
+partial on both sides &mdash; a new instructor eligible for nothing yet, a course
+nobody is eligible for.</p>
+<p><strong>Step 3 &mdash; and its attributes.</strong> "the number of sections
+<em>of that course</em> that <em>the instructor</em> has ever taught" names both
+entities in one breath, so <b>#&nbsp;sections</b> sits on the relationship. So
+does <b>year</b>, for the same reason: it is the year that instructor first taught
+that course. Hanging either one on <b>course</b> or on <b>instructor</b> would
+lose the pairing and give a wrong answer to an obvious query.</p>
+<p><strong>Step 4 &mdash; the favourite classroom.</strong> "<em>one</em>
+classroom" fixes the ratio at <var>M</var>&nbsp;:&nbsp;1 from instructor to
+classroom, so the <var>M</var> sits on the instructor end of <b>likes</b> and the
+1 on the classroom end. "Every instructor is <em>welcome to</em> name one" makes
+participation partial: an instructor with no favourite is perfectly legal.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.14">The Professor assigns one instructor to each course section. Typically, more than one section of a course is offered. To distinguish between different sections of a single course, the Professor labels them as "A", "B", "C", etc., and settles the meeting time for each section, as well as the maximum number of students that are entitled to enroll.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 655 345" role="img" aria-label="ER diagram of course sections as a weak entity set">
+<ellipse cx="130" cy="35" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecNum</text>
+<rect x="69.5" y="81" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="130" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">instructor</text>
+<path d="M130.0 52.0L130.0 81.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="275,150 330,123 385,150 330,177" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="330" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">assign</text>
+<path d="M130.0 119.0L130.0 150.0L275.0 150.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="170.5" y="135" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="445" y="131" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="450" y="136" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">section</text>
+<path d="M380.5 152.2L445.0 152.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M380.5 147.8L445.0 147.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="415" y="135" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="470" cy="88" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="470" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">letter</text>
+<path d="M470.0 105.0L478.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="88" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">time</text>
+<path d="M600.0 105.0L525.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="218" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="218" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">max</text>
+<path d="M600.0 201.0L525.0 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="75" y="236" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="130" y="255" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">course</text>
+<ellipse cx="130" cy="315" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="315" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">number</text>
+<path d="M130.0 298.0L130.0 274.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="275,255 330,228 385,255 330,282" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="282,255 330,235 378,255 330,275" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="330" y="255" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">has</text>
+<path d="M185.0 255.0L275.0 255.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="230" y="240" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M380.9 257.0L502.2 257.2L502.2 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M380.9 253.0L497.8 252.8L497.8 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="414.5" y="240" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>The course schedule, part two. A <b>section</b> cannot be identified without its course &mdash; &ldquo;section A&rdquo; means nothing on its own &mdash; so it is weak, and <b>letter</b> is a partial key.</figcaption></figure>
+<p><strong>Step 1 &mdash; why <b>section</b> is weak.</strong> The labels are "A",
+"B", "C" &mdash; and every course has a section A. "Section A" identifies nothing
+on its own; only "section A <em>of CSCI 331</em>" does. So <b>section</b> is a
+weak entity set, <b>letter</b> is its partial key (dashed underline), and
+<b>has</b> is the identifying relationship, drawn as a double diamond. This is the
+single most important judgement in the exercise, and the phrase "to distinguish
+between different sections of <em>a single course</em>" is what settles it.</p>
+<p><strong>Step 2 &mdash; the constraints on <b>has</b>.</strong> One course has
+many sections, so 1&nbsp;:&nbsp;<var>M</var>. Participation on the section side is
+<em>total</em>, drawn double &mdash; and it is not a judgement call: a weak entity
+that is not related to an owner cannot be identified, so the total line always
+comes with the double diamond.</p>
+<p><strong>Step 3 &mdash; the attributes of a section.</strong> <b>time</b> and
+<b>max</b> are settled per section, so they go on <b>section</b>.</p>
+<p><strong>Step 4 &mdash; assigning the instructor.</strong> "assigns
+<em>one</em> instructor to <em>each</em> section" is both constraints in five
+words: ratio 1&nbsp;:&nbsp;<var>M</var>, and total participation on the section
+side, since every section gets one. An instructor with no sections this term is
+fine, so that side stays partial.</p>
+<div class="box note"><span class="bt">Two owners, one weak set</span>
+<p>Notice that <b>section</b> is related to both <b>course</b> and
+<b>instructor</b>, but only <b>has</b> is an identifying relationship. Being
+related to something does not make it an owner; the owner is the entity set whose
+key you need in order to tell two weak entities apart. Swapping the instructor in
+week three does not change which section it is.</p></div>
+</div></details>
+
+<h3>Midnight Candle</h3>
+
+<p>Midnight Candle is a chain of popular libraries with excellent reputation
+nation-wide, operating at least one branch office in almost every town in the
+country.</p>
+
+<details class="prob"><summary data-label="Exercise 1.15">Branch offices are identified by name, and the information kept on file about each office contains the address of the office, one phone number, one Web URL, and the area (in square feet) of the available shelf space. The library owns many copies of each book, and these copies travel among branch offices, as the need arises. The library identifies books by ISBN number, and records the title of each book. Copies of the same book are distinguished by copy number, assigned internally. For each copy, the library keeps a numerical grade that describes visual appeal of that copy. The library needs to know the current location (branch office) of each copy of each book, as well as the day when the branch office received the copy.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="-20 0 693 360" role="img" aria-label="ER diagram of library branches, book copies and books">
+<rect x="65" y="131" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="120" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">branch</text>
+<ellipse cx="120" cy="42" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="42" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M120.0 59.0L110.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="248" cy="40" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="248" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M248.0 57.0L150.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="40" cy="96" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="40" y="96" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M40.0 113.0L88.7 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="35" cy="216" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="35" y="216" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">URL</text>
+<path d="M35.0 199.0L90.4 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="150" cy="232" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="150" y="232" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">area</text>
+<path d="M150.0 215.0L128.0 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="275,150 330,123 385,150 330,177" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="330" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">in</text>
+<path d="M175.0 150.0L275.0 150.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="225" y="135" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="445" y="131" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="450" y="136" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">copy</text>
+<path d="M380.5 152.2L445.0 152.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M380.5 147.8L445.0 147.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="415" y="135" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="340" cy="78" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="340" y="78" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">date</text>
+<path d="M340.0 95.0L330.0 123.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="500" cy="74" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="500" y="74" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">copy #</text>
+<path d="M500.0 91.0L500.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="216" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="216" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">grade</text>
+<path d="M600.0 199.0L530.0 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="445,250 500,223 555,250 500,277" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="452,250 500,230 548,250 500,270" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="250" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">of</text>
+<path d="M497.8 169.0L497.8 224.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M502.2 169.0L502.2 224.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="484" y="196" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="445" y="311" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="500" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">book</text>
+<path d="M500.0 277.0L500.0 311.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="486" y="294" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="360" cy="330" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="360" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">ISBN</text>
+<path d="M405.0 330.0L445.0 330.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="618" cy="330" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="618" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">title</text>
+<path d="M555.0 330.0L573.0 330.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Midnight Candle: books and their physical copies. A <b>copy</b> is weak twice over in spirit but weak once in the notation &mdash; its <b>copy&nbsp;#</b> is unique only within one book.</figcaption></figure>
+<p><strong>Step 1 &mdash; three entity sets, and one of them is weak.</strong>
+"Copies of the same book are distinguished by copy number" &mdash; distinguished
+<em>among copies of the same book</em>, so copy 3 of one title and copy 3 of
+another are different copies with the same number. <b>copy</b> is weak,
+<b>copy&nbsp;#</b> is its partial key, and <b>book</b> (keyed by <b>ISBN</b>) is
+the owner through a double diamond.</p>
+<p><strong>Step 2 &mdash; branch offices.</strong> Keyed by <b>name</b>, with
+<b>address</b>, <b>phone&nbsp;#</b>, <b>URL</b> and <b>area</b>. Note "one phone
+number, one Web URL": simple attributes, stated as such, in deliberate contrast
+with the multivalued phone numbers elsewhere in the problem book. The text tells
+you the cardinality of every attribute if you read it for that.</p>
+<p><strong>Step 3 &mdash; location as a relationship.</strong> The current
+location is a branch office, and the office changes over time, so it is a
+relationship <b>in</b>, not an attribute. "the current location of each copy" is
+<em>one</em> office per copy: ratio <var>M</var>&nbsp;:&nbsp;1 from copy to
+branch, and participation total on the copy side &mdash; every copy is physically
+somewhere.</p>
+<p><strong>Step 4 &mdash; the day received.</strong> It is the day <em>that
+office</em> received <em>that copy</em>, so <b>date</b> belongs to <b>in</b>.
+Since the ratio is <var>M</var>&nbsp;:&nbsp;1 it could be moved onto <b>copy</b>
+without loss, as in Exercise 1.9 &mdash; and here, as there, the relationship is
+where it says what it means.</p>
+<div class="box warn"><span class="bt">What this design cannot do</span>
+<p>It records where each copy is <em>now</em>, and when it arrived there. It does
+not record where the copy has <em>been</em>: the moment a copy moves, the old
+(branch, date) pair is overwritten and the history is gone. If the library wanted
+the travel history, one relationship instance per stay would be needed &mdash;
+which in this notation means a weak entity set <b>stay</b>, owned by the copy and
+partially keyed by the arrival date. Worth noticing that the specification, as
+written, does not ask for it.</p></div>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.16">Branch offices of Midnight Candle sell various items, for convenience of its diligent readers (such as reading lamps, tables, chairs, book-marks, candy, etc.) The library keeps a detailed catalog of these items, identifying them by item number (assigned internally). Each item has a name, a short description of its purpose, and sometimes one or more photographs. The library purchases these items from various suppliers, whose company names and addresses are stored. For each purchase of each item, a purchase order is generated with a unique order number, listing the supplier, item, number of units bought, price per unit, and the due delivery date.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 741 230" role="img" aria-label="ER diagram of items, purchase orders and suppliers">
+<rect x="40" y="91" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="95" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:16px;font-weight:600;">item</text>
+<polygon points="195,110 250,83 305,110 250,137" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="250" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">for</text>
+<rect x="345" y="91" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="400" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:16px;font-weight:600;">order</text>
+<polygon points="495,110 550,83 605,110 550,137" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="550" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">from</text>
+<rect x="621" y="91" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="676" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:16px;font-weight:600;">supplier</text>
+<path d="M150.0 110.0L195.0 110.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="172.5" y="95" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M305.0 110.0L345.0 110.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="325" y="95" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M455.0 110.0L495.0 110.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="475" y="95" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M605.0 110.0L621.0 110.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="613" y="95" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="60" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;text-decoration:underline;">number</text>
+<path d="M60.0 62.0L78.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="175" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="175" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">name</text>
+<path d="M175.0 62.0L115.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="60" cy="178" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="60" cy="178" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="178" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">photo</text>
+<path d="M60.0 161.0L80.0 129.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="180" cy="180" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="180" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">descript.</text>
+<path d="M180.0 163.0L115.0 129.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="355" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="355" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">units</text>
+<path d="M355.0 62.0L378.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="465" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="465" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">price</text>
+<path d="M465.0 62.0L420.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="350" cy="180" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="350" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">dueDate</text>
+<path d="M350.0 163.0L380.0 129.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="470" cy="182" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="470" y="182" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;text-decoration:underline;">number</text>
+<path d="M470.0 165.0L422.0 129.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="640" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="640" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M640.0 62.0L650.0 91.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="645" cy="180" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="645" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:400;">address</text>
+<path d="M645.0 163.0L655.0 129.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Midnight Candle&rsquo;s side trade. One purchase order names one item and one supplier, so both relationships are M&nbsp;:&nbsp;1 and the order carries units, price and due date itself.</figcaption></figure>
+<p><strong>Step 1 &mdash; the purchase order is an entity set.</strong> It has a
+unique order number of its own, so it is identified without reference to anything
+else &mdash; a strong entity set, not a relationship and not a weak set. Students
+who model the purchase as an <var>M</var>&nbsp;:&nbsp;<var>N</var> relationship
+between item and supplier lose the ability to place two separate orders for the
+same item from the same supplier, which is an ordinary thing to want to do.</p>
+<p><strong>Step 2 &mdash; "sometimes one or more photographs".</strong> A set,
+possibly empty: <b>photo</b> is multivalued. Same phrase-reading as the parking
+garages in Exercise 1.10.</p>
+<p><strong>Step 3 &mdash; two relationships, both functional.</strong> One order
+lists one supplier and one item, so <b>for</b> and <b>from</b> are each
+<var>M</var>&nbsp;:&nbsp;1 out of <b>order</b> &mdash; the <var>M</var> on each
+order end, the 1 on <b>item</b> and on <b>supplier</b>. Participation is total on
+the order side &mdash; an order
+naming no item or no supplier is not an order &mdash; and partial on the other
+two, since a catalogued item need never have been ordered.</p>
+<p><strong>Step 4 &mdash; where units, price and due date go.</strong> On
+<b>order</b>. Because both relationships are functional out of the order, each
+order has exactly one item and one supplier, so these values are facts about the
+order itself; there is nothing to be gained by hanging them on a diamond. Compare
+Exercise 1.8, where the price genuinely could not live on either entity set
+&mdash; the difference is that there was no order entity there to carry it.</p>
+</div></details>
+
+<h3>Two more</h3>
+
+<details class="prob"><summary data-label="Exercise 1.17">The personnel office at a college maintains a faculty database. The office records the name, social security number, rank and salary of every professor. Each professor belongs to one department, considered as his main affiliation, but may belong to others as well. The office keeps track of all these affiliations. The office needs to know the names of all departments, and the room number and phone number of each department office. Every department has a single chair-person (who is also a professor.) Whereas a department chair, as a professor, may belong to several departments, he can be a chairman of only one of them.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -1 620 363" role="img" aria-label="ER diagram of professors, departments, membership and chairing">
+<rect x="254.05" y="71" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="310" y="90" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">professor</text>
+<ellipse cx="105" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="105" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M105.0 49.0L255.0 71.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="240" cy="26" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="240" y="26" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">soc.sec. #</text>
+<path d="M240.0 43.0L288.0 71.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="370" cy="26" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="370" y="26" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">rank</text>
+<path d="M370.0 43.0L332.0 71.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="500" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="500" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M500.0 49.0L362.0 71.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="140,200 195,173 250,200 195,227" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="195" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">member</text>
+<polygon points="375,200 430,173 485,200 430,227" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="430" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">chair</text>
+<rect x="249.5" y="281" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="310" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">department</text>
+<path d="M267.3 109.0L216.2 183.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M272.7 109.0L220.2 185.3" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="233" y="147.4" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M216.1 216.6L269.1 281.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M220.2 214.6L274.9 281.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="237.5" y="254" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M350.0 109.0L407.5 184.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="391.2" y="147.4" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M405.5 215.0L347.1 281.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M409.6 217.0L352.9 281.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="387" y="254" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="120" cy="300" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M165.0 300.0L249.5 300.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="500" cy="288" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="500" y="288" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">room #</text>
+<path d="M370.5 292.3L455.0 288.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="505" cy="335" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="505" y="335" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M370.5 314.5L460.0 335.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Two different relationships between the same pair of entity sets. <b>member</b> records every affiliation; <b>chair</b> records the one professor who runs each department.</figcaption></figure>
+<p><strong>Step 1 &mdash; two entity sets, two relationships between them.</strong>
+That is the shape of this problem, and it is the thing to recognise. <b>member</b>
+records affiliation; <b>chair</b> records who runs the department. Two different
+facts about the same pair of entity sets need two diamonds &mdash; merging them
+into one relationship with a "role" attribute would make the 1:1 constraint on
+chairing inexpressible.</p>
+<p><strong>Step 2 &mdash; <b>member</b>.</strong> A professor belongs to one
+department and "may belong to others as well", and a department plainly has many
+professors: <var>M</var>&nbsp;:&nbsp;<var>N</var>. Participation is total on both
+sides &mdash; every professor belongs to at least one department, and a department
+with no members is not a department.</p>
+<p><strong>Step 3 &mdash; <b>chair</b>.</strong> "a single chair-person" and "he
+can be a chairman of only one of them" give 1&nbsp;:&nbsp;1 in both directions.
+Participation is total on the department side (every department has a chair) and
+partial on the professor side (most professors chair nothing).</p>
+<p><strong>Step 4 &mdash; the question the problem book asks about this
+diagram.</strong> <em>Which aspect of the specification is not implemented by this
+design?</em> The <b>main affiliation</b>. The text says each professor belongs to
+one department "considered as his main affiliation", plus others; the diagram
+records the affiliations as an undifferentiated <var>M</var>&nbsp;:&nbsp;<var>N</var>
+set and loses which one is primary.</p>
+<p>Two honest repairs. Add a boolean-valued attribute <b>is main</b> to
+<b>member</b> &mdash; cheap, but the constraint "exactly one per professor" cannot
+be drawn in this notation and would have to be written beside the diagram. Or add
+a third relationship <b>main affiliation</b>, 1&nbsp;:&nbsp;<var>M</var> from
+department to professor and total on the professor side, which does state the
+constraint in the diagram at the cost of a redundancy: every main affiliation is
+also a membership, and nothing in the diagram forces the two to agree.</p>
+<p>Either way, the discipline is the one this whole set is built around: when the
+notation cannot say something the specification requires, say so explicitly rather
+than letting the diagram quietly drop the requirement.</p>
+</div></details>
+
+<h3>Two big ones</h3>
+
+<p>The last two are larger than anything above: one asks you to put two diagrams
+you have already drawn into a single picture, the other builds six entity sets
+from scratch. Give each of them a full sheet of paper and expect to redraw once.
+There is no trick in either &mdash; only more of the same decisions, and more
+chances to make one of them silently.</p>
+
+<details class="prob"><summary data-label="Exercise 1.18">Draw a complete ER diagram for the whole course-schedule database &mdash; the eligibility of instructors to teach courses, their favourite classrooms, and the sections with their assigned instructors &mdash; that is, one diagram covering everything specified in Exercises 1.13 and 1.14 together.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 765 497" role="img" aria-label="Complete ER diagram of the department course schedule">
+<ellipse cx="120" cy="40" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecNum</text>
+<rect x="59.5" y="93" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="120" y="112" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">instructor</text>
+<path d="M120.0 57.0L120.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="295,48 350,21 405,48 350,75" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="48" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">likes</text>
+<path d="M180.5 98.8L295.0 48.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="234" y="61" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="524.05" y="93" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="580" y="112" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">classroom</text>
+<ellipse cx="580" cy="40" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">roomNumber</text>
+<path d="M580.0 57.0L580.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M405.0 48.0L532.5 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="450" y="80" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="700" cy="170" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="700" y="170" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">capacity</text>
+<path d="M700.0 153.0L615.0 131.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="194.1,235 255,208 315.9,235 255,262" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="255" y="235" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">can teach</text>
+<path d="M120.0 131.0L120.0 235.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M120.0 235.0L194.1 235.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="148.4" y="221" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="420" cy="210" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="420" y="210" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">year</text>
+<path d="M303.8 229.7L375.0 210.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="425" cy="268" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="425" y="268" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;"># sections</text>
+<path d="M300.0 242.0L371.0 268.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="525,235 580,208 635,235 580,262" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="580" y="235" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">assign</text>
+<path d="M175.0 131.0L175.0 165.0L490.0 165.0L490.0 235.0L525.0 235.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="501.5" y="220" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="65" y="386" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="120" y="405" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">course</text>
+<path d="M230.7 251.2L160.0 386.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="180.96" y="311.18" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="60" cy="462" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="462" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M60.0 445.0L100.0 424.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="185" cy="464" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="185" y="464" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">number</text>
+<path d="M185.0 447.0L140.0 424.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="320" cy="470" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="320" y="470" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">hours</text>
+<path d="M320.0 453.0L162.8 424.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="525" y="386" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="530" y="391" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="580" y="405" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">section</text>
+<path d="M577.8 260.9L577.8 386.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M582.2 260.9L582.2 386.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="564" y="324" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="700" cy="345" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="700" y="345" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">letter</text>
+<path d="M700.0 362.0L615.0 386.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="710" cy="405" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="710" y="405" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">time</text>
+<path d="M665.0 405.0L635.0 405.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="700" cy="462" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="700" y="462" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">max</text>
+<path d="M700.0 445.0L615.0 424.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="295,405 350,378 405,405 350,432" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="302,405 350,385 398,405 350,425" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="405" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">has</text>
+<path d="M175.0 405.0L295.0 405.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="235" y="391" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M400.5 407.2L525.0 407.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M400.5 402.8L525.0 402.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="465" y="391" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>The complete course schedule: Exercises 1.13 and 1.14 in one diagram. <b>section</b> is weak with respect to <b>course</b> only &mdash; the instructor may change without changing which section it is.</figcaption></figure>
+<p><strong>The point of the exercise.</strong> Combining two correct diagrams is
+not copying them side by side. Four things have to be settled that neither half
+had to settle on its own.</p>
+<p><strong>1. One <b>instructor</b> box, one <b>course</b> box.</strong> Each
+appeared in both halves; each appears once here. Every relationship that touched
+either one now touches the same box, which is what makes the diagram a single
+schema rather than two.</p>
+<p><strong>2. <b>instructor</b> now carries three relationships</strong> &mdash;
+<b>likes</b>, <b>can teach</b> and <b>assign</b> &mdash; and they say different
+things. Eligibility (<b>can teach</b>) is a standing fact; assignment
+(<b>assign</b>) is this term's decision. A student who merges them loses the
+ability to record an instructor who is eligible for a course but not teaching it
+this term, which is most of the table.</p>
+<p><strong>3. <b>section</b> is weak with respect to <b>course</b> only.</strong>
+It is related to <b>instructor</b> as well, but that relationship is not
+identifying and is drawn with a single diamond. Changing who teaches section A in
+week three does not make it a different section; changing the course would. The
+owner is whichever entity set you need the key of in order to tell two sections
+apart, and here that is <b>course</b>.</p>
+<p><strong>4. Nothing new is invented.</strong> Every attribute, ratio and
+participation line is exactly the one the two halves already justified. If
+anything changed when you merged, one of the two halves was wrong &mdash; go back
+and find which.</p>
+<div class="box note"><span class="bt">On laying out a big diagram</span>
+<p>Place the entity sets first, in a rough grid, with the ones that relate to each
+other near each other; add the relationship diamonds on the lines between them;
+hang the attributes off the outside edges last, pointing away from the centre.
+Crossing lines are allowed and sometimes unavoidable &mdash; but if your diagram
+has many, the boxes are usually in the wrong order, and moving one is quicker
+than redrawing thirty lines.</p></div>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 1.19">Draw a complete ER diagram for the <strong>bibliography database</strong>. Dangerous Professor keeps track of a variety of topics that occur in the subject matter of various courses taught by her. Topics are identified by unique names, in the Professor's own naming scheme. Each topic is classified as belonging to one or more subject areas &mdash; graph algorithms, for instance, is one area in which the topic of topological sorting appears. The Professor assigns an overall significance grade to each topic. An individual topic may appear in any number of books. The Professor needs to know all the books that address a given topic, and she assigns a number that estimates how well an individual book presents the given topic. Books are identified by ISBN, and the Professor stores the title, author, and year of publication of each book. The Professor teaches one or more sections of a certain number of courses in her department. Courses are identified by name (e.g. databases). Each section, at a given time, is identified by its 4-digit code (such as 0951 in the Spring of 2002). The Professor numbers the lectures in an individual course offering, and assigns one topic to each lecture, though this assignment varies from semester to semester, and even from section to section, when she teaches multiple sections of the same course.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="-2 0 768 579" role="img" aria-label="ER diagram of the bibliography database: subjects, topics, textbooks, courses, sections and lectures">
+<rect x="160" y="73" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="215" y="92" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">subject</text>
+<ellipse cx="215" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M215.0 49.0L215.0 73.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="160,190 215,163 270,190 215,217" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="215" y="190" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">under</text>
+<path d="M215.0 111.0L215.0 163.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="200" y="137" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="160" y="269" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="215" y="288" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">topic</text>
+<path d="M215.0 217.0L215.0 269.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="200" y="243" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">N</text>
+<ellipse cx="70" cy="245" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="245" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M115.0 245.0L160.0 279.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="70" cy="320" rx="61.8" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="320" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">significance</text>
+<path d="M131.8 320.0L160.0 297.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="158.2,388 215,361 271.8,388 215,415" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="215" y="388" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">coverage</text>
+<path d="M215.0 307.0L215.0 361.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="200" y="334" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="160" y="467" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="215" y="486" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">textbook</text>
+<path d="M215.0 415.0L215.0 467.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="200" y="441" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">N</text>
+<ellipse cx="370" cy="430" rx="61.8" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="370" y="430" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">presentation</text>
+<path d="M245.0 400.7L308.2 430.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="70" cy="430" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="430" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">ISBN</text>
+<path d="M115.0 430.0L160.0 470.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="70" cy="505" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="505" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">author</text>
+<path d="M115.0 505.0L160.0 486.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="215" cy="552" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="552" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">title</text>
+<path d="M215.0 535.0L215.0 505.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="390" cy="522" rx="65.7" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="390" y="522" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">yearPublished</text>
+<path d="M324.3 522.0L270.0 496.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="545" y="73" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="550" y="78" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="92" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">lecture</text>
+<ellipse cx="455" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="455" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">number</text>
+<path d="M500.0 32.0L552.5 73.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="545,190 600,163 655,190 600,217" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="552,190 600,170 648,190 600,210" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="190" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">contain</text>
+<path d="M597.8 111.0L597.8 164.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M602.2 111.0L602.2 164.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="584" y="137" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="545" y="269" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="550" y="274" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="288" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">section</text>
+<path d="M600.0 217.0L600.0 269.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="586" y="243" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="455" cy="230" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="455" y="230" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">4digitCode</text>
+<path d="M509.0 230.0L545.0 274.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="700" cy="230" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="700" y="230" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">year</text>
+<path d="M700.0 247.0L635.8 269.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="710" cy="340" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="710" y="340" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">semester</text>
+<path d="M710.0 323.0L635.8 307.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="545,388 600,361 655,388 600,415" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="552,388 600,368 648,388 600,408" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="388" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">offered</text>
+<path d="M597.8 307.0L597.8 362.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M602.2 307.0L602.2 362.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="584" y="334" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="545" y="467" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="486" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">course</text>
+<path d="M600.0 415.0L600.0 467.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="586" y="441" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="600" cy="546" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="546" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M600.0 529.0L600.0 505.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="351.2,120 408,93 464.8,120 408,147" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="408" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">syllabus</text>
+<path d="M545.0 92.0L464.8 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="499.9" y="93.4" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M369.1 128.5L264.6 269.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="292" y="182" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+</svg>
+<figcaption>The bibliography database. Six entity sets, two of them weak and nested &mdash; a lecture is identified within a section, which is itself identified within a course.</figcaption></figure>
+<p><strong>Step 1 &mdash; find the entity sets.</strong> Six:
+<b>subject</b>, <b>topic</b>, <b>textbook</b>, <b>course</b>, <b>section</b> and
+<b>lecture</b>. The keys the text gives you are <b>topic.name</b> ("identified by
+unique names"), <b>textbook.ISBN</b> and <b>course.name</b>. Subject areas are
+named, so <b>subject.name</b> is the key.</p>
+<p><strong>Step 2 &mdash; the two M&nbsp;:&nbsp;N relationships.</strong> A topic
+belongs to "one or more" subject areas and a subject area holds many topics, so
+<b>under</b> is <var>M</var>&nbsp;:&nbsp;<var>N</var>, total on the topic side.
+A topic appears in any number of books and a book addresses many topics, so
+<b>coverage</b> is <var>M</var>&nbsp;:&nbsp;<var>N</var> too &mdash; and the
+number estimating "how well an individual book presents the given topic" is
+determined by the pair, so <b>presentation</b> hangs off that diamond. Same test
+as the pharmacy in Exercise 1.8.</p>
+<p><strong>Step 3 &mdash; two weak entity sets, nested.</strong> This is the spine
+of the diagram.</p>
+<ul>
+<li>A section is identified by a 4-digit code "at a given time" &mdash; codes are
+reused across terms and courses, so <b>section</b> is weak, owned by
+<b>course</b> through <b>offered</b>, with <b>4digitCode</b> as its partial key
+and <b>year</b> and <b>semester</b> as ordinary attributes.</li>
+<li>Lectures are <em>numbered within</em> an offering &mdash; every section has a
+lecture 1 &mdash; so <b>lecture</b> is weak in turn, owned by <b>section</b>
+through <b>contain</b>, partially keyed by <b>number</b>.</li>
+</ul>
+<p>A lecture is therefore identified by (course name, 4-digit code, number): a
+weak entity set whose owner is itself weak inherits the whole chain. Both
+identifying relationships get a double diamond and a double line on the weak side.</p>
+<p><strong>Step 4 &mdash; where the topic attaches, and why it matters.</strong>
+The obvious wrong answer is to relate <b>topic</b> to <b>course</b>: courses are
+about topics, after all. But read the last sentence again. The assignment "varies
+from semester to semester, and even from section to section" &mdash; so the thing
+that has one topic is not the course, and not even the section, but the
+individual <b>lecture</b>. <b>syllabus</b> is
+<var>M</var>&nbsp;:&nbsp;1 from lecture to topic: one topic per lecture, a topic
+used in many lectures.</p>
+<p>That single decision is what the whole problem is built to test, and it is the
+reason the lectures had to be modelled at all. Attach the topic to the course and
+the database can no longer answer "what did I actually cover in section 0951 last
+spring?", which is the question the Professor is keeping the database for.</p>
+<div class="box warn"><span class="bt">A check worth running on any big diagram</span>
+<p>For each entity set, ask what a single entity of it is, out loud, in one
+sentence: "a lecture is the <var>n</var>-th meeting of one section of one course".
+If the sentence needs the word <em>and</em> to hold two unrelated things together,
+the box is doing two jobs and should be split. If you cannot say the sentence
+without naming another entity set, the box is weak &mdash; and if you have not
+drawn a double diamond, you have a bug.</p></div>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Every diagram on this page is a specification waiting to become tables. The
+mapping is mechanical &mdash; each entity set becomes a relation, each
+1&nbsp;:&nbsp;<var>M</var> relationship becomes a foreign key on the
+<var>M</var> side, each <var>M</var>&nbsp;:&nbsp;<var>N</var> relationship becomes
+a relation of its own carrying both keys plus the relationship's attributes, and a
+weak entity set takes its owner's key into its own primary key. Once you have seen
+that mapping, the constraints on this page stop being notation and start being
+the difference between a schema that can hold a wrong state and one that cannot.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="index.html"><span>Previous</span>Practice and resources</a>
+      <a class="next" aria-disabled="true"><span>Next</span>&mdash;</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
