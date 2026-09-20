@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 2 — EER: subclasses and specialization</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 2 &middot; EER modeling</span>
+  <nav class="topnav">
+    <a href="ex-er.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a aria-disabled="true">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#sub"><span class="t">2.1</span>Subclasses and inheritance</a></li>
+    <li><a href="#cons"><span class="t">2.2</span>The two constraints</a></li>
+    <li><a href="#attach"><span class="t">2.3</span>What attaches where</a></li>
+    <li><a href="#notation"><span class="t">2.4</span>The notation on one page</a></li>
+    <li><a href="#exercises"><span class="t">2.5</span>Exercises</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 2 &middot; after the EER lectures</span>
+  <span class="chnum">EER modeling</span>
+  <h1>Subclasses and specialization</h1>
+  <p class="chsum">Everything Set 1 left out: subclasses, superclasses and inheritance;
+  the disjointness and completeness constraints and how to read them off a sentence;
+  and where an attribute or a relationship belongs once a hierarchy exists. Nine
+  exercises, eight of them complete diagrams.</p>
+</div>
+
+<p>The enhanced model adds exactly one idea to the diagrams you drew in Set 1: an
+entity set can have <strong>subclasses</strong>. Everything else &mdash; the
+<b>d</b> and <b>o</b> circles, the double line, the little subset arcs &mdash; is
+notation for saying precisely <em>which</em> subclasses, and how they carve up the
+superclass.</p>
+
+<p>The idea earns its place because of a problem plain ER handles badly. When most
+of an entity set shares one set of attributes, but a minority carries extra ones
+that are <em>meaningless</em> for the rest, plain ER gives you two bad options:
+nullable attributes that nobody can interpret, or a second entity set that
+duplicates everything the two have in common. A subclass is the third option, and
+Set 1 deliberately avoided problems that need it.</p>
+
+<div class="box note"><span class="bt">Where this set comes from</span>
+<p>Several of these problems are the parts of the CSCI 331 problem book that Set 1
+skipped, precisely because they needed a subclass. If a scenario here feels
+familiar &mdash; the hospital, Rotund Trend, the course schedule, Midnight Candle
+&mdash; it is the same enterprise seen from the angle plain ER could not
+handle.</p></div>
+
+<h2 id="sub"><span class="secnum">2.1</span>Subclasses and inheritance</h2>
+
+<p>A <strong>subclass</strong> is a subset of an entity set, distinguished by its
+own special attributes and relationships. The entity set it is drawn from is the
+<strong>superclass</strong>, and the relationship between them is often written
+<em>is-a</em>: a physician <em>is a</em> medical professional.</p>
+
+<p>Two consequences follow, and both get used in every exercise below.</p>
+
+<ul>
+<li><strong>Inheritance.</strong> A subclass entity has every attribute of the
+superclass and takes part in every relationship the superclass takes part in.
+You never repeat an inherited attribute on the subclass &mdash; writing
+<b>name</b> on both <b>employee</b> and <b>physician</b> is not extra detail, it is
+a claim that a physician has two names.</li>
+<li><strong>Identity.</strong> A subclass entity <em>is</em> a superclass entity,
+not a copy of one. It needs no key of its own: it is identified by the
+superclass's key. This is what separates a subclass from a weak entity set, which
+is a different thing with its own partial key.</li>
+</ul>
+
+<div class="box warn"><span class="bt">When a subclass is <em>not</em> the answer</span>
+<p>The test is whether the extra attributes are <em>meaningless</em> outside the
+subclass, not merely unknown or usually empty. A patient's discharge date is
+unknown while they are still admitted &mdash; that is a null, not a subclass. A
+nurse's certifying agency has no meaning at all for an administrator &mdash; that
+is a subclass. Getting this backwards produces hierarchies three levels deep that
+model nothing, and is the most common way to over-use the notation.</p></div>
+
+<h2 id="cons"><span class="secnum">2.2</span>The two constraints</h2>
+
+<p>A specialization carries two constraints, and &mdash; exactly like cardinality
+and participation in Set 1 &mdash; they are independent of each other. Read each
+one off its own sentence in the narrative.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>constraint</th><th>notation</th><th>reading</th><th>the question to ask</th></tr></thead>
+<tbody>
+<tr><td>disjoint</td><td>circle marked <b>d</b></td><td>at most one subclass</td><td>can one entity be in two?</td></tr>
+<tr><td>overlapping</td><td>circle marked <b>o</b></td><td>any number of subclasses</td><td>&nbsp;</td></tr>
+<tr><td>total</td><td>double line to the circle</td><td>every entity is in some subclass</td><td>can one entity be in none?</td></tr>
+<tr><td>partial</td><td>single line to the circle</td><td>an entity may be in none</td><td>&nbsp;</td></tr>
+</tbody></table></div>
+
+<p>All four combinations occur. "Employees are either administrators or medical
+professionals" is disjoint and total. "A university may be strong in the sciences,
+the arts, both, or neither" is overlapping and partial. Nothing about the first
+constraint tells you the second.</p>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 200" role="img" aria-label="Disjoint specialization of vehicle into auto-bus and bicycle">
+<rect x="245" y="11" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">vehicle</text>
+<path d="M300.0 49.0L300.0 77.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="300" cy="88" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="300" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M292.2 95.8L179.0 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M307.8 95.8L421.0 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M206 127.8A9 9 0 0 0 224 127.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M376 127.8A9 9 0 0 0 394 127.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="105" y="149" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="160" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">auto-bus</text>
+<rect x="385" y="149" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">bicycle</text>
+</svg>
+<figcaption>A disjoint specialization with optional participation: the single line above the <b>d</b> circle says a vehicle need not be either one.</figcaption></figure>
+
+<details class="qc"><summary data-label="Check 2.1">A specialization has exactly one subclass &mdash; stores, of which some are discount stores. Is it disjoint or overlapping?</summary><div class="sol">
+<p>The question does not arise. Disjointness is a constraint <em>between</em>
+subclasses, so with only one subclass there is nothing to constrain, and
+<b>d</b> and <b>o</b> say exactly the same thing. The problem book writes
+<b>o</b> in this situation (Exercise 2.9); <b>d</b> would be equally correct.</p>
+<p>The completeness constraint still matters, though, and is still a real choice:
+a single line says some stores are not discount stores, a double line would claim
+they all are.</p>
+</div></details>
+
+<h2 id="attach"><span class="secnum">2.3</span>What attaches where</h2>
+
+<p>Once a hierarchy exists, every attribute and every relationship in the
+specification has to be placed at some level of it. The rule is short: <strong>put
+each one at the highest level where it is meaningful for every entity</strong>,
+and no higher.</p>
+
+<ul>
+<li>Meaningful for all employees &mdash; <b>salary</b> &mdash; goes on the
+superclass.</li>
+<li>Meaningful only for nurses &mdash; the certifying <b>agency</b> &mdash; goes
+on that subclass.</li>
+<li>A <em>relationship</em> obeys the same rule. In Exercise 2.8 only graduate
+students hold prior degrees, so <b>holds</b> attaches to <b>graduate</b>, not to
+<b>student</b> &mdash; and that is the whole content of the exercise.</li>
+</ul>
+
+<p>Attaching too high is the commoner error, because it looks harmless: putting
+<b>g.p.a.</b> on <b>student</b> rather than on <b>undergraduate</b> does not lose
+any data, but it silently asserts that a high-school GPA is a meaningful thing to
+record for a doctoral candidate.</p>
+
+<h2 id="notation"><span class="secnum">2.4</span>The notation on one page</h2>
+
+<p>Everything Set 1's notation page had, plus these four. The small arc on each
+branch is the <strong>subset symbol</strong>: it opens towards the subclass and
+says which end of the line is the subset of which.</p>
+
+<div class="grid3">
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 -5 190 127" role="img" aria-label="Disjoint specialization">
+<rect x="60" y="5" width="70" height="30" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="95" y="20" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">A</text>
+<path d="M95.0 35.0L95.0 49.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="95" cy="60" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="95" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M87.2 67.8L49.2 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M102.8 67.8L140.8 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M49 72.8A9 9 0 0 0 67 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M123 72.8A9 9 0 0 0 141 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="13" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="45" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">B</text>
+<rect x="113" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="145" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">C</text>
+</svg>
+<figcaption>Disjoint specialization</figcaption></figure><p><strong>Disjoint</strong><br>at most one subclass each</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 -5 190 127" role="img" aria-label="Overlapping specialization">
+<rect x="60" y="5" width="70" height="30" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="95" y="20" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">A</text>
+<path d="M95.0 35.0L95.0 49.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="95" cy="60" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="95" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M87.2 67.8L49.2 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M102.8 67.8L140.8 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M49 72.8A9 9 0 0 0 67 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M123 72.8A9 9 0 0 0 141 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="13" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="45" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">B</text>
+<rect x="113" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="145" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">C</text>
+</svg>
+<figcaption>Overlapping specialization</figcaption></figure><p><strong>Overlapping</strong><br>any number of subclasses</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 -5 190 127" role="img" aria-label="Total specialization">
+<rect x="60" y="5" width="70" height="30" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="95" y="20" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">A</text>
+<path d="M92.8 35.0L92.8 49.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M97.2 35.0L97.2 49.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="95" cy="60" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="95" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M87.2 67.8L49.2 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M102.8 67.8L140.8 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M49 72.8A9 9 0 0 0 67 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M123 72.8A9 9 0 0 0 141 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="13" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="45" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">B</text>
+<rect x="113" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="145" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">C</text>
+</svg>
+<figcaption>Total specialization</figcaption></figure><p><strong>Total</strong><br>double line: every entity is in one</p></div>
+  <div class="symcard"><figure class="fig" style="--figmax:11rem">
+<svg viewBox="0 -5 190 127" role="img" aria-label="Partial specialization">
+<rect x="60" y="5" width="70" height="30" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="95" y="20" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">A</text>
+<path d="M95.0 35.0L95.0 49.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="95" cy="60" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="95" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M87.2 67.8L49.2 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M102.8 67.8L140.8 84.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M49 72.8A9 9 0 0 0 67 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M123 72.8A9 9 0 0 0 141 72.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="13" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="45" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">B</text>
+<rect x="113" y="84" width="64" height="28" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="145" y="98" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:600;">C</text>
+</svg>
+<figcaption>Partial specialization</figcaption></figure><p><strong>Partial</strong><br>single line: an entity may be in none</p></div>
+</div>
+
+<h2 id="exercises"><span class="secnum">2.5</span>Exercises</h2>
+
+<p>One short warm-up, then eight diagrams. As in Set 1, indicate every applicable
+constraint: a specialization without its circle and its line into the superclass
+is not finished. Draw before you click.</p>
+
+<h3>Warm-up</h3>
+
+<details class="prob"><summary data-label="Exercise 2.1">State the definition of a <strong>subclass</strong> of an entity set, give a reasonable example, and explain it briefly.</summary><div class="sol">
+<p><strong>Definition.</strong> A subclass is a subset of an entity set,
+distinguished by its own special attributes and relationships.</p>
+<p><strong>Example.</strong> Woman is a subclass of the set of persons,
+characterised by the attribute number of pregnancies, which has no meaning for
+persons outside this subclass.</p>
+<p><strong>Why the example works.</strong> The attribute is not merely
+<em>usually empty</em> outside the subclass &mdash; it is <em>meaningless</em>
+there, and that is the test for whether a subclass earns its box. If the extra
+attributes would make sense for everyone and just happen to be unknown, you have
+a nullable attribute, not a subclass.</p>
+</div></details>
+
+<h3>One specialization at a time</h3>
+
+<details class="prob"><summary data-label="Exercise 2.2">Give a reasonable example of a specialization into two <strong>disjoint</strong> subclasses with <strong>optional</strong> participation. Draw the EER diagram, indicating carefully the cardinality and disjointness constraints.</summary><div class="sol">
+<p><strong>The example.</strong> The class "vehicle" has two subclasses,
+"auto-bus" and "bicycle". The two are obviously disjoint, unless somebody saw a
+bus on two wheels. The participation is optional, as there are many vehicles that
+are neither auto-buses nor bicycles.</p>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 600 200" role="img" aria-label="Disjoint specialization of vehicle into auto-bus and bicycle">
+<rect x="245" y="11" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">vehicle</text>
+<path d="M300.0 49.0L300.0 77.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="300" cy="88" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="300" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M292.2 95.8L179.0 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M307.8 95.8L421.0 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M206 127.8A9 9 0 0 0 224 127.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M376 127.8A9 9 0 0 0 394 127.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="105" y="149" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="160" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">auto-bus</text>
+<rect x="385" y="149" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">bicycle</text>
+</svg>
+<figcaption>A disjoint specialization with optional participation: the single line above the <b>d</b> circle says a vehicle need not be either one.</figcaption></figure>
+<p><strong>The method.</strong> Pick the superclass first, then choose subclasses
+that satisfy the two constraints the question names, and <em>test each one by
+trying to break it</em>.</p>
+<ul>
+<li><em>Disjoint</em> means no entity can be in both. Test it by describing
+something in the intersection: if the description is absurd &mdash; a two-wheeled
+bus &mdash; disjointness holds.</li>
+<li><em>Optional</em> (partial) means something in the superclass is in neither.
+Test it by naming one: a car, a tram, a snowmobile.</li>
+</ul>
+<p>If you cannot name the counter-example for the second test, your specialization
+is total and you have answered a different question.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 2.3">Give a reasonable example of an entity set that has two disjoint subclasses, with optional participation. Explain your answer briefly, and draw the diagram.</summary><div class="sol">
+<p><strong>The example.</strong> In a department store database, there may be an
+entity set <b>apparel</b>, intended to include anything and everything that a
+person can wear. Within this set, we may recognise a subclass <b>footwear</b> and
+another subclass <b>eye glasses</b>. The two subclasses are clearly disjoint,
+since one cannot easily conceive of an object that can function as footwear and
+eye-glasses simultaneously. The participation is optional, since many apparel
+items &mdash; skirts, trousers, shirts, coats, hats, gloves &mdash; classify
+neither as footwear nor as eye-glasses.</p>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 620 200" role="img" aria-label="Disjoint specialization of apparel into footwear and eye glasses">
+<rect x="255" y="11" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="310" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">apparel</text>
+<path d="M310.0 49.0L310.0 77.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="310" cy="88" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="310" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M302.2 95.8L173.8 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M317.8 95.8L446.2 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M204 126.8A9 9 0 0 0 222 126.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M398 126.8A9 9 0 0 0 416 126.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="95" y="149" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="150" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">footwear</text>
+<rect x="404.95" y="149" width="130.1" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">eye glasses</text>
+</svg>
+<figcaption>Department-store apparel. Disjoint &mdash; nothing is footwear and eye-glasses at once &mdash; and partial, since most apparel is neither.</figcaption></figure>
+<p><strong>What makes this a better answer than "vehicle" again.</strong> The two
+subclasses here would carry genuinely different attributes &mdash; shoe size and
+sole material for one, lens prescription and frame width for the other &mdash;
+and neither set means anything for a hat. That is the justification a marker is
+looking for: not just that the sets are disjoint, but that they need to exist at
+all.</p>
+</div></details>
+
+<h3>Complete diagrams</h3>
+
+<details class="prob"><summary data-label="Exercise 2.4">For each employee, the hospital records the social security number, name and salary. The employees are either administrators or medical professionals. For administrators, the hospital records their highest educational degree and the date it was received. Among medical professionals, the hospital pays special attention to physicians and certified nurses. For physicians, the hospital records their specialization area. For each certified nurse, the hospital stores the name of the agency that issued the certificate.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -15 620 379" role="img" aria-label="EER diagram of a hospital employee specialization hierarchy">
+<rect x="255" y="41" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="310" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">employee</text>
+<ellipse cx="310" cy="12" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="310" y="12" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M310.0 29.0L310.0 41.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="120" cy="60" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id #</text>
+<path d="M165.0 60.0L255.0 60.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="505" cy="60" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="505" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M460.0 60.0L365.0 60.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M310.0 79.0L310.0 111.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="310" cy="122" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="310" y="122" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M302.2 129.8L174.2 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M317.8 129.8L440.8 169.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M219 148.8A9 9 0 0 0 237 148.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M381 148.8A9 9 0 0 0 399 148.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="85.85" y="169" width="148.3" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="160" y="188" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">administrator</text>
+<rect x="400" y="169" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="455" y="188" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">medical</text>
+<ellipse cx="90" cy="250" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="90" y="250" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">degree</text>
+<path d="M128.0 207.0L90.0 233.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="205" cy="292" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="205" y="292" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">date</text>
+<path d="M162.0 207.0L200.0 275.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M455.0 207.0L455.0 231.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="455" cy="242" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="455" y="242" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M447.2 249.8L385.8 277.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M462.8 249.8L529.2 277.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M403 260.8A9 9 0 0 0 421 260.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M491 260.8A9 9 0 0 0 509 260.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="320" y="277" width="100" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="370" y="296" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">physician</text>
+<rect x="499" y="277" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="545" y="296" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">nurse</text>
+<ellipse cx="370" cy="340" rx="45" ry="14" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="370" y="340" text-anchor="middle" dominant-baseline="central" style="font-size:12px;font-weight:400;">area</text>
+<path d="M370.0 315.0L370.0 326.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="545" cy="340" rx="45" ry="14" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="545" y="340" text-anchor="middle" dominant-baseline="central" style="font-size:12px;font-weight:400;">agency</text>
+<path d="M545.0 315.0L545.0 326.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Hospital employees. Two specializations, one nested inside the other; each subclass carries only the attributes that make sense for it.</figcaption></figure>
+<p><strong>Step 1 &mdash; the superclass.</strong> <b>employee</b>, with
+<b>id&nbsp;#</b> as key, plus <b>name</b> and <b>salary</b>. Everything true of
+every employee goes here and nowhere else; the subclasses inherit it.</p>
+<p><strong>Step 2 &mdash; the first specialization.</strong> "The employees are
+either administrators or medical professionals" gives two subclasses. Disjoint
+(<b>d</b>): the word "either" excludes being both.</p>
+<p><strong>Step 3 &mdash; the second specialization, nested.</strong> "Among
+medical professionals&hellip; physicians and certified nurses" specialises
+<b>medical</b>, not <b>employee</b>. The nesting is the content of this exercise:
+a physician is a medical professional is an employee, and hanging all four
+subclasses off <b>employee</b> in one flat specialization would lose the fact that
+physicians and nurses are medical and administrators are not.</p>
+<p><strong>Step 4 &mdash; where each attribute lands.</strong> <b>degree</b> and
+<b>date</b> on <b>administrator</b>; <b>area</b> on <b>physician</b>;
+<b>agency</b> on <b>nurse</b>. Each sits at the lowest level where it is
+meaningful &mdash; the rule of &sect;2.3, applied four times.</p>
+<p><strong>Step 5 &mdash; the constraints you must decide.</strong> Both
+specializations are drawn disjoint and partial. The second one is the judgement
+call: the text says "among medical professionals" the hospital attends to
+physicians and nurses, which leaves room for medical staff who are neither &mdash;
+a technician, a therapist. If your reading is that the hospital employs nobody
+else, a double line and a stated assumption is a defensible answer. State the
+assumption; that is what earns the mark.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 2.5">Dangerous Professor records data about every instructor. Instructors are identified by social security number and addressed by last name and title. Notably, for those instructors who are employed part-time, the Professor needs to record the maximum number of credit hours that they are willing to lecture. Moreover, part-time instructors are invited to submit all of their contact phone-numbers (if any), while full-time instructors have only one office phone number that the Professor cares to keep.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 640 330" role="img" aria-label="EER diagram of instructors specialized into part-timers and full-timers">
+<rect x="259.5" y="36" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="320" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">instructor</text>
+<ellipse cx="120" cy="30" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">lastName</text>
+<path d="M166.2 30.0L259.5 47.3" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="530" cy="55" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="530" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecNum</text>
+<path d="M479.9 55.0L380.5 55.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="115" cy="108" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="115" y="108" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">title</text>
+<path d="M160.0 108.0L268.0 74.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M320.0 74.0L320.0 111.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="320" cy="122" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="320" y="122" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M312.2 129.8L201.6 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M327.8 129.8L448.4 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M239 154.8A9 9 0 0 0 257 154.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M383 154.8A9 9 0 0 0 401 154.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="119.5" y="181" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="180" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">part-timer</text>
+<rect x="409.5" y="181" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">full-timer</text>
+<ellipse cx="85" cy="262" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="85" y="262" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">maxHours</text>
+<path d="M85.0 245.0L140.0 219.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="235" cy="292" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="235" cy="292" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="235" y="292" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M235.0 275.0L200.0 219.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="490" cy="292" rx="69.6" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="490" y="292" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">office phone #</text>
+<path d="M490.0 275.0L475.0 219.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Course-schedule instructors. Only a part-timer has a maximum credit-hour load, and only a part-timer submits a whole set of contact numbers.</figcaption></figure>
+<p><strong>Step 1 &mdash; why a subclass at all.</strong> <b>maxHours</b> is the
+giveaway: a maximum willing teaching load is not merely unknown for a full-timer,
+it is meaningless. That is the &sect;2.1 test, and it is what rules out modelling
+this with a nullable attribute.</p>
+<p><strong>Step 2 &mdash; the shared attributes stay up.</strong>
+<b>socSecNum</b> (key), <b>lastName</b> and <b>title</b> describe every
+instructor, so they hang off the superclass and are inherited.</p>
+<p><strong>Step 3 &mdash; the phone numbers, which are the real exercise.</strong>
+Both subclasses have something called a phone number, and they are
+<em>different attributes</em>. A part-timer submits "all of their contact
+phone-numbers (if any)" &mdash; a set, possibly empty, so a multivalued attribute,
+double ellipse. A full-timer has "only one office phone number" &mdash; a single
+simple attribute. Putting one <b>phone&nbsp;#</b> on the superclass would collapse
+two different specifications into one and get both wrong.</p>
+<p><strong>Step 4 &mdash; the constraints.</strong> The problem book draws this
+one <b>o</b>, overlapping, and partial. Neither is forced by the text, and both
+are worth arguing about: if the department's contracts make part-time and
+full-time exclusive and exhaustive, <b>d</b> with a double line is the better
+model. What is not defensible is leaving the circle unmarked.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 2.6">The employees of Rotund Trend form a creative and devoted group. Apart from filing their social security number and name, Rotund Trend records at least one phone number for each employee. A special group of employees is in charge of delivery service; the management requires a driver license number from every employee in the delivery group. The management is careful about tracking the years of service &mdash; after spending precisely seven years with the company (in any position), an employee is awarded an honorary present from the President, and allowed to append the title "senior" to whatever title(s) they already hold. The values of the honorary gifts, awarded to individual senior employees at the seventh anniversary of their employment date, are archived in the database.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 640 330" role="img" aria-label="EER diagram of Rotund Trend employees with an overlapping specialization">
+<rect x="265" y="81" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="320" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">employee</text>
+<ellipse cx="110" cy="100" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="110" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">soc.sec.#</text>
+<path d="M160.1 100.0L265.0 100.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="155" cy="40" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="155" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M155.0 57.0L270.1 81.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="320" cy="36" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="320" y="36" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">date hired</text>
+<path d="M320.0 53.0L320.0 81.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="490" cy="38" rx="61.8" ry="17" stroke-dasharray="6 4" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="490" y="38" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">years served</text>
+<path d="M490.0 55.0L369.9 81.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="535" cy="100" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="535" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M490.0 100.0L375.0 100.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="520" cy="158" rx="73.5" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="520" cy="158" rx="69" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="520" y="158" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone # (add’l)</text>
+<path d="M446.5 158.0L375.0 117.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M320.0 119.0L320.0 151.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="320" cy="162" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="320" y="162" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M312.2 169.8L192.3 211.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M327.8 169.8L447.0 211.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M234 188.8A9 9 0 0 0 252 188.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M383 188.8A9 9 0 0 0 401 188.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="96.3" y="211" width="157.4" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="175" y="230" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">delivery empl.</text>
+<rect x="390.4" y="211" width="139.2" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="460" y="230" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">senior empl.</text>
+<ellipse cx="175" cy="292" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="175" y="292" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">license #</text>
+<path d="M175.0 249.0L175.0 275.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="460" cy="292" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="460" y="292" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">gift value</text>
+<path d="M460.0 249.0L460.0 275.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Rotund Trend employees. The subclasses <em>overlap</em> &mdash; the <b>o</b> circle &mdash; because a delivery employee can also reach seven years and become senior.</figcaption></figure>
+<p><strong>Step 1 &mdash; two subclasses, and why they overlap.</strong>
+<b>delivery empl.</b> carries <b>license&nbsp;#</b>; <b>senior empl.</b> carries
+<b>gift value</b>. The constraint is <em>overlapping</em>, because seniority is
+earned "in any position" &mdash; a driver who stays seven years is in both
+subclasses at once. Marking this <b>d</b> is the error the problem is built to
+catch, and the three words that prevent it are easy to read past.</p>
+<p><strong>Step 2 &mdash; and why it is partial.</strong> A two-year cashier is in
+neither subclass, so a single line into the circle.</p>
+<p><strong>Step 3 &mdash; "at least one phone number".</strong> Not quite a plain
+multivalued attribute, because "at least one" is a lower bound the notation cannot
+express on a single symbol. The diagram splits it: a required <b>phone&nbsp;#</b>
+as a simple attribute, and a multivalued <b>phone&nbsp;# (additional)</b> for the
+rest, which may be empty. A plain double ellipse plus a note in words is also
+accepted &mdash; but the split says it in the notation.</p>
+<p><strong>Step 4 &mdash; years of service.</strong> Derived from the employment
+date, so <b>date hired</b> is stored and <b>years served</b> is dashed. Note where
+it sits: on the <em>superclass</em>, because every employee has a length of
+service &mdash; it is the seven-year threshold, not the quantity, that defines the
+subclass.</p>
+<p><strong>Step 5 &mdash; what the gift value is an attribute of.</strong> It is
+awarded to an individual senior employee, one per person, so it is an attribute of
+<b>senior empl.</b> If the company gave a gift at every seventh anniversary, the
+model would have to change: value and date together, one pair per award, which
+means a weak entity set <b>award</b> owned by the employee.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 2.7">Midnight Candle has many customers, identified by library card number (issued internally), and the library database stores their name and address. The library practises careful profiling of its customers, based on their educational and professional affiliation, with the intention of predicting their taste in books. To this end, the library stores name, address and national rating of virtually any university in the country, and records the degree type, the date the degree was issued, and the university that granted it, for each college-level degree ever received by any of its customers. Universities are classified according to their perceived strength (if any) in one or more of the following foci of study: sciences, arts, humanities, and sport.</summary><div class="sol">
+<figure class="fig" style="--figmax:42rem">
+<svg viewBox="0 0 758 320" role="img" aria-label="EER diagram of library customers, their degrees and universities specialized by strength">
+<rect x="65" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="120" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">customer</text>
+<ellipse cx="70" cy="58" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="58" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">card #</text>
+<path d="M70.0 75.0L95.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="225" cy="52" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="225" y="52" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M225.0 69.0L150.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="120" cy="190" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="190" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M120.0 173.0L120.0 139.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="290,120 345,93 400,120 345,147" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="345" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">degree</text>
+<path d="M175.0 120.0L290.0 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="232.5" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="499.5" y="101" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="560" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">university</text>
+<path d="M400.0 120.0L499.5 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="449.75" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="345" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="345" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">type</text>
+<path d="M345.0 72.0L345.0 93.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="330" cy="192" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="330" y="192" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">date</text>
+<path d="M330.0 175.0L345.0 147.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="510" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="510" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M510.0 72.0L535.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="650" cy="58" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="650" y="58" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M650.0 75.0L590.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="690" cy="120" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="690" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">rating</text>
+<path d="M645.0 120.0L620.5 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M560.0 139.0L560.0 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="560" cy="192" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="560" y="192" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M552.2 199.8L295.9 251.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M554.3 201.4L428.0 251.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M565.7 201.4L594.5 251.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M567.8 199.8L700.0 251.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M337 230.8A9 9 0 0 0 355 230.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M443 230.8A9 9 0 0 0 461 230.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M578 230.8A9 9 0 0 0 596 230.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M659 230.8A9 9 0 0 0 677 230.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="218" y="251" width="104" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="270" y="270" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">science</text>
+<rect x="369" y="251" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="415" y="270" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">art</text>
+<rect x="498" y="251" width="124" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="560" y="270" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">humanities</text>
+<rect x="652" y="251" width="96" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="700" y="270" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:600;">sport</text>
+</svg>
+<figcaption>Midnight Candle&rsquo;s customer profiling. The four strengths <em>overlap</em>, and the specialization is partial: a university may be strong in none of them.</figcaption></figure>
+<p><strong>Step 1 &mdash; the degrees are a relationship, not an attribute.</strong>
+A degree connects a customer to a university, and its <b>type</b> and <b>date</b>
+are determined by that pair, so they hang off the <b>degree</b> diamond. This is
+Set 1 material and it is half the diagram.</p>
+<p><strong>Step 2 &mdash; the ratio.</strong> "each college-level degree ever
+received" &mdash; a customer may hold several, and a university grants many:
+<var>M</var>&nbsp;:&nbsp;<var>N</var>, partial on both sides.</p>
+<p><strong>Step 3 &mdash; the specialization, and the two words that settle
+it.</strong> "in <em>one or more</em> of the following foci" makes it
+<b>overlapping</b>: a university may be strong in sciences and in sport at once.
+"(<em>if any</em>)" makes it <b>partial</b>: a university may be strong in none.
+Both constraints are stated explicitly in the sentence, which is unusual and
+worth noticing &mdash; most narratives make you infer at least one.</p>
+<p><strong>Step 4 &mdash; four subclasses with no attributes.</strong> Nothing is
+recorded about a university <em>because</em> it is strong in the sciences, and the
+problem says so: "the library intends to collect further information about
+universities, based on this classification, but this database function has not yet
+been fully specified". The subclasses are placeholders for attributes that do not
+exist yet.</p>
+<p>That is a legitimate thing to draw, and it is worth being honest about the
+alternative: four subclasses carrying nothing could equally be one multivalued
+attribute <b>focus</b> on <b>university</b>. The specialization is the better
+model here only because the specification says those boxes are about to be filled
+in.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 2.8">A college department keeps a student database. For each student, the department records his name, student I.D. number, date of birth, and the major field of study. For graduate students, the department stores the following information about each undergraduate degree held: the university that issued the degree, date issued, and the major field of study. For undergraduate students, the department records their high-school GPA.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 -5 620 438" role="img" aria-label="EER diagram of students specialized into graduates and undergraduates">
+<rect x="255" y="43" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="310" y="62" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">student</text>
+<ellipse cx="85" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="85" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M130.0 30.0L255.0 50.5" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="230" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="230" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id</text>
+<path d="M230.0 39.0L288.0 43.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="370" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="370" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">d.o.b.</text>
+<path d="M370.0 39.0L335.0 43.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="525" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="525" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">major</text>
+<path d="M480.0 30.0L365.0 50.5" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M307.8 81.0L307.8 115.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M312.2 81.0L312.2 115.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="310" cy="126" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="310" y="126" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M302.2 133.8L188.6 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M317.8 133.8L447.7 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M229 156.8A9 9 0 0 0 247 156.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M381 156.8A9 9 0 0 0 399 156.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="125" y="181" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="180" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">graduate</text>
+<rect x="390.85" y="181" width="148.3" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="465" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">undergraduate</text>
+<ellipse cx="465" cy="262" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="465" y="262" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">g.p.a.</text>
+<path d="M465.0 245.0L465.0 219.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="125,272 180,245 235,272 180,299" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="132,272 180,252 228,272 180,292" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="180" y="272" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">holds</text>
+<path d="M177.8 219.0L177.8 246.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M182.2 219.0L182.2 246.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="166" y="232" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="125" y="329" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="130" y="334" width="100" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="180" y="348" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">degree</text>
+<path d="M177.8 297.9L177.8 329.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M182.2 297.9L182.2 329.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="164" y="314" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="75" cy="404" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="75" y="404" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">univers.</text>
+<path d="M75.0 387.0L150.0 367.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="200" cy="406" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="200" y="406" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">date</text>
+<path d="M200.0 389.0L180.0 367.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="330" cy="396" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="330" y="396" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">major</text>
+<path d="M330.0 379.0L213.8 367.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>A total, disjoint specialization &mdash; every student is one or the other &mdash; with a weak entity set hanging off <em>one</em> of the subclasses.</figcaption></figure>
+<p><strong>Step 1 &mdash; a total specialization.</strong> Every student in a
+college department is a graduate student or an undergraduate, and there is no
+third possibility, so the line into the <b>d</b> circle is <em>double</em>. This
+is the first total specialization in the set, and the first one where the double
+line is forced rather than chosen.</p>
+<p><strong>Step 2 &mdash; disjoint.</strong> Nobody is both at once.</p>
+<p><strong>Step 3 &mdash; the easy subclass.</strong> <b>g.p.a.</b> on
+<b>undergraduate</b>: a high-school GPA is meaningless for a doctoral candidate,
+not merely unknown.</p>
+<p><strong>Step 4 &mdash; the hard subclass, and the point of the exercise.</strong>
+A graduate student holds prior degrees, and each degree has three facts about it:
+university, date, major. That is not one attribute &mdash; it is a
+<em>repeating group of related values</em>, which is exactly what a weak entity
+set is for. So <b>degree</b> is a weak entity set, owned by <b>graduate</b>
+through the identifying relationship <b>holds</b>, with <b>date</b> as its partial
+key.</p>
+<p><strong>Step 5 &mdash; note where <b>holds</b> attaches.</strong> To
+<b>graduate</b>, not to <b>student</b>. A relationship is placed by the same rule
+as an attribute: at the level where it is meaningful, and no higher. Attaching it
+to <b>student</b> would say an undergraduate may hold prior college degrees, which
+the specification does not.</p>
+<div class="box note"><span class="bt">Subclass or weak entity set?</span>
+<p>Both appear in this one diagram, which makes it a good place to fix the
+difference. A <b>subclass</b> is the <em>same entity</em> seen in more detail
+&mdash; a graduate student <em>is</em> a student, and needs no key of its own. A
+<b>weak entity set</b> is a <em>different entity</em> that cannot be identified
+alone &mdash; a degree is not a student, and it borrows the student's key to
+complete its own. If you find yourself giving a subclass a partial key, you have
+confused the two.</p></div>
+</div></details>
+
+<h3>The capstone</h3>
+
+<details class="prob"><summary data-label="Exercise 2.9">Draw a complete EER diagram for the <strong>Pure Wood</strong> database. Pure Wood is a furniture store chain. All employees have their IDs, names and addresses on file, along with the date they were hired and the salary they are paid. Pure Wood keeps a register of its suppliers, identified by name; along with the name, records are kept of the mailing address, fax number, and ordinary contact voice phone number(s), if any. Pure Wood identifies its shops (stores) by name, characterises each shop by address, and assigns to each shop its manager, identified by employee ID. Some Pure Wood stores are operated as discount stores; Pure Wood records the size of the available parking lot of each discount store. Every item sold bears a product code, which identifies a class of all items that are equivalent: two identical chairs off the same assembly line have equal product codes and are two instances of the same product. They are, however, two distinct chairs, and bear distinct instance identifiers, written on a sticker the item bears from acquisition until delivery. For every item instance, at any moment, Pure Wood knows the store where that instance is located, and can determine its product code from its instance identifier. Every product must have a type, weight, height, length, width and colour. Products may be associated with purposes (studying, sleeping, meditating); some products may be suitable for multiple purposes, and some need not have any purpose on file. Whenever a product is found suitable for an individual purpose, a photograph is stored which illustrates this. All instances of the same product are sold at the same price in all stores, and that price is on file, along with the supplier who has supplied the product.</summary><div class="sol">
+<p>Drawn here as two panels for legibility; it is one diagram, and <b>product</b>
+appears in both to show where they join.</p>
+<figure class="fig" style="--figmax:42rem">
+<svg viewBox="-20 0 720 455" role="img" aria-label="ER diagram of Pure Wood products, suppliers and purposes">
+<rect x="245" y="26" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">purpose</text>
+<ellipse cx="155" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="155" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">title</text>
+<path d="M200.0 45.0L245.0 45.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="245,132 300,105 355,132 300,159" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="132" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">serve</text>
+<path d="M300.0 64.0L300.0 105.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="286" y="84.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="160" cy="132" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="160" y="132" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">photo</text>
+<path d="M205.0 132.0L245.0 132.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="245" y="211" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="230" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">product</text>
+<path d="M300.0 159.0L300.0 211.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="286" y="185" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="20" y="211" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="75" y="230" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">supplier</text>
+<polygon points="135,300 190,273 245,300 190,327" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">from</text>
+<path d="M75.0 249.0L135.0 300.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="89" y="274.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M245.0 300.0L258.0 249.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="251.5" y="258.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="70" cy="168" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="168" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M70.0 185.0L75.0 211.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="195" cy="190" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="195" cy="190" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="195" y="190" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">voice #</text>
+<path d="M150.0 190.0L130.0 230.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="35" cy="355" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="35" y="355" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">email</text>
+<path d="M35.0 338.0L55.0 249.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="160" cy="375" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="160" y="375" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">fax</text>
+<path d="M160.0 358.0L95.0 249.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">code</text>
+<path d="M355.0 230.0L535.0 32.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="87" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="87" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">price</text>
+<path d="M355.0 230.0L535.0 87.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="142" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="142" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">type</text>
+<path d="M355.0 230.0L535.0 142.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="197" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="197" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">color</text>
+<path d="M355.0 230.0L535.0 197.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="252" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="252" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">length</text>
+<path d="M355.0 230.0L535.0 252.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="307" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="307" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">width</text>
+<path d="M355.0 230.0L535.0 307.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="362" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="362" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">height</text>
+<path d="M355.0 230.0L535.0 362.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="417" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="417" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">weight</text>
+<path d="M355.0 230.0L535.0 417.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Pure Wood, part one: what a product <em>is</em>, who supplies it and what it is for. No specialization anywhere &mdash; this whole panel is ordinary ER.</figcaption></figure>
+<figure class="fig" style="--figmax:44rem">
+<svg viewBox="0 0 860 480" role="img" aria-label="EER diagram of Pure Wood product instances, stores and employees">
+<rect x="50" y="21" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="105" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">product</text>
+<polygon points="50,112 105,85 160,112 105,139" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="105" y="112" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">of</text>
+<path d="M105.0 59.0L105.0 85.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="91" y="72" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="17.5" y="176" width="175" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="105" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">product instance</text>
+<path d="M102.8 137.9L102.8 176.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M107.2 137.9L107.2 176.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="89" y="157.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="105" cy="265" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="105" y="265" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">label id</text>
+<path d="M105.0 248.0L105.0 214.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="243.2,195 300,168 356.8,195 300,222" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">location</text>
+<path d="M192.5 197.2L247.8 197.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M192.5 192.8L247.8 192.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="217.85" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="425" y="176" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="480" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">store</text>
+<path d="M356.8 195.0L425.0 195.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="390.9" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="480" cy="130" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="480" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M480.0 147.0L480.0 176.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="340" cy="300" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="340" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M340.0 283.0L480.0 214.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M505.0 214.0L505.0 261.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="505" cy="272" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="505" y="272" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M505.0 283.0L505.0 315.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M496 310.2A9 9 0 0 1 514 310.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="427.5" y="315" width="155" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="505" y="334" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">discount store</text>
+<ellipse cx="505" cy="398" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="505" y="398" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">lot size</text>
+<path d="M505.0 381.0L505.0 353.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="605,195 660,168 715,195 660,222" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="660" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">manage</text>
+<path d="M535.0 195.0L605.0 195.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="570" y="180" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="605" y="71" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="660" y="90" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">employee</text>
+<path d="M660.0 168.0L660.0 109.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="646" y="138.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="785" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="785" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id #</text>
+<path d="M715.0 90.0L740.0 30.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="785" cy="88" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="785" y="88" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M715.0 90.0L740.0 88.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="785" cy="146" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="785" y="146" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M715.0 90.0L740.0 146.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="785" cy="210" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="785" y="210" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">date hired</text>
+<path d="M715.0 90.0L731.0 210.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="785" cy="272" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="785" y="272" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M715.0 90.0L740.0 272.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Pure Wood, part two: where the furniture physically is, and who runs the shop. The one specialization in the whole database is here.</figcaption></figure>
+<p><strong>Step 1 &mdash; the distinction the whole problem turns on.</strong>
+A <b>product</b> is a <em>class</em> of equivalent items; a <b>product
+instance</b> is one physical chair. Two boxes, related 1&nbsp;:&nbsp;<var>M</var>
+by <b>of</b>. Collapsing them loses the ability to say where any particular chair
+is, which the narrative asks for explicitly. Everything shared by identical items
+&mdash; type, dimensions, colour, price, supplier, purposes &mdash; belongs to
+<b>product</b>; everything about one physical object &mdash; its label and its
+current store &mdash; belongs to <b>product instance</b>.</p>
+<p><strong>Step 2 &mdash; instance identifiers are a key, not a partial
+key.</strong> The sticker "identifies the instance" and its product code can be
+<em>determined from</em> it, so it is unique across the whole company.
+<b>product instance</b> is therefore a <em>strong</em> entity set with
+<b>label id</b> as its key &mdash; despite being 1&nbsp;:&nbsp;<var>M</var> under
+a parent, which is what tempts people to draw it weak. Compare Exercise 2.8's
+<b>degree</b>, which genuinely is weak.</p>
+<p><strong>Step 3 &mdash; the single specialization.</strong> Out of twelve boxes,
+exactly one subclass: <b>discount store</b> under <b>store</b>, carrying
+<b>lot size</b>. Partial, since not every store is a discount store. With one
+subclass, <b>d</b> and <b>o</b> are equivalent (see Check 2.1); the problem book
+writes <b>o</b>.</p>
+<p><strong>Step 4 &mdash; the relationships, one sentence each.</strong></p>
+<ul>
+<li><b>manage</b>: "assigns to each shop its manager" &mdash; each store has one
+manager, an employee may manage several, so <var>M</var>&nbsp;:&nbsp;1 from store
+to employee, total on the store side.</li>
+<li><b>location</b>: "at any moment, Pure Wood knows the store where that instance
+is located" &mdash; <var>M</var>&nbsp;:&nbsp;1, total on the instance side, since
+every instance is physically somewhere.</li>
+<li><b>from</b>: one supplier per product, so <var>M</var>&nbsp;:&nbsp;1.</li>
+<li><b>serve</b>: "some products may be suitable for multiple purposes, and some
+need not have any" &mdash; <var>M</var>&nbsp;:&nbsp;<var>N</var>, partial on the
+product side. The <b>photo</b> illustrates one product serving one purpose, so it
+is an attribute of the relationship.</li>
+</ul>
+<p><strong>Step 5 &mdash; the price.</strong> "All instances of the same product
+are sold at the same price in all stores" is a sentence written to stop you
+attaching price to the instance or to the store. It is a fact about the product,
+and nothing else.</p>
+<div class="box warn"><span class="bt">The lesson of the capstone</span>
+<p>One subclass in a database this size is normal. EER is a small extension to ER,
+used sparingly, and a diagram that is mostly specializations is usually a diagram
+that has mistaken nullable attributes for subclasses. The hard work here was all
+Set 1 work &mdash; deciding what is an entity, what is a value, and what an
+attribute belongs to.</p></div>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Mapping a specialization to tables is where the choice between <b>d</b> and
+<b>o</b>, total and partial, stops being decoration. A total, disjoint
+specialization can become one table per subclass with no superclass table at all;
+a partial one cannot, because the entities in no subclass would have nowhere to
+live. An overlapping specialization rules out the single-table-with-a-type-column
+approach, since one entity would need two type values at once. Every combination
+maps, but each maps differently &mdash; which is the real reason the notation
+insists you decide.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-er.html"><span>Previous</span>Set 1. ER modeling: drawing the diagram</a>
+      <a class="next" aria-disabled="true"><span>Next</span>&mdash;</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
