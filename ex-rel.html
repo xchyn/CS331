@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 3 — The relational model: from diagram to tables</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 3 &middot; Relational model</span>
+  <nav class="topnav">
+    <a href="ex-eer.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a aria-disabled="true">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#schema"><span class="t">3.1</span>What a relational schema is</a></li>
+    <li><a href="#integrity"><span class="t">3.2</span>The integrity constraints</a></li>
+    <li><a href="#rules"><span class="t">3.3</span>The mapping rules</a></li>
+    <li><a href="#judgement"><span class="t">3.4</span>The two judgement calls</a></li>
+    <li><a href="#exercises"><span class="t">3.5</span>Exercises</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 3 &middot; after the relational-model lectures</span>
+  <span class="chnum">Relational model</span>
+  <h1>From diagram to tables</h1>
+  <p class="chsum">Relations, keys and the three integrity constraints; the rules
+  that turn an ER or EER diagram into a set of relational schemas, and the two
+  places where those rules leave you a real choice. Twelve exercises &mdash; four
+  abstract mapping drills, one in reverse, four on a live database, and three that
+  map diagrams you drew in Sets 1 and 2.</p>
+</div>
+
+<p>Sets 1 and 2 were about deciding what is true of the enterprise. This set is
+about carrying those decisions across into a structure a DBMS can actually
+enforce. Most of the mapping is mechanical &mdash; which is exactly why the two
+steps that are <em>not</em> mechanical are where the marks are.</p>
+
+<p>The payoff is that constraints stop being notation. A double line in Set 1 was
+a claim about the world; here it becomes a <code>NOT NULL</code>, or the
+difference between one table and two. If you have ever wondered why the
+participation constraint mattered, this is the answer.</p>
+
+<div class="box note"><span class="bt">Every schema on this page was run</span>
+<p>All the answers below were created as real tables in MariaDB, with their
+primary keys and foreign keys declared, before they went into the page. Where a
+solution claims a constraint is enforced, the constraint was tested by trying to
+insert a row that violates it and watching the server refuse. Two of those tests
+are quoted in the solutions, because their outcome is the point of the
+exercise.</p></div>
+
+<h2 id="schema"><span class="secnum">3.1</span>What a relational schema is</h2>
+
+<p>A <strong>relation schema</strong> is a name and a list of attributes, each
+over some domain. The notation used throughout this set &mdash; and in the problem
+book &mdash; puts the primary key underlined in the attribute list:</p>
+
+<pre>professor (<u>socSecNum</u>, firstName, lastName, salary, rank, wizardID)
+department (<u>name</u>, office, phone, chairId)
+member (<u>deptName</u>, <u>profId</u>)</pre>
+
+<p>Foreign keys do not fit in that notation, so they are listed separately. This
+is not a stylistic choice: a foreign key is a statement about a <em>pair</em> of
+schemas, and it cannot be written inside either one.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>chairId</code></td><td><code>department</code></td><td><code>professor</code></td></tr>
+<tr><td><code>profId</code></td><td><code>member</code></td><td><code>professor</code></td></tr>
+<tr><td><code>deptName</code></td><td><code>member</code></td><td><code>department</code></td></tr>
+</tbody></table></div>
+
+<p>A <strong>super-key</strong> is any set of attributes that is unique across the
+relation; a <strong>candidate key</strong> is a minimal one; the
+<strong>primary key</strong> is the candidate key you chose. The distinctions
+matter in Exercise 3.1 and then mostly stop mattering until normalization.</p>
+
+<h2 id="integrity"><span class="secnum">3.2</span>The integrity constraints</h2>
+
+<p>Three constraints hold in every relational database, whatever it is about.
+Learn them as sentences &mdash; they are worth full marks on an exam and take
+fifteen seconds to write.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>constraint</th><th>statement</th></tr></thead>
+<tbody>
+<tr><td>primary key</td><td>No two tuples in a relation may agree on the values of the primary key.</td></tr>
+<tr><td>entity integrity</td><td>No attribute that belongs to the primary key can assume a null value.</td></tr>
+<tr><td>referential integrity</td><td>The value of any foreign key either occurs in a tuple of the referenced relation, or is null.</td></tr>
+</tbody></table></div>
+
+<p>The third one has a consequence that catches people out: a foreign key is
+allowed to be null <em>unless</em> something else forbids it. So "every car must
+be assigned to a facility" &mdash; a double line in Set 1 &mdash; is not expressed
+by the foreign key at all. It needs <code>NOT NULL</code> on top.</p>
+
+<h2 id="rules"><span class="secnum">3.3</span>The mapping rules</h2>
+
+<p>Work through a diagram in this order. Each row is mechanical; the two starred
+ones are not, and &sect;3.4 is about those.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>in the diagram</th><th>in the schema</th></tr></thead>
+<tbody>
+<tr><td>strong entity set</td><td>one relation; its key becomes the primary key</td></tr>
+<tr><td>weak entity set</td><td>one relation; primary key = owner&rsquo;s key + partial key, and the owner&rsquo;s key is also a foreign key</td></tr>
+<tr><td>simple attribute</td><td>one column</td></tr>
+<tr><td>composite attribute</td><td>flattens &mdash; one column per leaf component, and the composite itself disappears</td></tr>
+<tr><td>multivalued attribute</td><td>its own relation: owner&rsquo;s key + the attribute, both in the primary key</td></tr>
+<tr><td>derived attribute</td><td>nothing at all</td></tr>
+<tr><td><var>M</var>&nbsp;:&nbsp;<var>N</var> relationship</td><td>its own relation; primary key = both keys; the relationship&rsquo;s own attributes live here</td></tr>
+<tr><td>1&nbsp;:&nbsp;<var>M</var> relationship *</td><td>a foreign key on the <var>M</var> side &mdash; <em>or</em> its own relation</td></tr>
+<tr><td>specialization *</td><td>three options; see Exercise 3.12</td></tr>
+</tbody></table></div>
+
+<h2 id="judgement"><span class="secnum">3.4</span>The two judgement calls</h2>
+
+<p><strong>A 1&nbsp;:&nbsp;<var>M</var> relationship, and what participation does
+to it.</strong> The default is to put a foreign key on the <var>M</var> side.
+That is correct whenever participation on that side is <em>total</em>: every
+entity has a partner, so the column is never null and you have lost nothing.</p>
+
+<p>When participation is <em>partial</em>, the foreign key is null for every
+unrelated entity &mdash; and if that is most of them, the column is mostly holes.
+Giving the relationship its own relation stores only the pairs that exist. Both
+designs are correct; the diagram tells you which one the enterprise deserves, and
+Exercises 3.2 and 3.3 are the same diagram with that one line changed.</p>
+
+<p><strong>A specialization.</strong> Three options, and which are <em>legal</em>
+depends on the <b>d</b>/<b>o</b> and total/partial constraints you drew in Set 2.
+Exercise 3.12 works all three and shows what each one can and cannot enforce.</p>
+
+<div class="box warn"><span class="bt">The rule that is never a judgement call</span>
+<p>An <var>M</var>&nbsp;:&nbsp;<var>N</var> relationship always becomes its own
+relation. There is no foreign-key version of it &mdash; a column holds one value,
+and the whole point of <var>M</var>&nbsp;:&nbsp;<var>N</var> is that there are
+many. Students who "simplify" by putting a foreign key on one side have not
+simplified the design, they have changed it into a different one.</p></div>
+
+<h2 id="exercises"><span class="secnum">3.5</span>Exercises</h2>
+
+<p>For every schema you write, underline the primary key and list the foreign keys
+separately &mdash; an answer without its foreign keys is half an answer. Draw or
+write before you click.</p>
+
+<h3>Warm-up</h3>
+
+<details class="prob"><summary data-label="Exercise 3.1">(a) State the entity integrity constraint. (b) State the referential integrity constraint. (c) State the primary key constraint. (d) What is a foreign key? (e) Explain briefly which attributes of a super-key in a relation, if any, may be null.</summary><div class="sol">
+<p><strong>(a) Entity integrity.</strong> No attribute that belongs to the primary
+key can assume a null value.</p>
+<p><strong>(b) Referential integrity.</strong> The value of any foreign key either
+occurs in a tuple of the referenced relation or is null. In other words: if a
+relational schema <var>R</var> has a foreign key <var>K</var> which references
+schema <var>S</var>, then in each tuple of <var>R</var> the value of <var>K</var>
+must be equal to the value of <var>K</var> in some tuple of <var>S</var>, unless
+the entire <var>K</var> is null.</p>
+<p><strong>(c) Primary key constraint.</strong> No two tuples in a relation may
+agree on the values of the primary key.</p>
+<p><strong>(d) Foreign key.</strong> A foreign key of a schema <var>R</var> which
+references schema <var>S</var> is a set of fields of <var>R</var> that forms the
+primary key of <var>S</var>.</p>
+<p><strong>(e) Super-key attributes and nulls.</strong> Since no attribute of a
+primary key may be null, exactly those attributes of the given super-key that do
+<em>not</em> belong to the actual primary key may be null. This may mean all such
+attributes, or some of them, or none, depending on the relationship of this
+super-key and the primary key.</p>
+<p><strong>Why (e) is the interesting one.</strong> It is the only part that
+requires you to hold both definitions at once. A super-key is any unique set; the
+primary key is one particular minimal unique set. The attributes in the
+difference are under no entity-integrity obligation at all &mdash; and a super-key
+containing a nullable attribute is still a super-key, which is one reason we
+bother to pick a primary key rather than using any old unique set.</p>
+</div></details>
+
+<h3>Four mapping drills</h3>
+
+<p>Each of the next three gives an ER diagram in letters rather than nouns. That
+is deliberate: with no story to lean on, the only thing left to read is the
+notation.</p>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 650 515" role="img" aria-label="ER diagram with entity sets E, F, H and weak entity set W">
+<ellipse cx="100" cy="40" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="100" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">A</text>
+<rect x="54" y="86" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="100" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">E</text>
+<ellipse cx="100" cy="175" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="100" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">K</text>
+<path d="M100.0 57.0L100.0 86.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M100.0 158.0L100.0 124.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="222,105 270,78 318,105 270,132" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="270" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">R</text>
+<path d="M146.0 105.0L222.0 105.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="184" y="90" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="394" y="86" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">F</text>
+<path d="M318.0 105.0L394.0 105.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="356" y="90" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="440" cy="40" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="440" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">B</text>
+<path d="M440.0 57.0L440.0 86.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="575" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="575" cy="45" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="575" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">V</text>
+<path d="M575.0 62.0L482.5 86.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="130" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">L</text>
+<path d="M535.0 130.0L486.0 116.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="392,200 440,173 488,200 440,227" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">S</text>
+<path d="M440.0 124.0L440.0 173.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="426" y="148.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="394" y="276" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="295" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">H</text>
+<path d="M440.0 227.0L440.0 276.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="426" y="251.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="575" cy="262" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="575" y="262" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">J</text>
+<path d="M530.0 262.0L486.0 285.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="575" cy="318" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="575" y="318" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">C</text>
+<path d="M530.0 318.0L486.0 306.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="390,385 440,358 490,385 440,412" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="397,385 440,365 483,385 440,405" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="385" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">G</text>
+<path d="M440.0 314.0L440.0 358.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="426" y="336" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="388" y="451" width="104" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="393" y="456" width="94" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="440" y="470" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">W</text>
+<path d="M437.8 410.8L437.8 451.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M442.2 410.8L442.2 451.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="424" y="431.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="310" cy="470" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="310" y="470" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">P</text>
+<path d="M355.0 470.0L388.0 470.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="570" cy="470" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="570" y="470" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">D</text>
+<path d="M492.0 470.0L525.0 470.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 55. Entity sets <b>E</b>, <b>F</b> and <b>H</b>, with a weak entity set <b>W</b>.</figcaption></figure>
+<details class="prob"><summary data-label="Exercise 3.2">Write a set of relational schemas for the database represented by the ER diagram given in Figure 55 above, and identify precisely all the primary key(s) (if any) and the foreign key(s) (if any). Your design should have an adequate level of normalization.</summary><div class="sol">
+<pre>E  (<u>K</u>, A)
+F  (<u>L</u>, B)
+Fv (<u>L</u>, <u>V</u>)
+R  (<u>K</u>, L)
+H  (<u>J</u>, C)
+S  (<u>J</u>, <u>L</u>)
+W  (<u>J</u>, <u>P</u>, D)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references field</th><th>in schema</th></tr></thead>
+<tbody>
+<tr><td>L</td><td>Fv</td><td>L</td><td>F</td></tr>
+<tr><td>K</td><td>R</td><td>K</td><td>E</td></tr>
+<tr><td>L</td><td>R</td><td>L</td><td>F</td></tr>
+<tr><td>J</td><td>S</td><td>J</td><td>H</td></tr>
+<tr><td>L</td><td>S</td><td>L</td><td>F</td></tr>
+<tr><td>J</td><td>W</td><td>J</td><td>H</td></tr>
+</tbody></table></div>
+<p><strong>Step 1 &mdash; the entity sets.</strong> <b>E</b>, <b>F</b> and
+<b>H</b> are strong, so each becomes a relation keyed by its own key attribute:
+<code>E(K, …)</code>, <code>F(L, …)</code>, <code>H(J, …)</code>.</p>
+<p><strong>Step 2 &mdash; the multivalued attribute.</strong> <b>V</b> is a double
+ellipse, so it cannot be a column of <code>F</code> &mdash; a column holds one
+value. It becomes <code>Fv(L, V)</code> with <em>both</em> attributes in the
+primary key: the same F may have many V values, and the same V value may belong
+to many F&rsquo;s. Forgetting to put V in the key is the usual slip; it would
+allow only one V per F, which is what you were trying to escape.</p>
+<p><strong>Step 3 &mdash; the weak entity set.</strong> <b>W</b>&rsquo;s key is
+its owner&rsquo;s key plus its own partial key: <code>W(J, P, D)</code> with
+(J, P) primary and J a foreign key to <code>H</code>. The double line into
+<b>G</b> is what makes J non-null here, and it is non-null by construction, since
+it is part of the primary key.</p>
+<p><strong>Step 4 &mdash; the two relationships, which go differently.</strong>
+<b>S</b> is <var>M</var>&nbsp;:&nbsp;<var>N</var>, so it must become its own
+relation <code>S(J, L)</code> keyed by both. <b>R</b> is
+<var>M</var>&nbsp;:&nbsp;1 from E to F, so the default would be a column L inside
+<code>E</code> &mdash; but <b>E</b>&rsquo;s participation in <b>R</b> is
+<em>partial</em> (a single line), so that column would be null for every E with
+no F. The book gives <b>R</b> its own relation <code>R(K, L)</code>, keyed by K
+alone: at most one row per E, so the cardinality is still enforced, and E&rsquo;s
+with no partner simply have no row.</p>
+<p>Keep that last paragraph in mind for the next exercise, where exactly one line
+in the diagram changes.</p>
+</div></details>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="-5 -27 760 582" role="img" aria-label="ER diagram like Figure 55 with a composite attribute and a specialization">
+<ellipse cx="95" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="95" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">A</text>
+<ellipse cx="215" cy="40" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">K</text>
+<rect x="84" y="96" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="130" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">E</text>
+<path d="M95.0 62.0L109.9 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M215.0 57.0L152.4 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="252,115 300,88 348,115 300,142" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">R</text>
+<path d="M176.0 117.2L255.9 117.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M176.0 112.8L255.9 112.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="214" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="424" y="96" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">F</text>
+<path d="M348.0 115.0L424.0 115.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="386" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="470" cy="50" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="470" y="50" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">B</text>
+<path d="M470.0 67.0L470.0 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">V</text>
+<path d="M600.0 72.0L512.5 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="0" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="0" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">Y</text>
+<path d="M600.0 17.0L600.0 38.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="700" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="700" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">X</text>
+<path d="M655.0 55.0L645.0 55.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="610" cy="140" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="610" y="140" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">L</text>
+<path d="M565.0 140.0L516.0 126.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M130.0 134.0L130.0 173.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="130" cy="184" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="184" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M122.2 191.8L58.6 231.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M137.8 191.8L201.4 231.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M77 208.8A9 9 0 0 0 95 208.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M165 208.8A9 9 0 0 0 183 208.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="8" y="231" width="84" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="50" y="250" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">N</text>
+<rect x="168" y="231" width="84" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="210" y="250" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">T</text>
+<ellipse cx="50" cy="315" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="50" y="315" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">Q</text>
+<path d="M50.0 298.0L50.0 269.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="210" cy="315" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="210" y="315" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">Z</text>
+<path d="M210.0 298.0L210.0 269.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="422,210 470,183 518,210 470,237" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="210" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">S</text>
+<path d="M470.0 134.0L470.0 183.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="158.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="424" y="286" width="92" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">H</text>
+<path d="M470.0 237.0L470.0 286.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="261.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="600" cy="272" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="272" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">J</text>
+<path d="M555.0 272.0L516.0 295.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="328" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="328" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">C</text>
+<path d="M555.0 328.0L516.0 316.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="620" cy="385" rx="45" ry="17" stroke-dasharray="6 4" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="620" y="385" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">O</text>
+<path d="M575.0 385.0L508.0 324.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="420,400 470,373 520,400 470,427" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="427,400 470,380 513,400 470,420" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="400" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">G</text>
+<path d="M470.0 324.0L470.0 373.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="348.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="418" y="471" width="104" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="423" y="476" width="94" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="490" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">W</text>
+<path d="M467.8 425.8L467.8 471.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M472.2 425.8L472.2 471.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="454" y="449" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="340" cy="490" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="340" y="490" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">P</text>
+<path d="M385.0 490.0L418.0 490.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="600" cy="490" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="490" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">D</text>
+<path d="M522.0 490.0L555.0 490.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 56. Almost the same diagram as Figure 55. Compare the two line by line before mapping either one.</figcaption></figure>
+<details class="prob"><summary data-label="Exercise 3.3">Write a set of relational schemas for the database represented by the ER diagram given in Figure 56 above, and identify precisely all the primary key(s) and the foreign key(s). Your design should have an adequate level of normalization.</summary><div class="sol">
+<pre>E (<u>K</u>, A, L)
+F (<u>L</u>, B, X, Y)
+N (<u>K</u>, Q)
+T (<u>K</u>, Z)
+H (<u>J</u>, C)
+S (<u>J</u>, <u>L</u>)
+W (<u>J</u>, <u>P</u>, D)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references field</th><th>in schema</th></tr></thead>
+<tbody>
+<tr><td>K</td><td>N</td><td>K</td><td>E</td></tr>
+<tr><td>K</td><td>T</td><td>K</td><td>E</td></tr>
+<tr><td>L</td><td>E</td><td>L</td><td>F</td></tr>
+<tr><td>J</td><td>S</td><td>J</td><td>H</td></tr>
+<tr><td>L</td><td>S</td><td>L</td><td>F</td></tr>
+<tr><td>J</td><td>W</td><td>J</td><td>H</td></tr>
+</tbody></table></div>
+<p>Four things changed from Figure 55, and each one changes the schema.</p>
+<p><strong>1. <b>V</b> is now composite, not multivalued.</strong> It is a plain
+ellipse with <b>Y</b> and <b>X</b> hanging off it. A composite attribute
+<em>flattens</em>: its leaves become columns of the owner and the composite itself
+vanishes, giving <code>F(L, B, X, Y)</code>. No extra relation. Compare
+<code>Fv</code> in Exercise 3.2 &mdash; one ellipse drawn differently is the whole
+difference between four columns and a second table.</p>
+<p><strong>2. <b>E</b> now participates totally in <b>R</b>.</strong> The line
+from <b>E</b> to <b>R</b> is doubled. Every E has an F, so the foreign key L can
+live inside <code>E</code> and be <code>NOT NULL</code> &mdash; there are no holes
+to avoid, and the separate <code>R</code> relation of Exercise 3.2 would now be an
+extra join for nothing. Hence <code>E(K, A, L)</code>.</p>
+<p><strong>3. <b>E</b> has a specialization.</strong> <b>N</b> and <b>T</b> become
+relations keyed by the superclass&rsquo;s key, each carrying only its own extra
+attribute and a foreign key up to <code>E</code>. This is option (a) of Exercise
+3.12, and it is the only one available here: the specialization is partial, so
+some E is in neither subclass and a design without an <code>E</code> table would
+have nowhere to put it.</p>
+<p><strong>4. <b>O</b> is derived.</strong> Dashed ellipse, so it is computed, not
+stored. It contributes no column at all &mdash; the one mapping rule whose output
+is nothing.</p>
+<div class="box note"><span class="bt">A discrepancy in the printed answer</span>
+<p>The problem book&rsquo;s foreign-key table for this problem lists "L in
+<b>R</b> references L in <b>F</b>", but its own schema list for Figure 56 contains
+no relation called <b>R</b> &mdash; L now lives in <code>E</code>. The schema list
+is the part that matches the diagram, so the row above reads "L in E". Worth
+knowing in case you are comparing against the book and think you have lost a
+table.</p></div>
+</div></details>
+
+<figure class="fig" style="--figmax:44rem">
+<svg viewBox="-5 0 905 365" role="img" aria-label="ER diagram with entity sets X, S, H and a specialization of H">
+<ellipse cx="75" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="75" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">B</text>
+<ellipse cx="50" cy="130" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="50" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">J</text>
+<ellipse cx="100" cy="205" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="100" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">D</text>
+<rect x="146" y="111" width="88" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">X</text>
+<path d="M75.0 72.0L165.4 111.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M95.0 130.0L146.0 130.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M100.0 188.0L172.0 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="277,130 325,103 373,130 325,157" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="325" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">F</text>
+<path d="M234.0 130.0L277.0 130.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="255.5" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="325" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="325" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">P</text>
+<path d="M325.0 72.0L325.0 103.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="325" cy="205" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="325" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">A</text>
+<path d="M325.0 188.0L325.0 157.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="416" y="111" width="88" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="460" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">S</text>
+<path d="M369.1 132.2L416.0 132.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M369.1 127.8L416.0 127.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="394.5" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="460" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="460" cy="55" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="460" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">G</text>
+<path d="M460.0 72.0L460.0 111.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="460" cy="205" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="460" y="205" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">L</text>
+<path d="M460.0 188.0L460.0 149.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="552,130 600,103 648,130 600,157" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">K</text>
+<path d="M504.0 130.0L552.0 130.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="528" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="600" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="600" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">Z</text>
+<path d="M600.0 72.0L600.0 103.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="696" y="111" width="88" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="740" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">H</text>
+<path d="M648.0 130.0L696.0 130.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="672" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="740" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="740" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">Q</text>
+<path d="M740.0 72.0L740.0 111.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="845" cy="68" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="845" y="68" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">C</text>
+<path d="M845.0 85.0L779.1 111.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M740.0 149.0L740.0 188.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="740" cy="199" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="740" y="199" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">o</text>
+<path d="M732.2 206.8L671.0 246.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M747.8 206.8L809.0 246.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M687 224.8A9 9 0 0 0 705 224.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M775 224.8A9 9 0 0 0 793 224.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="623" y="246" width="84" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="665" y="265" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Y</text>
+<rect x="773" y="246" width="84" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="815" y="265" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">E</text>
+<ellipse cx="665" cy="330" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="665" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">T</text>
+<path d="M665.0 313.0L665.0 284.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="815" cy="330" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="815" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">V</text>
+<path d="M815.0 313.0L815.0 284.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 57. Entity sets <b>X</b>, <b>S</b> and <b>H</b>, with a specialization at the end of the chain.</figcaption></figure>
+<details class="prob"><summary data-label="Exercise 3.4">Write a set of relational schemas for the database represented by the ER diagram given in Figure 57 above, and identify precisely all the primary key(s) and the foreign key(s).</summary><div class="sol">
+<pre>H  (<u>C</u>, Q)
+Y  (<u>C</u>, T)
+E  (<u>C</u>, V)
+X  (<u>D</u>, J, B)
+S  (<u>L</u>, D, A, P)
+Sg (<u>L</u>, <u>G</u>)
+K  (<u>C</u>, L, Z)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td>C</td><td>Y</td><td>H</td></tr>
+<tr><td>C</td><td>E</td><td>H</td></tr>
+<tr><td>D</td><td>S</td><td>X</td></tr>
+<tr><td>L</td><td>Sg</td><td>S</td></tr>
+<tr><td>C</td><td>K</td><td>H</td></tr>
+<tr><td>L</td><td>K</td><td>S</td></tr>
+</tbody></table></div>
+<p><strong>Step 1 &mdash; <b>F</b> folds, <b>K</b> does not.</strong> Both are
+functional, and the difference is participation, exactly as in the previous two
+exercises. <b>S</b> participates <em>totally</em> in <b>F</b> (double line), so
+<b>F</b>&rsquo;s attributes <b>A</b> and <b>P</b> and the foreign key <b>D</b> all
+fold into <code>S</code>. <b>H</b> participates <em>partially</em> in <b>K</b>
+(single line), so <b>K</b> keeps its own relation, keyed by C alone.</p>
+<p><strong>Step 2 &mdash; where a relationship&rsquo;s attributes go.</strong>
+When a relationship folds, its attributes fold with it: that is why
+<code>S</code> carries A and P, which belong to <b>F</b> and not to <b>S</b>.
+When it does not fold, they stay with it: <code>K</code> carries Z. Losing these
+is the commonest way to drop information in this exercise.</p>
+<p><strong>Step 3 &mdash; the multivalued <b>G</b>.</strong> Its own relation
+<code>Sg(L, G)</code>, both columns in the key. Same rule as <code>Fv</code> in
+Exercise 3.2.</p>
+<p><strong>Step 4 &mdash; the specialization.</strong> <b>Y</b> and <b>E</b>
+become relations keyed by <b>H</b>&rsquo;s key C, each with its own attribute.</p>
+<p><strong>A sanity check worth doing.</strong> Every underlined key in the
+diagram appears as a primary key somewhere, and every line in the diagram is
+accounted for by either a foreign key or a whole relation. If a line has vanished,
+information has vanished with it.</p>
+</div></details>
+
+<p>The conceptual schema for the next exercise:</p>
+<pre>T1 (<u>A</u>, B, C)
+T2 (<u>G</u>, H, J)
+T3 (<u>A</u>, G, L)
+T4 (<u>A</u>, <u>P</u>, M)</pre>
+<p>with foreign keys: <code>A</code> in <code>T3</code> references <code>T1</code>;
+<code>G</code> in <code>T3</code> references <code>T2</code>; <code>A</code> in
+<code>T4</code> references <code>T1</code>.</p>
+
+<details class="prob"><summary data-label="Exercise 3.5">Draw a complete ER diagram, indicating carefully all the applicable constraints, for the database whose conceptual schema is the one given just above. Your diagram has to be equivalent to that conceptual schema.</summary><div class="sol">
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="0 0 735 370" role="img" aria-label="ER diagram recovered from four relational schemas">
+<ellipse cx="60" cy="115" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">A</text>
+<ellipse cx="150" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="150" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">B</text>
+<ellipse cx="255" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="255" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">C</text>
+<rect x="142" y="96" width="96" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">T1</text>
+<path d="M105.0 115.0L142.0 115.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M150.0 62.0L167.6 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M255.0 62.0L212.4 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="330,115 385,88 440,115 385,142" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="385" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">T3</text>
+<path d="M238.0 115.0L330.0 115.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="284" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="385" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="385" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">L</text>
+<path d="M385.0 62.0L385.0 88.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="522" y="96" width="96" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="570" y="115" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">T2</text>
+<path d="M440.0 115.0L522.0 115.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="481" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="520" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="520" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">J</text>
+<path d="M520.0 62.0L549.9 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="630" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="630" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">H</text>
+<path d="M630.0 62.0L592.4 96.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="680" cy="130" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="680" y="130" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">G</text>
+<path d="M635.0 130.0L618.0 115.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="138,210 190,183 242,210 190,237" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="145,210 190,190 235,210 190,230" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="210" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;"></text>
+<path d="M190.0 134.0L190.0 183.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="176" y="158.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="140" y="281" width="100" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<rect x="145" y="286" width="90" height="28" rx="1" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">T4</text>
+<path d="M187.8 235.9L187.8 281.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M192.2 235.9L192.2 281.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="174" y="259" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="70" cy="300" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">P</text>
+<path d="M115.0 300.0L140.0 300.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="320" cy="300" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="320" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">M</text>
+<path d="M240.0 300.0L275.0 300.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 58: the diagram that the four relational schemas describe. <b>T4</b> is weak because its primary key extends <b>T1</b>&rsquo;s.</figcaption></figure>
+<p>This is the previous three exercises run backwards, and the reasoning is the
+same rules read right to left.</p>
+<p><strong>Step 1 &mdash; which relations are entity sets?</strong> A relation
+whose primary key is a single attribute that is <em>not</em> a foreign key is a
+strong entity set. <code>T1</code> (key A) and <code>T2</code> (key G) qualify.
+Their non-key columns become attributes: B and C on <b>T1</b>, H and J on
+<b>T2</b>.</p>
+<p><strong>Step 2 &mdash; <code>T4</code> is a weak entity set.</strong> Its
+primary key is (A, P) where A alone is a foreign key to <code>T1</code>. That is
+the signature of a weak entity set: a borrowed key extended by a partial key. So
+<b>T4</b> is drawn with a double rectangle, <b>P</b> dash-underlined, and an
+identifying double diamond to <b>T1</b> with a double line on the T4 side.
+<b>M</b> is an ordinary attribute of it.</p>
+<p><strong>Step 3 &mdash; <code>T3</code> is a relationship.</strong> Its key is A
+alone, and it holds foreign keys to both <code>T1</code> and <code>T2</code>. Key
+on one side only means <em>at most one row per T1</em>: the relationship is
+<var>M</var>&nbsp;:&nbsp;1 from <b>T1</b> to <b>T2</b>. Its extra column <b>L</b>
+is an attribute of the relationship. And because <code>T3</code> was given its own
+relation rather than folded into <code>T1</code>, participation on the T1 side is
+partial &mdash; a single line.</p>
+<p><strong>Step 4 &mdash; what you cannot recover.</strong> A schema does not
+record whether the designer folded a total 1:<var>M</var> relationship or kept a
+partial one separate, so more than one diagram maps to the same tables. The
+diagram above is the natural reading; a diagram with total participation and
+<code>T3</code> kept separate anyway would produce identical tables. Say which
+reading you took &mdash; that is what "equivalent to the given schema" asks
+for.</p>
+</div></details>
+
+<h3>The Professor Payroll database</h3>
+
+<p>The next three work on one live database. Its Part&nbsp;I conceptual schema is
+the one quoted in &sect;3.1: <code>professor</code>, <code>department</code> and
+<code>member</code>, with <code>chairId</code> in <code>department</code>
+referencing <code>professor</code>, and <code>profId</code> and
+<code>deptName</code> in <code>member</code> referencing <code>professor</code>
+and <code>department</code>.</p>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="-10 0 800 375" role="img" aria-label="Incorrect ER diagram of the Professor Payroll database">
+<rect x="119.05" y="156" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="175" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">professor</text>
+<ellipse cx="60" cy="45" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">firstName</text>
+<path d="M60.0 62.0L150.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="215" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecN</text>
+<path d="M215.0 52.0L185.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="48" cy="105" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="48" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">lastName</text>
+<path d="M94.2 105.0L119.1 157.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="45" cy="245" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="45" y="245" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M45.0 228.0L130.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="55" cy="305" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="55" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">rank</text>
+<path d="M55.0 288.0L155.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="185" cy="340" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="185" y="340" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">wizID</text>
+<path d="M185.0 323.0L175.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="539.5" y="156" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">department</text>
+<ellipse cx="620" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="620" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M620.0 62.0L612.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="730" cy="105" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="730" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">office</text>
+<path d="M685.0 105.0L660.5 156.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="650" cy="305" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="650" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone</text>
+<path d="M650.0 288.0L620.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="335,105 390,78 445,105 390,132" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">chair</text>
+<path d="M230.9 160.4L346.3 110.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="263.75" y="132.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M433.7 110.6L539.5 157.9" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="516.25" y="132.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<polygon points="335,248 390,221 445,248 390,275" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="248" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">member</text>
+<path d="M230.9 189.6L346.3 242.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="268.5" y="222.7" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M433.7 242.4L539.5 192.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="511.5" y="222.7" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>Figure 59: the programmer&rsquo;s conversion. Two of these four cardinality marks are wrong.</figcaption></figure>
+<details class="prob"><summary data-label="Exercise 3.6">An inexperienced programmer has converted the conceptual schema of the Professor Payroll database into the ER diagram given in Figure 59 above, and made two significant, independent mistakes. Find them, draw the correct diagram, and for each mistake write two explanations: one for the programmer, in technical terms, and one for the data administrator, saying how the business will suffer if the design is adopted uncorrected.</summary><div class="sol">
+<p>Both mistakes are cardinality marks, and both are found the same way: read what
+the <em>tables</em> say, then check whether the diagram says it too.</p>
+<p><strong>Mistake 1 &mdash; <b>chair</b> points the wrong way.</strong></p>
+<p><em>For the programmer:</em> relation <b>chair</b> was programmed to be
+<var>M</var>&nbsp;:&nbsp;1 from <b>professor</b> to <b>department</b>, but it must
+be <var>M</var>&nbsp;:&nbsp;1 from <b>department</b> to <b>professor</b>, since
+<code>chairId</code> is a non-key attribute in table <code>department</code>.
+Furthermore, participation in relation <b>chair</b> must be mandatory on the side
+of <b>department</b>, since <code>chairId</code> is assumed to be non-null.</p>
+<p><em>For the data administrator:</em> if this is not corrected, the design will
+allow departments to have any number &mdash; zero or more &mdash; of professors as
+chair.</p>
+<p><strong>Mistake 2 &mdash; <b>member</b> is not functional at all.</strong></p>
+<p><em>For the programmer:</em> relation <b>member</b> was programmed to be
+<var>M</var>&nbsp;:&nbsp;1 from <b>department</b> to <b>professor</b>, but it must
+be <var>M</var>&nbsp;:&nbsp;<var>M</var>, since an instance of membership (in
+table <code>member</code>) is identified by a <em>pair</em> of identifiers,
+<code>deptName</code> and <code>profId</code>.</p>
+<p><em>For the data administrator:</em> if this is not corrected, the original
+design will prevent departments from having more than one member.</p>
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="-10 0 800 375" role="img" aria-label="Correct ER diagram of the Professor Payroll database">
+<rect x="119.05" y="156" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="175" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">professor</text>
+<ellipse cx="60" cy="45" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">firstName</text>
+<path d="M60.0 62.0L150.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="215" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecN</text>
+<path d="M215.0 52.0L185.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="48" cy="105" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="48" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">lastName</text>
+<path d="M94.2 105.0L119.1 157.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="45" cy="245" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="45" y="245" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M45.0 228.0L130.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="55" cy="305" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="55" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">rank</text>
+<path d="M55.0 288.0L155.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="185" cy="340" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="185" y="340" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">wizID</text>
+<path d="M185.0 323.0L175.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="539.5" y="156" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">department</text>
+<ellipse cx="620" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="620" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M620.0 62.0L612.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="730" cy="105" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="730" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">office</text>
+<path d="M685.0 105.0L660.5 156.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="650" cy="305" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="650" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone</text>
+<path d="M650.0 288.0L620.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="335,105 390,78 445,105 390,132" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">chair</text>
+<path d="M230.9 160.4L346.3 110.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="263.75" y="132.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M431.1 111.8L539.5 160.3" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M436.2 109.3L540.7 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="516.25" y="132.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<polygon points="335,248 390,221 445,248 390,275" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="248" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">member</text>
+<path d="M230.9 189.6L346.3 242.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="268.5" y="222.7" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M433.7 242.4L539.5 192.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="511.5" y="222.7" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>Figure 60: the correct diagram. <b>chair</b> runs 1&nbsp;:&nbsp;M from professor to department and is total on the department side; <b>member</b> is M&nbsp;:&nbsp;M.</figcaption></figure>
+<p><strong>The technique, which generalises.</strong> The primary key of a table
+tells you the cardinality, and nothing else does.</p>
+<ul>
+<li>A foreign key sitting in a table whose primary key is <em>something else</em>
+&mdash; <code>chairId</code> inside <code>department</code> &mdash; means "one per
+row of this table": the relationship is functional <em>from</em> this table.</li>
+<li>A table whose primary key is <em>both</em> foreign keys &mdash;
+<code>member(deptName, profId)</code> &mdash; is
+<var>M</var>&nbsp;:&nbsp;<var>N</var>. It can hold the same department many times
+and the same professor many times.</li>
+<li>A foreign key declared <code>NOT NULL</code> means total participation on that
+side.</li>
+</ul>
+<p>Read those three off the tables before you look at the diagram, and a wrong
+diagram cannot hide.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 3.7">The enterprise will start recording individual paychecks paid to professors. Paychecks are issued by departments: each department identifies its own paychecks by serial number, and each department has its own paycheck numbering, independent of other departments. In addition to the serial number and issuing department, a paycheck specifies the amount to be paid, and the professor to whom it is to be paid. A professor may receive a paycheck only from a department in which the professor is a member. Write a set of relational schemas to implement this upgrade. You may not modify any existing table, only introduce new ones.</summary><div class="sol">
+<pre>paycheck (<u>dpt</u>, <u>serNum</u>, amount, prof)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>dpt, prof</code></td><td><code>paycheck</code></td><td><code>member</code></td></tr>
+</tbody></table></div>
+<p><strong>Step 1 &mdash; a paycheck is a weak entity.</strong> "Each department
+identifies its own paychecks by serial number&hellip; independent of other
+departments" is the definition of a partial key. So the primary key is
+(<code>dpt</code>, <code>serNum</code>), and <code>dpt</code> is inherited from
+the owner.</p>
+<p><strong>Step 2 &mdash; the sentence that makes this exercise interesting.</strong>
+"A professor may receive a paycheck only from a department in which the professor
+is a member." The obvious design gives <code>paycheck</code> two separate foreign
+keys, one to <code>department</code> and one to <code>professor</code> &mdash; and
+that design cannot enforce this rule at all. It would happily record a paycheck
+from a department the professor has nothing to do with.</p>
+<p>The rule is about a <em>pair</em>, and there is already a table whose rows are
+exactly the legal pairs: <code>member</code>. So the foreign key is composite:
+(<code>dpt</code>, <code>prof</code>) together reference
+<code>member(deptName, profId)</code>. One constraint, and the illegal paycheck
+becomes unrepresentable.</p>
+<p><strong>Verified.</strong> With one professor who is a member of CSCI only, the
+server accepts a CSCI paycheck and refuses a MATH one:</p>
+<pre>INSERT INTO paycheck VALUES ('MATH', 1, 5000, '111111111');
+ERROR 1452 (23000): Cannot add or update a child row: a foreign key
+constraint fails (`paycheck`, CONSTRAINT `paycheck_ibfk_1`
+FOREIGN KEY (`dpt`, `prof`) REFERENCES `member` (`deptName`, `profId`))</pre>
+<p>That is the whole argument for the composite foreign key, and it is worth
+running yourself rather than taking on trust.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 3.8">The enterprise will start recording subjects that individual professors teach. Subjects are identified by subject code and further characterised by name, extended textual description, and numeric difficulty rating. When a professor declares their willingness to teach a subject, the enterprise records this fact along with the professor's numeric preference rating of this subject. Additionally, the enterprise assigns its own numeric rating of the professor's appropriateness for the subject. Write a set of relational schemas to implement this upgrade, introducing new tables only.</summary><div class="sol">
+<pre>subject    (<u>code</u>, name, description, difficulty)
+wouldTeach (<u>subjectCode</u>, <u>profCode</u>, preference, fit)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>subjectCode</code></td><td><code>wouldTeach</code></td><td><code>subject</code></td></tr>
+<tr><td><code>profCode</code></td><td><code>wouldTeach</code></td><td><code>professor</code></td></tr>
+</tbody></table></div>
+<p><strong>Step 1 &mdash; one new entity set.</strong> <b>subject</b> is strong:
+it has its own identifier and exists whether or not anyone teaches it.</p>
+<p><strong>Step 2 &mdash; the willingness is a relationship, and it is
+<var>M</var>&nbsp;:&nbsp;<var>N</var>.</strong> A professor may declare several
+subjects and a subject may attract several professors, so it becomes its own
+relation keyed by both foreign keys. No judgement call here &mdash; see the
+warning in &sect;3.4.</p>
+<p><strong>Step 3 &mdash; where the two ratings go, which is the exercise.</strong>
+<b>preference</b> is the professor&rsquo;s rating <em>of that subject</em>, and
+<b>fit</b> is the enterprise&rsquo;s rating <em>of that professor for that
+subject</em>. Both are determined by the pair, so both are columns of
+<code>wouldTeach</code>. Putting <b>difficulty</b> there too would be the
+mirror-image error: a subject&rsquo;s difficulty is a fact about the subject
+alone, and it belongs in <code>subject</code>.</p>
+<p>This is the same test as Set 1&rsquo;s "what is an attribute an attribute of?",
+now with tables instead of diamonds. The question has not changed; only the
+notation has.</p>
+</div></details>
+
+<h3>A whole database</h3>
+
+<figure class="fig" style="--figmax:42rem">
+<svg viewBox="0 0 760 422" role="img" aria-label="ER diagram of a student database with courses, offerings and enrolment">
+<rect x="65" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="120" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">course</text>
+<ellipse cx="120" cy="55" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="55" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M120.0 72.0L120.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="120" cy="190" rx="57.9" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="190" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">description</text>
+<path d="M120.0 173.0L120.0 139.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="245,120 300,93 355,120 300,147" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">given</text>
+<path d="M175.0 120.0L245.0 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="210" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="425" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="480" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">offering</text>
+<path d="M355.0 120.0L425.0 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="390" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="430" cy="50" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="430" y="50" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">year</text>
+<path d="M430.0 67.0L455.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="560" cy="40" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="560" y="40" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">semester</text>
+<path d="M560.0 57.0L500.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="660" cy="100" rx="61.8" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="660" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">4-digit code</text>
+<path d="M598.2 100.0L535.0 120.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="660" cy="170" rx="57.9" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="660" y="170" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">classroom #</text>
+<path d="M602.1 170.0L535.0 137.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="425,235 480,208 535,235 480,262" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="480" y="235" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">enroll</text>
+<path d="M480.0 139.0L480.0 208.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="466" y="173.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="330" cy="235" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="330" y="235" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">grade</text>
+<path d="M375.0 235.0L425.0 235.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="425" y="311" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="480" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">student</text>
+<path d="M480.0 262.0L480.0 311.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="466" y="286.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="390" cy="395" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="390" y="395" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id. number</text>
+<path d="M390.0 378.0L450.0 349.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="620" cy="385" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="620" y="385" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M620.0 368.0L515.0 349.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 61: the Dangerous Professor&rsquo;s student database.</figcaption></figure>
+<details class="prob"><summary data-label="Exercise 3.9">Dangerous Professor keeps a database with information about students who took her courses. The ER diagram is given in Figure 61 above. (a) Construct the relational schemas for this database, with an adequate level of normalization. (b) For each schema, state the primary key and the foreign keys, if any.</summary><div class="sol">
+<pre>student  (<u>id_number</u>, name)
+offering (<u>year</u>, <u>semester</u>, <u>4_digit_code</u>, classroom_number)
+course   (<u>name</u>, description)
+given    (<u>year</u>, <u>semester</u>, <u>4_digit_code</u>, course_name)
+enroll   (<u>year</u>, <u>semester</u>, <u>4_digit_code</u>, <u>student_id_number</u>, grade)</pre>
+<p>The foreign keys:</p>
+<ul>
+<li>Fields <code>year</code>, <code>semester</code>, <code>4_digit_code</code> in
+schema <code>given</code> form a foreign key that references fields
+<code>year</code>, <code>semester</code>, <code>4_digit_code</code> in schema
+<code>offering</code>.</li>
+<li>Field <code>course_name</code> in schema <code>given</code> is a foreign key
+that references field <code>name</code> in schema <code>course</code>.</li>
+<li>Fields <code>year</code>, <code>semester</code>, <code>4_digit_code</code> in
+schema <code>enroll</code> form a foreign key that references the same three
+fields in schema <code>offering</code>.</li>
+<li>Field <code>student_id_number</code> in schema <code>enroll</code> is a
+foreign key that references field <code>id_number</code> in schema
+<code>student</code>.</li>
+</ul>
+<p><strong>Step 1 &mdash; the three-part key, and why everything downstream is
+wide.</strong> An <b>offering</b> is identified by year, semester <em>and</em>
+4-digit code together: the code is reused every term. All three are underlined in
+the diagram, so all three are in the primary key &mdash; and every table that
+references an offering must carry all three columns. Half the work in this
+exercise is bookkeeping that follows from one decision in the diagram.</p>
+<p><strong>Step 2 &mdash; <b>given</b> keeps its own relation.</strong> It is
+1&nbsp;:&nbsp;<var>M</var> from course to offering, so <code>course_name</code>
+could have folded into <code>offering</code>. The book keeps it separate, and the
+key is the offering&rsquo;s three fields alone &mdash; at most one course per
+offering, so the cardinality still holds. Folding it in is equally defensible; say
+which you did.</p>
+<p><strong>Step 3 &mdash; <b>enroll</b> is the <var>M</var>&nbsp;:&nbsp;<var>N</var>
+one.</strong> Its key is the offering&rsquo;s three fields plus the
+student&rsquo;s, four columns in all, and <b>grade</b> &mdash; an attribute of the
+relationship, not of either side &mdash; rides along. A student&rsquo;s grade is
+not a fact about the student, and not a fact about the offering.</p>
+<div class="box note"><span class="bt">Why not give <b>offering</b> a surrogate key?</span>
+<p>In practice you often would: one <code>offering_id</code> column, and
+<code>enroll</code> becomes two columns instead of four. That is a legitimate
+implementation decision and a real one &mdash; but it is not the mapping, and
+doing it silently in an exam answer loses the marks for the composite key. Map
+first, then say you would add a surrogate key and why.</p></div>
+</div></details>
+
+<h3>Mapping what you already drew</h3>
+
+<p>The last three take diagrams from Sets 1 and 2 and finish the job. If you still
+have your own answers to those exercises, map <em>yours</em> rather than mine
+&mdash; the mapping is mechanical, so a disagreement means a disagreement about
+the diagram, which is the more interesting thing to find.</p>
+
+<details class="prob"><summary data-label="Exercise 3.10">Map your answer to Exercise 1.8 &mdash; the hospital pharmacy, where suppliers offer medications at a price and under a brand name &mdash; into relational schemas.</summary><div class="sol">
+<pre>supplier       (<u>name</u>, address)
+supplier_phone (<u>name</u>, <u>phone</u>)
+medication     (<u>gen_name</u>)
+offer          (<u>supplier_name</u>, <u>gen_name</u>, price, brand_name)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td><code>supplier_phone</code></td><td><code>supplier</code></td></tr>
+<tr><td><code>supplier_name</code></td><td><code>offer</code></td><td><code>supplier</code></td></tr>
+<tr><td><code>gen_name</code></td><td><code>offer</code></td><td><code>medication</code></td></tr>
+</tbody></table></div>
+<p><strong>The multivalued attribute becomes the second table.</strong> "Contact
+phone numbers", plural, was a double ellipse in Set 1; here it is
+<code>supplier_phone</code>, with both columns in the key. This is the same rule
+as <code>Fv</code> in Exercise 3.2, now with a noun attached.</p>
+<p><strong>The relationship attributes land where the diagram said they would.</strong>
+<b>price</b> and <b>brand name</b> hung off the <b>offer</b> diamond because they
+are determined by the (supplier, medication) pair. In the schema they are ordinary
+columns of <code>offer</code> &mdash; and the reason they could not go on
+<code>supplier</code> or <code>medication</code> is now mechanical rather than
+conceptual: neither of those tables has a row per pair to put them in.</p>
+<p><strong>A one-column table is fine.</strong> <code>medication</code> has
+nothing but its key, because the Set 1 problem gave medications no attribute other
+than the generic name. Do not be tempted to delete it and use the name directly in
+<code>offer</code>: the table is what asserts that the medication exists, and the
+foreign key is what stops a typo inventing one.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 3.11">Map your answer to Exercise 1.15 &mdash; Midnight Candle&rsquo;s branches, books and physical copies &mdash; into relational schemas.</summary><div class="sol">
+<pre>branch (<u>name</u>, address, phone, url, area)
+book   (<u>isbn</u>, title)
+copy   (<u>isbn</u>, <u>copy_no</u>, grade, branch_name, received)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>isbn</code></td><td><code>copy</code></td><td><code>book</code></td></tr>
+<tr><td><code>branch_name</code></td><td><code>copy</code></td><td><code>branch</code></td></tr>
+</tbody></table></div>
+<p><strong>The weak entity set.</strong> A copy is identified by its book plus its
+copy number, so the primary key is (<code>isbn</code>, <code>copy_no</code>) and
+<code>isbn</code> is also a foreign key. Three tables, not four: the identifying
+relationship <b>of</b> does not become a relation of its own &mdash; it is
+<em>already</em> represented by the <code>isbn</code> column that the weak
+entity had to borrow.</p>
+<p><strong>The <var>M</var>&nbsp;:&nbsp;1 relationship folds, and takes its
+attribute with it.</strong> Every copy is in exactly one branch &mdash; total
+participation, drawn as a double line &mdash; so <code>branch_name</code> is a
+column of <code>copy</code>, declared <code>NOT NULL</code>, and <b>date</b>
+(here <code>received</code>) folds in beside it. This is the total case of
+&sect;3.4, and it is why <code>copy</code> has five columns instead of a separate
+<code>in</code> table.</p>
+<p><strong>What the schema quietly confirms.</strong> Set 1 noted that this design
+records where a copy is <em>now</em> and forgets where it has been. Look at
+<code>copy</code>: one <code>branch_name</code>, one <code>received</code>, one
+row per copy. Moving a copy overwrites both. The limitation was arguable in the
+diagram; in the table it is plainly visible, which is a good reason to map a
+design before committing to it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 3.12">Map your answer to Exercise 2.8 &mdash; students, specialized totally and disjointly into graduates and undergraduates, with prior degrees hanging off the graduate subclass &mdash; into relational schemas. Give all three standard options for the specialization and say what each can enforce.</summary><div class="sol">
+<p><strong>Option (a) &mdash; superclass plus one relation per subclass.</strong>
+Always legal, whatever the constraints.</p>
+<pre>student       (<u>id</u>, name, dob, major)
+graduate      (<u>id</u>)
+undergraduate (<u>id</u>, gpa)
+degree        (<u>id</u>, <u>issued</u>, univers, major)</pre>
+<p>with <code>id</code> in <code>graduate</code> and <code>undergraduate</code>
+referencing <code>student</code>, and <code>id</code> in <code>degree</code>
+referencing <code>graduate</code>. Note where <code>degree</code> points: at
+<code>graduate</code>, not at <code>student</code>. That is the relationship
+attaching to the subclass, carried across intact &mdash; and it is what makes an
+undergraduate with a prior degree unrepresentable, which is what Set 2 said the
+diagram meant.</p>
+<p><strong>Option (b) &mdash; subclass relations only, no superclass.</strong>
+Legal <em>only</em> because this specialization is total: every student is in one
+of the two tables, so nothing is homeless.</p>
+<pre>graduate      (<u>id</u>, name, dob, major)
+undergraduate (<u>id</u>, name, dob, major, gpa)</pre>
+<p>The shared attributes are repeated in both. It saves a join, and it cannot
+enforce disjointness: nothing stops the same <code>id</code> appearing in both
+tables. Tested, and it does not stop it &mdash; both inserts succeed:</p>
+<pre>INSERT INTO graduate      VALUES ('S1', 'x', '2000-01-01', 'CS');
+INSERT INTO undergraduate VALUES ('S1', 'x', '2000-01-01', 'CS', 3.9);
+-- both accepted: option (b) cannot enforce the d constraint</pre>
+<p>It also has nowhere natural to put a query over all students, and
+<code>degree</code> would now reference <code>graduate</code> directly.</p>
+<p><strong>Option (c) &mdash; one relation with a type column.</strong> Legal
+<em>only</em> because the specialization is disjoint &mdash; a single
+<code>kind</code> column holds one value, so an overlapping specialization could
+not use it.</p>
+<pre>student (<u>id</u>, name, dob, major, kind, gpa)</pre>
+<p>with <code>kind</code> in {graduate, undergraduate}. One table, no joins, and
+<code>gpa</code> is null for every graduate &mdash; harmless with two subclasses
+and one extra attribute, unpleasant with five subclasses and twenty.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>option</th><th>needs</th><th>enforces disjoint?</th><th>enforces total?</th><th>nulls</th></tr></thead>
+<tbody>
+<tr><td>(a) super + subs</td><td>nothing</td><td>no</td><td>no</td><td>none</td></tr>
+<tr><td>(b) subs only</td><td>total</td><td>no</td><td>yes</td><td>none</td></tr>
+<tr><td>(c) one table</td><td>disjoint</td><td>yes</td><td>yes</td><td>many</td></tr>
+</tbody></table></div>
+<p><strong>The honest summary.</strong> None of the three enforces everything the
+EER diagram states. Option (a) enforces neither constraint, (b) enforces totality
+but not disjointness, (c) enforces both but pays in nulls. Whichever you choose,
+some constraint you drew in Set 2 survives only as a note to the implementer or a
+<code>CHECK</code> written by hand &mdash; which is the real reason the choice is
+worth thinking about rather than defaulting.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Every schema on this page was written by rule, and none of them was checked for
+redundancy. That is the next question: a set of tables can satisfy every integrity
+constraint and still store the same fact in two places, so that an update can make
+the database contradict itself. Deciding when that has happened, and splitting the
+tables until it cannot, is normalization &mdash; and the functional dependencies
+it works from are exactly the "what determines what" questions you have been
+answering since Set 1.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-eer.html"><span>Previous</span>Set 2. EER: subclasses and specialization</a>
+      <a class="next" aria-disabled="true"><span>Next</span>&mdash;</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
