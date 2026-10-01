@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setting up SQL — MySQL or MariaDB on macOS and Windows</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Setup &middot; MySQL / MariaDB</span>
+  <nav class="topnav">
+    <a href="ex-rel.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a aria-disabled="true">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#which"><span class="t">A.1</span>Which one to install</a></li>
+    <li><a href="#mac"><span class="t">A.2</span>macOS</a></li>
+    <li><a href="#win"><span class="t">A.3</span>Windows</a></li>
+    <li><a href="#check"><span class="t">A.4</span>Check it works</a></li>
+    <li><a href="#first"><span class="t">A.5</span>Your first session</a></li>
+    <li><a href="#gui"><span class="t">A.6</span>Graphical clients</a></li>
+    <li><a href="#trouble"><span class="t">A.7</span>Troubleshooting</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Software setup &middot; do this before we start writing SQL</span>
+  <span class="chnum">Appendix A</span>
+  <h1>Setting up SQL</h1>
+  <p class="chsum">Installing MySQL or MariaDB on macOS and Windows, checking that
+  it actually started, and loading the course demo database so you have something
+  to query. Fifteen minutes, most of it waiting for a download.</p>
+</div>
+
+<p>Everything in this course that is not a diagram eventually becomes SQL, and
+SQL is one of those things you cannot learn by reading. You need a server you can
+break, reset and break again on your own machine &mdash; which is all this
+appendix is for.</p>
+
+<h2 id="which"><span class="secnum">A.1</span>Which one to install</h2>
+
+<p>You can choose either <strong>MySQL</strong> or <strong>MariaDB</strong>.
+MariaDB is a drop-in replacement for MySQL: same client command, same SQL, same
+port. Everything in this course works identically on both, and nothing on this
+site depends on which you picked.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>&nbsp;</th><th>pick this if</th></tr></thead>
+<tbody>
+<tr><td><strong>MySQL</strong></td><td>you are on Windows &mdash; the official installer bundles the server, the command-line client and Workbench in one download</td></tr>
+<tr><td><strong>MariaDB</strong></td><td>you are on macOS with Homebrew, or you simply prefer it; it is the one the answer keys on this site were checked against</td></tr>
+</tbody></table></div>
+
+<div class="box note"><span class="bt">What "SQL" is and is not</span>
+<p>SQL is the language. MySQL and MariaDB are <em>servers</em> that speak it. What
+you are installing is a program that sits in the background holding your
+databases, plus a client that connects to it and sends it statements. That is why
+there are two separate steps below &mdash; installing, and then <em>starting</em>
+&mdash; and why forgetting the second one is the most common thing to go
+wrong.</p></div>
+
+<h2 id="mac"><span class="secnum">A.2</span>macOS</h2>
+
+<h3>1. Install Homebrew, if you have not already</h3>
+
+<p>Homebrew is a package manager for macOS, and the easiest way to install
+software like MySQL or MariaDB. Open Terminal and run:</p>
+
+<pre>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre>
+
+<p>It will ask for your password and may ask you to install Apple's command-line
+developer tools first. Let it.</p>
+
+<h3>2. Install the server</h3>
+
+<pre class="asm">brew install mysql        <span class="c"># or:</span>
+brew install mariadb</pre>
+
+<h3>3. Start the service</h3>
+
+<pre class="asm">brew services start mysql        <span class="c"># or:</span>
+brew services start mariadb</pre>
+
+<p><code>brew services</code> starts the server now <em>and</em> arranges for it to
+start again when you log in, which is what you want &mdash; otherwise the server
+is gone after the next restart and nothing connects.</p>
+
+<h3>4. Secure the installation</h3>
+
+<p>Good practice, and it is where you set the root password:</p>
+
+<pre>mysql_secure_installation</pre>
+
+<p>Follow the prompts to set the root password, remove anonymous users, disallow
+remote root login, and remove the test databases. Saying yes to all of them is
+fine for a course machine.</p>
+
+<h3>5. Connect</h3>
+
+<pre>mysql -u root -p</pre>
+
+<p>It prompts for the root password you just set. A <code>mysql&gt;</code> or
+<code>MariaDB [(none)]&gt;</code> prompt means you are in; <code>exit</code> gets
+you out again.</p>
+
+<h2 id="win"><span class="secnum">A.3</span>Windows</h2>
+
+<h3>1. Download the installer</h3>
+
+<p>Go to the MySQL downloads page and get the <strong>MySQL Installer for
+Windows</strong>. Alternatively, download MariaDB from its own website; the
+MariaDB installer follows the same shape as the steps below.</p>
+
+<h3>2. Run it</h3>
+
+<p>Choose <strong>Developer Default</strong> or <strong>Server Only</strong>,
+depending on your needs. Developer Default brings the MySQL Server, MySQL
+Workbench and the other client tools in one go, and is the simpler choice if you
+are not sure.</p>
+
+<h3>3. Configure the server</h3>
+
+<p>During installation you will be prompted to configure the MySQL Server:</p>
+
+<ul>
+<li>server type, and the port &mdash; the default is <strong>3306</strong>, and
+there is no reason to change it;</li>
+<li>the authentication method &mdash; use the recommended one;</li>
+<li>a <strong>root password</strong>. Write it down. There is no convenient way to
+recover it, and you will need it every time you connect.</li>
+</ul>
+
+<h3>4. Finish, then connect</h3>
+
+<p>Once installation completes, MySQL is installed and ready. To use it from the
+command line, search the Start menu for <strong>MySQL Command Line Client</strong>
+and open it; it asks for the root password you set during installation. MySQL
+Workbench is the graphical alternative and is installed alongside it under
+Developer Default.</p>
+
+<div class="box note"><span class="bt">If you want Workbench separately</span>
+<p>MySQL Workbench is a graphical tool for managing and querying your databases.
+It can be installed through the MySQL Installer, or on its own from the MySQL
+Workbench downloads page.</p></div>
+
+<h2 id="check"><span class="secnum">A.4</span>Check it works</h2>
+
+<p>On either system, open a terminal (or Command Prompt) and ask the client for
+its version:</p>
+
+<pre>mysql --version</pre>
+
+<p>If it is installed correctly this returns the version of MySQL or MariaDB that
+is running &mdash; something like:</p>
+
+<pre>mysql  Ver 8.0.43 for macos14 on arm64 (Homebrew)</pre>
+
+<p>or, on MariaDB:</p>
+
+<pre>mariadb  Ver 15.1 Distrib 10.11.14-MariaDB, for debian-linux-gnu (x86_64)</pre>
+
+<div class="box warn"><span class="bt">A version number is not a running server</span>
+<p><code>mysql --version</code> asks the <em>client</em> what it is, and the client
+is just a program on disk. It answers happily even when no server is running. The
+real test is connecting &mdash; <code>mysql -u root -p</code> &mdash; and the
+first section of &sect;A.7 is about what to do when that fails.</p></div>
+
+<h2 id="first"><span class="secnum">A.5</span>Your first session</h2>
+
+<p>Worth doing straight away, so that the next time you sit down to write SQL
+there is already something to write it against. The course demo file
+<code>collegeDBdemo.sql</code> builds a small college database &mdash; people,
+teachers, departments.</p>
+
+<p>From a terminal, in the folder that holds the file:</p>
+
+<pre>mysql -u root -p -e "CREATE DATABASE collegeDB;"
+mysql -u root -p collegeDB &lt; collegeDBdemo.sql</pre>
+
+<p>Then connect and look around:</p>
+
+<pre>mysql -u root -p collegeDB</pre>
+
+<pre>SHOW TABLES;
++---------------------+
+| Tables_in_collegeDB |
++---------------------+
+| Department          |
+| Discipline          |
+| Person              |
+| Teacher             |
++---------------------+
+
+SELECT * FROM Person;
++------+-------+-----------+
+| id   | name  | yearBorn  |
++------+-------+-----------+
+| 1001 | Blue  |      1970 |
+| 1002 | Red   |      NULL |
+| 1003 | Pink  |      NULL |
+| 1004 | Green |      1980 |
++------+-------+-----------+</pre>
+
+<p>If you get those two results, your installation is working and you are ready
+for everything else on this site.</p>
+
+<div class="box note"><span class="bt">Four things worth knowing on day one</span>
+<ul>
+<li>Every statement ends with a <strong>semicolon</strong>. Without it the client
+just waits, showing <code>-&gt;</code>, for the rest of a statement you thought you
+had finished.</li>
+<li><code>SHOW DATABASES;</code> lists what is on the server;
+<code>USE name;</code> switches to one; <code>SHOW TABLES;</code> lists what is in
+the current one.</li>
+<li>Keywords are not case-sensitive, but on some systems <em>table names
+are</em> &mdash; <code>Person</code> and <code>person</code> may be different
+tables on Linux and the same one on Windows. Type them exactly as they were
+created.</li>
+<li>To run a file instead of typing: <code>SOURCE filename.sql;</code> from inside
+the client, or <code>mysql -u root -p dbname &lt; filename.sql</code> from the
+shell.</li>
+</ul></div>
+
+<h2 id="gui"><span class="secnum">A.6</span>Graphical clients</h2>
+
+<p>Optional. If you would rather not work at the command line:</p>
+
+<ul>
+<li><strong>DBeaver</strong> &mdash; a cross-platform database management tool;
+works with MySQL, MariaDB and most other servers.</li>
+<li><strong>MySQL Workbench</strong> &mdash; the official MySQL GUI, for database
+design and query management. Already present if you chose Developer Default on
+Windows.</li>
+</ul>
+
+<p>Both connect to the server you just installed: host <code>localhost</code>,
+port <code>3306</code>, user <code>root</code>, and the password you set. A GUI is
+genuinely nicer for reading results and for drawing schema diagrams; it is worth
+being able to work without one too, since an exam question will not come with a
+mouse.</p>
+
+<h2 id="trouble"><span class="secnum">A.7</span>Troubleshooting</h2>
+
+<details class="prob"><summary data-label="Problem">&ldquo;Can&rsquo;t connect to local MySQL server through socket&rdquo; / &ldquo;Can&rsquo;t connect to server on 'localhost'&rdquo;</summary><div class="sol">
+<p>The client is fine; the server is not running. This is the single most common
+problem, and it usually means the machine was restarted since you installed.</p>
+<p><strong>macOS:</strong></p>
+<pre class="asm">brew services start mysql        <span class="c"># or mariadb</span>
+brew services list               <span class="c"># shows "started" or "none"</span></pre>
+<p><strong>Windows:</strong> open <strong>Services</strong> from the Start menu,
+find <code>MySQL80</code> (or similar), and start it. Set its startup type to
+Automatic so this does not recur.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Problem">&ldquo;command not found: mysql&rdquo;</summary><div class="sol">
+<p>The program is installed but your shell cannot find it &mdash; a PATH problem,
+not an installation problem.</p>
+<p><strong>macOS, Apple silicon:</strong> Homebrew installs under
+<code>/opt/homebrew</code>, which an older shell profile may not include. Check
+with <code>brew --prefix mysql</code>, then add its <code>bin</code> directory to
+your PATH, or run the full path once to confirm the program is there.</p>
+<p><strong>Windows:</strong> use the <strong>MySQL Command Line Client</strong>
+from the Start menu, which knows where it lives, or add MySQL's
+<code>bin</code> folder to the system PATH.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Problem">&ldquo;Access denied for user 'root'@'localhost'&rdquo;</summary><div class="sol">
+<p>Wrong password, or no password where one is expected. Try
+<code>mysql -u root -p</code> and type it at the prompt rather than putting it on
+the command line &mdash; <code>-p</code> with the password attached has to have
+<em>no space</em> after it, which trips people up.</p>
+<p>If the password is genuinely lost, the quickest route on a course machine is to
+uninstall and reinstall the server; there is nothing in it yet that you cannot
+rebuild from <code>collegeDBdemo.sql</code>. Recovering a root password is
+possible but fiddly, and not worth the time at this stage.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Problem">The client prints <code>-&gt;</code> and will not do anything</summary><div class="sol">
+<p>It is waiting for you to finish the statement. You almost certainly missed the
+semicolon. Type <code>;</code> and press return, and it will run what you typed.</p>
+<p>If you are stuck mid-statement and want out, <code>\c</code> cancels the line.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Problem">&ldquo;Unknown database&rdquo; when loading the demo file</summary><div class="sol">
+<p><code>mysql … collegeDB &lt; collegeDBdemo.sql</code> connects to a database
+that must already exist &mdash; the redirect does not create it. Run the
+<code>CREATE DATABASE collegeDB;</code> step in &sect;A.5 first.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Once this works, the useful habit is to keep your SQL in a <code>.sql</code>
+file rather than typing it into the client. You can re-run it after a mistake, you
+can hand it in, and you can see the whole query at once instead of one line of
+terminal. Every answer key on this site was produced that way &mdash; written to a
+file, run against a server, and the output pasted back.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-rel.html"><span>Previous</span>Set 3. The relational model: from diagram to tables</a>
+      <a class="next" aria-disabled="true"><span>Next</span>&mdash;</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
