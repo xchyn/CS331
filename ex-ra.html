@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 5 — Relational algebra as DML</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 5 &middot; Relational algebra</span>
+  <nav class="topnav">
+    <a href="ex-cons.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-ra-sql.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#ops"><span class="t">5.1</span>The five operations</a></li>
+    <li><a href="#nojoin"><span class="t">5.2</span>Why we write the join out</a></li>
+    <li><a href="#illegal"><span class="t">5.3</span>When an expression is impossible</a></li>
+    <li><a href="#copies"><span class="t">5.4</span>Numbered copies</a></li>
+    <li><a href="#losers"><span class="t">5.5</span>Losers and winners</a></li>
+    <li><a href="#db"><span class="t">5.6</span>The two databases</a></li>
+    <li><a href="#mechanics"><span class="t">5.7</span>Exercises: mechanics</a></li>
+    <li><a href="#college"><span class="t">5.8</span>Exercises: the College database</a></li>
+    <li><a href="#payroll"><span class="t">5.9</span>Exercises: Professor Payroll</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 5 &middot; Lectures 8 and 9</span>
+  <span class="chnum">Relational algebra</span>
+  <h1>A set of operations that apply to relations and produce relations</h1>
+  <p class="chsum">The five operations in the order the lectures give them, then
+  twenty-two exercises: eight on evaluating an expression (or saying precisely
+  why it has none), seven of the lecture's own queries against the College
+  database, and seven more against the Professor Payroll database. No expression
+  on this page uses the join &mdash; &sect;5.2 says why.</p>
+</div>
+
+<p>The relational algebra is small enough to learn in an afternoon and strange
+enough to take a week. Two things make it strange. It has no quantifiers, so
+every <em>no</em>, <em>never</em> and <em>not</em> has to be rebuilt out of set
+difference. And it has no variables, so &ldquo;two different departments&rdquo;
+has to be rebuilt out of two copies of one relation. Sections 5.4 and 5.5 are
+those two tricks; everything else is bookkeeping.</p>
+
+<h2 id="ops"><span class="secnum">5.1</span>The five operations</h2>
+
+<p>A set of operations that apply to relations and produce a relation. Each one
+is defined by what its result's <strong>schema</strong> is and what its result's
+<strong>content</strong> is.</p>
+
+<p><strong>&#9312; Set operations</strong> &mdash; union, intersection and
+difference, for <em>union compatible</em> relations: the two schemas must be the
+same, including the domains.</p>
+
+<pre>Schema:   same as R, or S
+
+Content:  t &isin; R &cup; S  &hArr;  t &isin; R  or   t &isin; S
+          t &isin; R &cap; S  &hArr;  t &isin; R  and  t &isin; S
+          t &isin; R &minus; S  &hArr;  t &isin; R  and  t &notin; S        (also written R \ S)</pre>
+
+<p><strong>&#9313; Selection</strong> &mdash; <code>&sigma;[F] R</code> selects
+the tuples of <var>R</var> that satisfy the filter formula <var>F</var>.</p>
+
+<pre>Schema:   R
+
+Content:  t &isin; &sigma;[F] R  &hArr;  t &isin; R  and  F(t)</pre>
+
+<p><strong>&#9314; Projection</strong> &mdash; <code>&Pi;[D] R</code> selects
+certain attributes <var>D</var> from <var>R</var>.</p>
+
+<pre>Schema:   D
+
+Content:  t &isin; &Pi;[D] R  &hArr;  (&exist; w &isin; R)( w[D] = t )</pre>
+
+<p><strong>&#9315; Product</strong> &mdash; <code>R &times; S</code>, the
+cartesian product of <code>R[A1,&hellip;,An]</code> and
+<code>S[B1,&hellip;,Bm]</code>.</p>
+
+<pre>Schema:   A1, ..., An, B1, ..., Bm
+
+Content:  t &isin; R &times; S  &hArr;  (&exist; v &isin; R)(&exist; w &isin; S)
+                            ( t[A1..An] = v  and  t[B1..Bm] = w )
+
+          |R &times; S|  =  |R| &middot; |S|</pre>
+
+<p><strong>&#9316; Join</strong> &mdash; <code>R &#8904; S</code> combines
+related tuples from two relations by matching on every attribute they share.
+It is defined for completeness; no expression on this page uses it, and
+&sect;5.2 says why. What matters here is the identity the lectures end on:</p>
+
+<pre>R &#8904; S  =  &Pi;[the shared attributes once, then the rest] &sigma;[F] ( R &times; S )
+    where   F  &equiv;  [ every attribute R and S share is equal on both sides ]</pre>
+
+<p>&mdash; a join is a product, a selection and a projection, written short.</p>
+
+<div class="box note"><span class="bt">Notation on this page</span>
+<p>A subscript is written in square brackets immediately after its operator, so
+that an expression fits on one line of monospace: <code>&Pi;[tid] &sigma;[F]
+Teacher</code>. A long filter formula is given a name &mdash; <var>F</var>,
+<var>G</var> &mdash; and written underneath, exactly as in the lectures. Copies
+of a relation in one product are numbered by appending a digit, so
+<code>Teacher1 &times; Person2</code> has fields <code>tid1</code> and
+<code>id2</code>.</p></div>
+
+<div class="box warn"><span class="bt">Projection deduplicates. Selection does not.</span>
+<p>&Pi; returns a <em>set</em>, so <code>&Pi;[A,B] R</code> on a six-tuple
+relation may have two tuples. This is not an optimisation, it is the definition
+&mdash; a relation is a set &mdash; and half the mechanics exercises below turn
+on remembering it. SQL's <code>SELECT</code> does <em>not</em> deduplicate,
+which is why the next set writes <code>SELECT DISTINCT</code> everywhere.</p></div>
+
+<h2 id="nojoin"><span class="secnum">5.2</span>Why we write the join out</h2>
+
+<p>Every exercise on this page is answered with
+<span class="nb">&sigma;, &Pi;, &times;, &cup;, &cap;, &minus;</span> and
+nothing else. That is a deliberate restriction, and it is the one the problem
+book imposes too.</p>
+
+<p>The reason is that <code>&#8904;</code> hides the thing being marked. A join
+decides for itself which attributes to match on &mdash; every pair of columns
+that happen to share a name &mdash; so an answer written with a join never has
+to <em>state</em> the condition that links two relations. Writing
+<code>Teacher1 &times; Department2</code> and then
+<code>tid1 = chair2</code> forces you to know which foreign key you are
+following, and that is the entire content of a query answer. It is also what
+you will type into SQL in the next set, where the comma in the
+<code>FROM</code> clause is the product and the <code>WHERE</code> clause is
+your filter formula &mdash; there is no implicit matching there either.</p>
+
+<p>Two consequences worth noticing before you start.</p>
+
+<p><strong>A product of relations that share an attribute name is still
+fine.</strong> The result simply has two columns of that name, which is what
+the numbered copies of &sect;5.4 are for. A join would have silently merged
+them.</p>
+
+<p><strong>Over two relations with identical schemas, a join is
+intersection.</strong> <code>R &#8904; S</code> there matches on every
+attribute, so it keeps exactly the tuples both relations have &mdash; which is
+<code>R &cap; S</code>, an operation you are allowed. Exercises 5.3 and 5.5 use
+this.</p>
+
+<h2 id="illegal"><span class="secnum">5.3</span>When an expression is impossible</h2>
+
+<p>Roughly a third of the mechanics exercises have no answer, and saying so
+precisely is the whole mark. There are exactly three ways an expression can fail
+to denote a relation.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>fault</th><th>where it bites</th><th>how to say it</th></tr></thead>
+<tbody>
+<tr><td>not union compatible</td><td><code>&cup;</code>, <code>&cap;</code>, <code>&minus;</code></td><td>&ldquo;<var>R</var> and <var>T</var> do not have identical relational schemas&rdquo; &mdash; different arity, or the same arity with different attribute names or domains</td></tr>
+<tr><td>unknown attribute in a filter formula</td><td><code>&sigma;</code></td><td>&ldquo;the condition <var>D</var>&nbsp;=&nbsp;<var>A</var> is invalid, since attribute <var>A</var> is not in the schema of <var>V</var>&rdquo;</td></tr>
+<tr><td>unknown attribute in a projection list</td><td><code>&Pi;</code></td><td>&ldquo;the schema <var>T</var> does not have attributes <var>C</var> and <var>D</var>&rdquo;</td></tr>
+</tbody></table></div>
+
+<p>Nothing else is impossible. In particular, <strong>an empty result is a
+perfectly good result</strong>. Give its schema and an empty body. Several
+exercises below are testing exactly this distinction, and
+&ldquo;impossible&rdquo; where an empty relation is wanted is a wrong
+answer.</p>
+
+<h2 id="copies"><span class="secnum">5.4</span>Numbered copies</h2>
+
+<p>There are no variables, so &ldquo;a teacher who chairs two different
+departments&rdquo; cannot be said directly. It is said by taking two copies of
+<code>Department</code> in one product and numbering them, so that the filter
+formula can mention one copy's field and not the other's:</p>
+
+<pre>&Pi;[name2, salary1] &sigma;[F] ( Teacher1 &times; Person2 &times; Department3 &times; Department4 )
+    where   F  &equiv;  [ tid1 = id2  &and;  tid1 = chair3  &and;  tid1 = chair4  &and;  code3 &ne; code4 ]</pre>
+
+<p>Read it as: lay out every combination of one teacher, one person, and two
+departments; keep the combinations where the person <em>is</em> that teacher and
+both departments are chaired by them and the two departments are different; then
+report the name and salary. The final &Pi; is doing real work &mdash; without it
+the same teacher appears once per qualifying <em>pair</em> of departments.</p>
+
+<p>Three rules of thumb.</p>
+
+<p><strong>The inequality is what makes &ldquo;two&rdquo; mean two.</strong>
+Drop <code>code3 &ne; code4</code> and every teacher who chairs one department
+qualifies, paired with itself. Put the inequality on the <em>key</em> of the
+relation being doubled, or on whichever part of the key the other conditions
+have not already pinned down; an inequality on a non-key field says something
+weaker and usually something wrong.</p>
+
+<p><strong>The number of copies is the number of things the English quantifies
+over.</strong> &ldquo;A department that paid <var>X</var> more than it paid
+<var>Y</var>&rdquo; needs five &mdash; one department, two paychecks and two
+professors.</p>
+
+<p><strong>Every copy needs a condition tying it to the others.</strong> With
+<var>n</var> relations in the product you want at least <var>n</var>&minus;1
+equalities. A missing one is the single most common error in this topic, and it
+is invisible in the result: the answer has the right columns and roughly the
+right number of rows, and is wrong. Count the equalities against the copies
+before you hand the answer in.</p>
+
+<h2 id="losers"><span class="secnum">5.5</span>Losers and winners</h2>
+
+<p>The algebra has no &ldquo;not exists&rdquo;. Every query whose English
+contains <em>no</em>, <em>never</em>, <em>not</em>, <em>only</em> or a
+superlative is built the same way, in three steps:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>step</th><th>name</th><th>what it holds</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>the losers</td><td>the identifiers that are <em>disqualified</em>, because the thing you want to deny does happen to them</td></tr>
+<tr><td>2</td><td>the winners</td><td>all the identifiers, minus the losers</td></tr>
+<tr><td>3</td><td>the result</td><td>put the winners back against the full relation to recover the other fields you were asked for</td></tr>
+</tbody></table></div>
+
+<p>The lectures write it with named intermediate results and a left arrow, which
+is clearer than one nested expression and is what you should do on paper:</p>
+
+<pre>Fail       &larr;  &Pi;[sid] &sigma;[grade = 'F'] GradeSheet
+NeverFail  &larr;  &Pi;[sid] Student  &minus;  Fail
+Result     &larr;  &Pi;[name1] &sigma;[id1 = sid2] ( Person1 &times; NeverFail2 )</pre>
+
+<p>Step 1 is where the thinking is, and it is always the <em>positive</em>
+version of the question. &ldquo;Students that never failed&rdquo; &rarr; the
+losers are the students who <em>did</em> fail. &ldquo;Departments that have
+never issued a paycheck&rdquo; &rarr; the losers are the departments that
+<em>have</em>. Step 2 never varies. Step 3 is needed because the winners are
+bare identifiers and the question asked for names.</p>
+
+<p>Both sides of a difference must be union compatible, which in practice means
+the losers must be projected onto <em>exactly</em> the key you are subtracting
+from &mdash; one column, matching domain. If your losers have two columns the
+difference will not typecheck, and the fix is to project harder.</p>
+
+<div class="box worked"><span class="bt">Subtract from the right relation</span>
+<p><code>&Pi;[sid] Student &minus; Fail</code>, not
+<code>&Pi;[sid] GradeSheet &minus; Fail</code>. A student with no grade sheet at
+all has never failed anything and belongs in the answer, and only the first
+version finds them. The rule generalises: step 2 subtracts from the relation
+that lists <em>everyone who could have qualified</em>, which is almost never the
+relation the losers came out of.</p></div>
+
+<div class="box worked"><span class="bt">A superlative is a negative</span>
+<p>&ldquo;The highest-paid teacher&rdquo; has no maximum operator behind it.
+Turn it round: a teacher is disqualified from being highest-paid exactly when
+somebody earns more. So the losers are the teachers who are out-earned by
+<em>somebody</em> &mdash; a product of <code>Teacher</code> with itself,
+selected on <code>salary1 &lt; salary2</code>, projected onto
+<code>tid1</code>. The winners are everybody else, and that is the maximum.
+Exercise 5.15 is this query; &ldquo;the lowest&rdquo;, &ldquo;the oldest&rdquo;
+and &ldquo;the most&rdquo; are the same move with the inequality turned
+around.</p></div>
+
+<h2 id="db"><span class="secnum">5.6</span>The two databases</h2>
+
+<p><strong>The College database</strong> &mdash; the schema of Lecture 9, whose
+keys you worked out in Exercise 4.9. &sect;5.8 queries it.</p>
+
+<pre>Person     (<u>id</u>, name, address, yearborn)
+Teacher    (<u>tid</u>, rank, salary)
+Student    (<u>sid</u>, yearenroll)
+Department (<u>code</u>, name, chair)
+Course     (<u>dcode</u>, <u>number</u>, name, credit)
+Section    (<u>reqNum</u>, dcode, cnum, <u>year</u>)
+GradeSheet (<u>sid</u>, <u>reqNum</u>, <u>year</u>, grade)</pre>
+
+<div class="tablewrap"><table>
+<thead><tr><th>field(s)</th><th>in schema</th><th>references field(s)</th><th>in schema</th></tr></thead>
+<tbody>
+<tr><td><code>tid</code></td><td><code>Teacher</code></td><td><code>id</code></td><td><code>Person</code></td></tr>
+<tr><td><code>sid</code></td><td><code>Student</code></td><td><code>id</code></td><td><code>Person</code></td></tr>
+<tr><td><code>chair</code></td><td><code>Department</code></td><td><code>tid</code></td><td><code>Teacher</code></td></tr>
+<tr><td><code>dcode</code></td><td><code>Course</code></td><td><code>code</code></td><td><code>Department</code></td></tr>
+<tr><td><code>dcode</code>, <code>cnum</code></td><td><code>Section</code></td><td><code>dcode</code>, <code>number</code></td><td><code>Course</code></td></tr>
+<tr><td><code>sid</code></td><td><code>GradeSheet</code></td><td><code>sid</code></td><td><code>Student</code></td></tr>
+<tr><td><code>reqNum</code>, <code>year</code></td><td><code>GradeSheet</code></td><td><code>reqNum</code>, <code>year</code></td><td><code>Section</code></td></tr>
+</tbody></table></div>
+
+<p>Three features of it drive most of &sect;5.8. <code>Teacher</code> and
+<code>Student</code> hold no names &mdash; a name lives on <code>Person</code>
+and nowhere else, so almost every query needs <code>Person</code> whether or not
+the English mentions it. A grade belongs to a <code>(student, section,
+year)</code> triple, so anything about failing goes through
+<code>GradeSheet</code>. And a section knows its department only through
+<code>Course</code>, by the pair <code>(dcode, cnum)</code> &mdash; except that
+<code>Section</code> also carries <code>dcode</code> directly, which saves a
+relation in several queries.</p>
+
+<p><strong>The Professor Payroll database</strong> &mdash; Appendix B.18 of the
+problem book, Parts (I) and (II). &sect;5.9 queries it.</p>
+
+<pre>professor  (<u>socSecNum</u>, firstName, lastName, salary, rank, wizardID)
+department (<u>name</u>, office, phone, chairId)
+member     (<u>deptName</u>, <u>profId</u>)
+paycheck   (<u>dpt</u>, <u>serNum</u>, amount, prof)</pre>
+
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>chairId</code></td><td><code>department</code></td><td><code>professor</code></td></tr>
+<tr><td><code>profId</code></td><td><code>member</code></td><td><code>professor</code></td></tr>
+<tr><td><code>deptName</code></td><td><code>member</code></td><td><code>department</code></td></tr>
+<tr><td><code>dpt</code>, <code>prof</code></td><td><code>paycheck</code></td><td><code>member</code></td></tr>
+</tbody></table></div>
+
+<p>It is the College database's awkward cousin, and the differences are what
+make it worth doing second. Membership is M&nbsp;:&nbsp;M here, so it has its
+own relation and a professor can belong to several departments at once &mdash;
+where a College teacher chairs departments but belongs to none. And
+<code>paycheck</code>'s foreign key is the <em>pair</em>
+<code>(dpt, prof)</code> into <code>member</code>, so a department can only pay
+its own members, which is why &ldquo;paid by a department they chair&rdquo; is a
+real question and not a tautology.</p>
+
+<h2 id="mechanics"><span class="secnum">5.7</span>Exercises: mechanics</h2>
+
+<p>For each construction, give the schema and the content of the result, or
+explain why the expression is impossible.</p>
+
+<details class="prob"><summary data-label="Exercise 5.1">Construct each of the following, or explain why it is impossible.<p>(1) <code>R &minus; S</code>&nbsp; (2) <code>S &cup; T</code>&nbsp; (3) <code>&sigma;[A&ne;2] R</code>&nbsp; (4) <code>&sigma;[B&ne;3] S</code>&nbsp; (5) <code>&Pi;[A,B] R</code>&nbsp; (6) <code>&Pi;[A,B] &sigma;[C=4] S</code>&nbsp; (7) <code>R &times; T</code>&nbsp; (8) <code>R &cap; S</code></p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>2</td><td>4</td><td>4</td></tr>
+<tr><td>2</td><td>4</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>S</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>5</td><td>6</td><td>7</td></tr>
+<tr><td>9</td><td>3</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>T</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>3</td><td>5</td></tr>
+<tr><td>3</td><td>6</td></tr>
+<tr><td>4</td><td>7</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="box note"><span class="bt">From the lecture</span><p>This is the exercise of Lecture 9, with its join part replaced by the intersection in (8). Your notes have the rest of the answers; they are repeated here so the reasoning is written down.</p></div>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(1) R &minus; S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>4</td><td>4</td></tr>
+<tr><td>2</td><td>4</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(3) &sigma;[A&ne;2] R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td colspan="3"><em>(empty)</em></td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(4) &sigma;[B&ne;3] S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>5</td><td>6</td><td>7</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(5) &Pi;[A,B] R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td></tr>
+<tr><td>2</td><td>4</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(6) &Pi;[A,B] &sigma;[C=4] S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5">(7) R &times; T</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td><td>4</td><td>3</td><td>5</td></tr>
+<tr><td>2</td><td>3</td><td>4</td><td>3</td><td>6</td></tr>
+<tr><td>2</td><td>3</td><td>4</td><td>4</td><td>7</td></tr>
+<tr><td>2</td><td>4</td><td>4</td><td>3</td><td>5</td></tr>
+<tr><td>2</td><td>4</td><td>4</td><td>3</td><td>6</td></tr>
+<tr><td>2</td><td>4</td><td>4</td><td>4</td><td>7</td></tr>
+<tr><td>2</td><td>4</td><td>3</td><td>3</td><td>5</td></tr>
+<tr><td>2</td><td>4</td><td>3</td><td>3</td><td>6</td></tr>
+<tr><td>2</td><td>4</td><td>3</td><td>4</td><td>7</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(8) R &cap; S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td><td>4</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>(2)</strong> is impossible: <var>S</var> and <var>T</var> are not union compatible &mdash; <var>S</var> has three attributes and <var>T</var> has two, so no tuple of one could ever be a tuple of the other.</p>
+<p><strong>(1)</strong> Same schema, so the difference is legal; only <code>(2,3,4)</code> occurs in both.</p>
+<p><strong>(3)</strong> Every tuple of <var>R</var> has <code>A=2</code>, so nothing survives. The result is a relation &mdash; schema <code>A B C</code>, empty body &mdash; not an error. Giving the schema is half the mark.</p>
+<p><strong>(5)</strong> Three tuples in, two out: <code>(2,4,4)</code> and <code>(2,4,3)</code> both project to <code>(2,4)</code> and the duplicate disappears. This is the single most common slip in the whole topic.</p>
+<p><strong>(6)</strong> Select first, then project. Reversed, <code>C</code> is gone before the filter can look at it.</p>
+<p><strong>(7)</strong> Nine tuples &mdash; <code>|R| &middot; |T|</code> &mdash; and the schema has <code>B</code> twice, once from each operand. That is legal, and it is exactly why numbered copies exist.</p>
+<p><strong>(8)</strong> <var>R</var> and <var>S</var> are union compatible, so the intersection is legal: the tuples in both. Note that this is what <code>R &#8904; S</code> would have given you as well, since the two schemas are identical &mdash; see &sect;5.2.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.2">Construct each of the following, or explain why it is impossible.<p>(1) <code>R &minus; T</code>&nbsp; (2) <code>T &cup; R</code>&nbsp; (3) <code>R &cup; S</code>&nbsp; (4) <code>R &cap; T</code>&nbsp; (5) <code>&sigma;[B&ne;m] S</code>&nbsp; (6) <code>&Pi;[A,B] R</code>&nbsp; (7) <code>&sigma;[A&ne;a] R</code>&nbsp; (8) <code>R &times; S</code></p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>m</td></tr>
+<tr><td>a</td><td>m</td><td>m</td></tr>
+<tr><td>a</td><td>m</td><td>b</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>T</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>m</td></tr>
+<tr><td>f</td><td>g</td><td>h</td></tr>
+<tr><td>c</td><td>b</td><td>b</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>S</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>f</td></tr>
+<tr><td>b</td><td>g</td></tr>
+<tr><td>m</td><td>h</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(1) R &minus; T</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>m</td><td>m</td></tr>
+<tr><td>a</td><td>m</td><td>b</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(2) T &cup; R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>m</td></tr>
+<tr><td>f</td><td>g</td><td>h</td></tr>
+<tr><td>c</td><td>b</td><td>b</td></tr>
+<tr><td>a</td><td>m</td><td>m</td></tr>
+<tr><td>a</td><td>m</td><td>b</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(4) R &cap; T</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>m</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(5) &sigma;[B&ne;m] S</th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>f</td></tr>
+<tr><td>b</td><td>g</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(6) &Pi;[A,B] R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td></tr>
+<tr><td>a</td><td>m</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(7) &sigma;[A&ne;a] R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td colspan="3"><em>(empty)</em></td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5">(8) R &times; S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>m</td><td>b</td><td>f</td></tr>
+<tr><td>a</td><td>b</td><td>m</td><td>b</td><td>g</td></tr>
+<tr><td>a</td><td>b</td><td>m</td><td>m</td><td>h</td></tr>
+<tr><td>a</td><td>m</td><td>m</td><td>b</td><td>f</td></tr>
+<tr><td>a</td><td>m</td><td>m</td><td>b</td><td>g</td></tr>
+<tr><td>a</td><td>m</td><td>m</td><td>m</td><td>h</td></tr>
+<tr><td>a</td><td>m</td><td>b</td><td>b</td><td>f</td></tr>
+<tr><td>a</td><td>m</td><td>b</td><td>b</td><td>g</td></tr>
+<tr><td>a</td><td>m</td><td>b</td><td>m</td><td>h</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>(3)</strong> is impossible: <var>R</var> and <var>S</var> are not union compatible. Say so and name the schemas &mdash; three attributes against two.</p>
+<p>The same eight constructions as Exercise 5.1 over letters instead of numbers, which removes the temptation to read arithmetic into the values.</p>
+<p><strong>(2)</strong> Five tuples, not six: <code>(a,b,m)</code> is in both relations and the union is a set.</p>
+<p><strong>(6)</strong> Three tuples in, two out, for the same reason as before.</p>
+<p><strong>(8)</strong> Nine tuples and two columns named <code>B</code>. Had this been a join, the two <code>B</code>s would have been forced equal and seven of the nine tuples would have vanished &mdash; which is precisely the decision &sect;5.2 says you should have to make for yourself.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.3">Construct each of the following, or explain why it is impossible.<p>(1) <code>S &minus; R</code>&nbsp; (2) <code>R &cup; S</code>&nbsp; (3) <code>R &cap; S</code>&nbsp; (4) <code>R &minus; T</code>&nbsp; (5) <code>&sigma;[A=B] R</code>&nbsp; (6) <code>&Pi;[C,D] V</code>&nbsp; (7) <code>&Pi;[A] R &times; &sigma;[D=7] V</code>&nbsp; (8) <code>&Pi;[B] R &times; &sigma;[B=7] T</code></p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>2</td><td>2</td><td>5</td><td>4</td></tr>
+<tr><td>2</td><td>6</td><td>5</td><td>7</td></tr>
+<tr><td>1</td><td>5</td><td>8</td><td>9</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>S</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>2</td><td>5</td><td>4</td></tr>
+<tr><td>4</td><td>6</td><td>1</td><td>2</td></tr>
+<tr><td>1</td><td>5</td><td>8</td><td>9</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>T</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>4</td></tr>
+<tr><td>1</td><td>4</td></tr>
+<tr><td>6</td><td>7</td></tr>
+<tr><td>5</td><td>7</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>V</var></th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>4</td><td>5</td></tr>
+<tr><td>6</td><td>7</td><td>8</td></tr>
+<tr><td>3</td><td>5</td><td>2</td></tr>
+<tr><td>6</td><td>6</td><td>1</td></tr>
+<tr><td>1</td><td>3</td><td>2</td></tr>
+<tr><td>6</td><td>7</td><td>2</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(1) S &minus; R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>6</td><td>1</td><td>2</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(2) R &cup; S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>2</td><td>2</td><td>5</td><td>4</td></tr>
+<tr><td>2</td><td>6</td><td>5</td><td>7</td></tr>
+<tr><td>1</td><td>5</td><td>8</td><td>9</td></tr>
+<tr><td>4</td><td>6</td><td>1</td><td>2</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(3) R &cap; S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>2</td><td>5</td><td>4</td></tr>
+<tr><td>1</td><td>5</td><td>8</td><td>9</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(5) &sigma;[A=B] R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>2</td><td>2</td><td>5</td><td>4</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(6) &Pi;[C,D] V</th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>4</td></tr>
+<tr><td>6</td><td>7</td></tr>
+<tr><td>3</td><td>5</td></tr>
+<tr><td>6</td><td>6</td></tr>
+<tr><td>1</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(7) &Pi;[A] R &times; &sigma;[D=7] V</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>6</td><td>7</td><td>8</td></tr>
+<tr><td>2</td><td>6</td><td>7</td><td>2</td></tr>
+<tr><td>1</td><td>6</td><td>7</td><td>8</td></tr>
+<tr><td>1</td><td>6</td><td>7</td><td>2</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(8) &Pi;[B] R &times; &sigma;[B=7] T</th></tr><tr><th style="text-align:center">B:R</th><th style="text-align:center">B:T</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td colspan="3"><em>(empty)</em></td></tr>
+</tbody></table></div>
+</div>
+<p><strong>(4)</strong> is impossible: <var>R</var> and <var>T</var> do not have identical relational schemas &mdash; they do not even have an equal number of domains.</p>
+<p><strong>(2)</strong> <var>S</var>&rsquo;s first tuple <code>(2,2,5,4)</code> is already in <var>R</var>, so the union has five tuples, not seven.</p>
+<p><strong>(3)</strong> Two tuples are in both. Union compatibility is what makes (1), (2) and (3) all legal and (4) not.</p>
+<p><strong>(6)</strong> Six tuples in, five out: <code>(6,7,8)</code> and <code>(6,7,2)</code> both project to <code>(6,7)</code>.</p>
+<p><strong>(7)</strong> <code>&Pi;[A] R</code> is <code>{2, 1}</code> &mdash; the three tuples with <code>A=2</code> collapse &mdash; and <code>&sigma;[D=7] V</code> has two tuples, so the product has four. Note the schema: <code>A</code> from the left, <code>C D E</code> from the right.</p>
+<p><strong>(8)</strong> Both halves are legal and the right-hand one is empty, so the product is empty. The schema still has to be stated, and it has two columns named <code>B</code> &mdash; one from each operand, written here <code>B:R</code> and <code>B:T</code>.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.4">Construct each of the following, or explain why it is impossible.<p>(1) <code>S &cup; T</code>&nbsp; (2) <code>R &cap; S</code>&nbsp; (3) <code>&sigma;[C=E &or; D=A] V</code>&nbsp; (4) <code>&Pi;[C,D] &sigma;[A=B] R</code>&nbsp; (5) <code>R &minus; T</code>&nbsp; (6) <code>&Pi;[A] R &times; &sigma;[D&ne;d] S</code>&nbsp; (7) <code>&Pi;[A,B] R &times; &Pi;[C,D] S</code></p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>c</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>a</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>b</td><td>d</td></tr>
+<tr><td>b</td><td>g</td><td>f</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>c</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>j</td><td>l</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>S</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>b</td><td>f</td><td>d</td></tr>
+<tr><td>d</td><td>g</td><td>a</td><td>b</td></tr>
+<tr><td>a</td><td>f</td><td>f</td><td>d</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>T</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>d</td></tr>
+<tr><td>g</td><td>h</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>V</var></th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>f</td><td>d</td><td>f</td></tr>
+<tr><td>a</td><td>b</td><td>j</td></tr>
+<tr><td>c</td><td>f</td><td>c</td></tr>
+<tr><td>g</td><td>h</td><td>a</td></tr>
+<tr><td>a</td><td>b</td><td>b</td></tr>
+<tr><td>g</td><td>h</td><td>b</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(2) R &cap; S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td colspan="4"><em>(empty)</em></td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(4) &Pi;[C,D] &sigma;[A=B] R</th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>d</td></tr>
+<tr><td>b</td><td>d</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5">(6) &Pi;[A] R &times; &sigma;[D&ne;d] S</th></tr><tr><th style="text-align:center">A:R</th><th style="text-align:center">A:S</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>d</td><td>g</td><td>a</td><td>b</td></tr>
+<tr><td>b</td><td>d</td><td>g</td><td>a</td><td>b</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(7) &Pi;[A,B] R &times; &Pi;[C,D] S</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>f</td><td>d</td></tr>
+<tr><td>a</td><td>b</td><td>a</td><td>b</td></tr>
+<tr><td>b</td><td>b</td><td>f</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>a</td><td>b</td></tr>
+<tr><td>b</td><td>g</td><td>f</td><td>d</td></tr>
+<tr><td>b</td><td>g</td><td>a</td><td>b</td></tr>
+<tr><td>a</td><td>g</td><td>f</td><td>d</td></tr>
+<tr><td>a</td><td>g</td><td>a</td><td>b</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>(1)</strong> is impossible: <var>S</var> and <var>T</var> are not union compatible.</p>
+<p><strong>(3)</strong> is impossible: the condition <code>D = A</code> is invalid, since attribute <code>A</code> is not in the schema of <var>V</var>.</p>
+<p><strong>(5)</strong> is impossible: <var>R</var> and <var>T</var> are not union compatible.</p>
+<p><strong>(2)</strong> <var>R</var> and <var>S</var> have the same schema, so the intersection is legal &mdash; and they happen to share no tuple, so the answer is the empty relation on <code>A B C D</code>. Legal and empty, not impossible: compare (1), (3) and (5), which are the three genuine failures.</p>
+<p><strong>(3)</strong> and <strong>(5)</strong> are two different kinds of illegality side by side: a filter formula naming an attribute the relation does not have, and a difference between relations of different arity.</p>
+<p><strong>(6)</strong> Note the schema. <code>A</code> appears twice &mdash; once from <code>&Pi;[A] R</code> and once from <var>S</var> &mdash; so the result has five columns, and the two <code>A</code>s hold different things. Both columns are really called <code>A</code>; the <code>:R</code> and <code>:S</code> written above them here are only so that you can tell which is which on the page.</p>
+<p><strong>(7)</strong> Four tuples times two tuples is eight, and the result contains combinations such as <code>(a,b,a,b)</code> that occur in neither original. That is what a product does, and it is why a product on its own is almost never the answer to anything &mdash; it is the raw material a <code>&sigma;</code> then cuts down.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.5">Construct each of the following, or explain why it is impossible.<p>(a) <code>&Pi;[B] R</code>&nbsp; (b) <code>&sigma;[A&gt;B &or; C&gt;D] R</code>&nbsp; (c) <code>&sigma;[A&lt;D &and; D&lt;E] T</code>&nbsp; (d) <code>&sigma;[B&lt;C] S &times; &sigma;[E&gt;0] V</code>&nbsp; (e) <code>&Pi;[B,C] R &minus; &Pi;[B,C] S</code>&nbsp; (f) <code>&Pi;[B,C] R &cap; &Pi;[B,C] S</code></p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>4</td><td>3</td><td>2</td><td>1</td></tr>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td></tr>
+<tr><td>2</td><td>2</td><td>0</td><td>0</td></tr>
+<tr><td>1</td><td>3</td><td>3</td><td>1</td></tr>
+<tr><td>5</td><td>0</td><td>1</td><td>6</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>S</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>3</td></tr>
+<tr><td>4</td><td>3</td><td>2</td></tr>
+<tr><td>0</td><td>0</td><td>1</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>T</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>1</td><td>0</td></tr>
+<tr><td>2</td><td>3</td><td>1</td></tr>
+<tr><td>3</td><td>0</td><td>1</td></tr>
+<tr><td>4</td><td>0</td><td>1</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>V</var></th></tr><tr><th style="text-align:center">F</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>7</td><td>0</td></tr>
+<tr><td>8</td><td>0</td></tr>
+<tr><td>0</td><td>2</td></tr>
+<tr><td>7</td><td>1</td></tr>
+<tr><td>5</td><td>1</td></tr>
+<tr><td>4</td><td>3</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="1">(a) &Pi;[B] R</th></tr><tr><th style="text-align:center">B</th></tr></thead>
+<tbody>
+<tr><td>2</td></tr>
+<tr><td>3</td></tr>
+<tr><td>0</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">(b) &sigma;[A&gt;B &or; C&gt;D] R</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>3</td><td>2</td><td>1</td></tr>
+<tr><td>1</td><td>3</td><td>3</td><td>1</td></tr>
+<tr><td>5</td><td>0</td><td>1</td><td>6</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">(c) &sigma;[A&lt;D &and; D&lt;E] T</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td colspan="3"><em>(empty)</em></td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5">(d) &sigma;[B&lt;C] S &times; &sigma;[E&gt;0] V</th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">F</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>3</td><td>0</td><td>2</td></tr>
+<tr><td>1</td><td>2</td><td>3</td><td>7</td><td>1</td></tr>
+<tr><td>1</td><td>2</td><td>3</td><td>5</td><td>1</td></tr>
+<tr><td>1</td><td>2</td><td>3</td><td>4</td><td>3</td></tr>
+<tr><td>0</td><td>0</td><td>1</td><td>0</td><td>2</td></tr>
+<tr><td>0</td><td>0</td><td>1</td><td>7</td><td>1</td></tr>
+<tr><td>0</td><td>0</td><td>1</td><td>5</td><td>1</td></tr>
+<tr><td>0</td><td>0</td><td>1</td><td>4</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(e) &Pi;[B,C] R &minus; &Pi;[B,C] S</th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>0</td></tr>
+<tr><td>3</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(f) &Pi;[B,C] R &cap; &Pi;[B,C] S</th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td></tr>
+<tr><td>3</td><td>2</td></tr>
+<tr><td>0</td><td>1</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>(a)</strong> Six tuples in, three out. <code>B</code> takes the values <code>2, 3, 0, 2, 3, 0</code> and a relation is a set.</p>
+<p><strong>(b)</strong> Evaluate the disjunction tuple by tuple and resist shortcuts: <code>(2,2,0,0)</code> fails both halves, because <code>2&gt;2</code> and <code>0&gt;0</code> are both false.</p>
+<p><strong>(c)</strong> No tuple of <var>T</var> satisfies both conjuncts, so the result is empty &mdash; with schema <code>A D E</code>.</p>
+<p><strong>(e)</strong> and <strong>(f)</strong> are worth doing together. Projected onto <code>B,C</code>, the two relations are <code>{(2,3),(3,2),(0,1),(2,0),(3,3)}</code> and <code>{(2,3),(3,2),(0,1)}</code> &mdash; note that <var>R</var>&rsquo;s six tuples give five, because <code>(0,0,1,1)</code> and <code>(5,0,1,6)</code> both project to <code>(0,1)</code>. The difference keeps what only <var>R</var> has; the intersection keeps what both have, and the two together partition <code>&Pi;[B,C] R</code>.</p>
+<p>Part (f) is also the one place a join would have given the same answer, since the two operands have identical schemas &mdash; see &sect;5.2. Writing it as <code>&cap;</code> says what you mean.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.6">Construct each of the following, or explain why it is impossible.<p>(a) <code>&Pi;[A] &sigma;[H&gt;C] S</code>&nbsp; (b) <code>&Pi;[B,C] ( &sigma;[H=C] S &times; &sigma;[D=E] V )</code>&nbsp; (c) <code>S &minus; V</code>&nbsp; (d) <code>&Pi;[E] V &minus; &Pi;[E] S</code>&nbsp; (e) <code>&Pi;[E] V &cap; &Pi;[E] S</code></p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>S</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">H</th><th style="text-align:center">C</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>2</td><td>7</td><td>4</td></tr>
+<tr><td>4</td><td>6</td><td>3</td><td>2</td></tr>
+<tr><td>3</td><td>7</td><td>7</td><td>4</td></tr>
+<tr><td>1</td><td>8</td><td>5</td><td>2</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>V</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>4</td><td>7</td></tr>
+<tr><td>3</td><td>4</td><td>4</td></tr>
+<tr><td>2</td><td>7</td><td>1</td></tr>
+<tr><td>6</td><td>5</td><td>3</td></tr>
+<tr><td>5</td><td>2</td><td>2</td></tr>
+<tr><td>3</td><td>8</td><td>4</td></tr>
+<tr><td>6</td><td>7</td><td>2</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="1">(a) &Pi;[A] &sigma;[H&gt;C] S</th></tr><tr><th style="text-align:center">A</th></tr></thead>
+<tbody>
+<tr><td>4</td></tr>
+<tr><td>1</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(b) &Pi;[B,C] ( &sigma;[H=C] S &times; &sigma;[D=E] V )</th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>3</td><td>7</td></tr>
+<tr><td>5</td><td>7</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="1">(d) &Pi;[E] V &minus; &Pi;[E] S</th></tr><tr><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>7</td></tr>
+<tr><td>1</td></tr>
+<tr><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="1">(e) &Pi;[E] V &cap; &Pi;[E] S</th></tr><tr><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>4</td></tr>
+<tr><td>2</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>(c)</strong> is impossible: <var>S</var> and <var>V</var> are not union compatible; they do not even have the same number of attributes.</p>
+<p><strong>(a)</strong> <code>H&gt;C</code> holds for <code>(4,6,3,2)</code> and <code>(1,8,5,2)</code>. Note that <code>(3,7,7,4)</code> fails, since <code>7&gt;7</code> is false &mdash; and that <code>(2,2,7,4)</code> fails too, since <code>2&gt;7</code> is false.</p>
+<p><strong>(b)</strong> Only <code>(3,7,7,4)</code> has <code>H=C</code>, and only <code>(3,4,4)</code> and <code>(5,2,2)</code> have <code>D=E</code>. So the product has two tuples, and projecting onto <code>B</code> (which comes from <var>V</var>) and <code>C</code> (which comes from <var>S</var>) gives <code>(3,7)</code> and <code>(5,7)</code>. Watch which relation each projected attribute belongs to &mdash; that is the whole exercise.</p>
+<p><strong>(d)</strong> and <strong>(e)</strong>. <code>&Pi;[E] V</code> is <code>{7,4,1,3,2}</code> and <code>&Pi;[E] S</code> is <code>{4,2}</code>. Both are single-column relations over the same domain, so both operations typecheck &mdash; and note how much projecting had to happen first to get there. Projecting down to the one shared attribute is how you make two unrelated relations union compatible, and it is the move every losers-and-winners query in &sect;5.8 and &sect;5.9 starts with.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.7">Using only <code>&sigma;, &Pi;, &times;</code> and the set operations, write an expression that defines each of the tables <var>X</var> and <var>Y</var>.
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>c</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>a</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>g</td><td>h</td></tr>
+<tr><td>b</td><td>g</td><td>a</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>c</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>j</td><td>l</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>T</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>d</td></tr>
+<tr><td>g</td><td>h</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>V</var></th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>f</td><td>d</td><td>f</td></tr>
+<tr><td>a</td><td>d</td><td>j</td></tr>
+<tr><td>c</td><td>f</td><td>c</td></tr>
+<tr><td>g</td><td>h</td><td>a</td></tr>
+<tr><td>a</td><td>d</td><td>b</td></tr>
+<tr><td>g</td><td>h</td><td>b</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>X</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>c</td><td>d</td></tr>
+<tr><td>g</td><td>c</td><td>h</td></tr>
+<tr><td>g</td><td>j</td><td>l</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>Y</var></th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>d</td><td>j</td></tr>
+<tr><td>a</td><td>d</td><td>b</td></tr>
+<tr><td>g</td><td>h</td><td>a</td></tr>
+<tr><td>g</td><td>h</td><td>b</td></tr>
+</tbody></table></div>
+</div>
+<pre>X  =  &Pi;[B,C,D] &sigma;[A = a] R
+
+Y  =  &Pi;[C2, D2, E2] &sigma;[F] ( R1 &times; V2 )
+          where   F  &equiv;  [ C1 = C2  &and;  D1 = D2 ]</pre>
+<p><strong>How to find <var>X</var>.</strong> Its schema is <code>B C D</code>, which is <var>R</var> minus <code>A</code> &mdash; so start by guessing a projection of <var>R</var>. <var>R</var> has six tuples and <var>X</var> has three, so something was filtered; look at which three survived (<code>(a,b,c,d)</code>, <code>(a,g,c,h)</code>, <code>(a,g,j,l)</code>) and the common factor is the column that vanished. All three have <code>A = a</code>. Select, then project &mdash; in that order, because once <code>A</code> has been projected away there is nothing left to select on.</p>
+<p><strong>How to find <var>Y</var>.</strong> Schema <code>C D E</code> means <var>V</var> is involved, since nothing else has an <code>E</code>. But <var>Y</var> has four tuples and <var>V</var> has six, so two were <em>removed</em> &mdash; and no filter formula over <code>C, D, E</code> alone that you would want to write removes <code>(f,d,f)</code> and <code>(c,f,c)</code> while keeping <code>(a,d,j)</code> and <code>(a,d,b)</code>. So the filtering came from somewhere else: the surviving tuples are exactly those whose <code>(C,D)</code> pair occurs in <var>R</var> &mdash; <code>(a,d)</code> and <code>(g,h)</code>.</p>
+<p><strong>Writing that without a join.</strong> Put the two relations in a product, equate the columns that have to match, and project away everything from the left-hand copy. The two conjuncts in <var>F</var> are precisely what <code>R &#8904; V</code> would have inferred from the shared names <code>C</code> and <code>D</code> &mdash; and writing them down is the point, because next time the attributes you need to match may <em>not</em> share a name, and then the join is no help at all.</p>
+<p>Using a product to filter one relation by another, then projecting the extra columns away, is the single most useful pattern in the algebra. It is worth recognising from the <em>shape</em> of the answer rather than rediscovering each time.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.8">Using only <code>&sigma;, &Pi;, &times;</code> and the set operations, write an expression that defines each of the tables <var>X</var> and <var>Y</var>.
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>R</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>a</td><td>b</td><td>g</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>a</td><td>d</td></tr>
+<tr><td>b</td><td>b</td><td>g</td><td>h</td></tr>
+<tr><td>b</td><td>g</td><td>j</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>c</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>j</td><td>l</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><var>T</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>d</td></tr>
+<tr><td>g</td><td>h</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><var>V</var></th></tr><tr><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>f</td><td>d</td><td>f</td></tr>
+<tr><td>a</td><td>d</td><td>j</td></tr>
+<tr><td>c</td><td>f</td><td>c</td></tr>
+<tr><td>g</td><td>h</td><td>a</td></tr>
+<tr><td>a</td><td>d</td><td>b</td></tr>
+<tr><td>g</td><td>h</td><td>b</td></tr>
+</tbody></table></div>
+</div>
+</summary><div class="sol">
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>X</var></th></tr><tr><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th><th style="text-align:center">E</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>f</td><td>d</td><td>f</td></tr>
+<tr><td>b</td><td>a</td><td>d</td><td>j</td></tr>
+<tr><td>b</td><td>a</td><td>d</td><td>b</td></tr>
+<tr><td>g</td><td>g</td><td>h</td><td>a</td></tr>
+<tr><td>g</td><td>g</td><td>h</td><td>b</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><var>Y</var></th></tr><tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>b</td><td>b</td><td>g</td><td>h</td></tr>
+<tr><td>a</td><td>g</td><td>j</td><td>l</td></tr>
+</tbody></table></div>
+</div>
+<pre>X  =  &Pi;[B1, C2, D2, E2] &sigma;[F] ( T1 &times; V2 )
+          where   F  &equiv;  [ D1 = D2 ]
+
+Match  &larr;  &Pi;[A1, B1, C1, D1] &sigma;[G] ( R1 &times; T2 )
+          where   G  &equiv;  [ B1 = B2  &and;  D1 = D2 ]
+
+Y      &larr;  R  &minus;  Match</pre>
+<p><strong><var>X</var>.</strong> The schema <code>B C D E</code> is <var>T</var>&rsquo;s two attributes plus <var>V</var>&rsquo;s two new ones, with <code>D</code> shared &mdash; so <var>T</var> and <var>V</var> are being matched on <code>D</code>. Check the count: <var>T</var>&rsquo;s <code>(b,d)</code> matches the three <var>V</var> tuples with <code>D = d</code>, and <code>(g,h)</code> matches the two with <code>D = h</code>. Five tuples, as printed. The projection keeps <code>D</code> once, from either copy &mdash; they are equal, which is exactly what the filter formula asserted.</p>
+<p><strong><var>Y</var>.</strong> Schema <code>A B C D</code> and two tuples, both of which occur in <var>R</var> &mdash; so <var>Y</var> is <var>R</var> with four tuples removed. Which four? Those whose <code>(B,D)</code> pair appears in <var>T</var>: <code>(b,d)</code> for the first two and <code>(g,h)</code> for the fourth and fifth. The survivors are <code>(b,b,g,h)</code>, whose pair is <code>(b,h)</code>, and <code>(a,g,j,l)</code>, whose pair is <code>(g,l)</code> &mdash; neither in <var>T</var>.</p>
+<p><strong>Why <code>Match</code> has to be projected back onto all four attributes of <var>R</var>.</strong> The difference in the last line needs its two operands union compatible, and <var>R</var>&rsquo;s schema is <code>A B C D</code>. So the intermediate result must be projected back to exactly that &mdash; not to <code>(B,D)</code>, which would have been the natural thing to write and would not typecheck.</p>
+<p>&ldquo;<var>R</var> minus the part of <var>R</var> that matches&rdquo; is the losers-and-winners pattern of &sect;5.5, here with a product doing the disqualifying instead of a selection. Every query in &sect;5.8 and &sect;5.9 whose English contains a <em>not</em> has this shape, and this exercise is the small version of it with the answer printed, so it is worth being able to see it without the hint.</p>
+</div></details>
+
+
+<h2 id="college"><span class="secnum">5.8</span>Exercises: the College database</h2>
+
+<p>The seven queries worked in Lectures 8 and 9, against the schema of
+&sect;5.6. Use only
+<span class="nb">&sigma;, &Pi;, &times;, &cup;, &cap;, &minus;</span>.</p>
+
+<details class="prob"><summary data-label="Exercise 5.9">(a) Find Person born after 2005. (b) Find id of teachers where their salary is greater than $100,000.</summary><div class="sol">
+<pre>(a)  &sigma;[yearborn &gt; 2005] Person
+
+(b)  &Pi;[tid] &sigma;[F] Teacher
+         where   F  &equiv;  [ salary &gt; 100000 ]</pre>
+<p>The two smallest queries in the set, and each has exactly one thing in it.</p>
+<p><strong>(a)</strong> is a bare selection, so the schema of the answer is the
+whole of <code>Person</code> &mdash; id, name, address and yearborn. If the
+question had asked for the names, a <code>&Pi;[name]</code> would go on the
+outside.</p>
+<p><strong>A note on the inequality.</strong> &ldquo;Born after 2005&rdquo;
+strictly means <code>yearborn &gt; 2005</code>, which excludes anyone born in
+2005 itself. The lecture writes <code>&ge; 2005</code>, which includes them. On
+our data that is the difference between five people and seven. Neither reading
+is wrong as English &mdash; the point is that the ambiguity is in the
+<em>question</em>, and a good answer states which reading it took. Exams are
+written by people, and &ldquo;after&rdquo;, &ldquo;over&rdquo; and
+&ldquo;more than&rdquo; are the three words most often meant loosely.</p>
+<p><strong>(b)</strong> shows the order that always applies: select first, then
+project. Reverse them and <code>salary</code> is gone before the filter can look
+at it. Note also that the answer is a list of <code>tid</code>s and not of names
+&mdash; which is what was asked, but is almost never what is wanted; the next
+exercise is the version that fixes it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.10">Find the id and name of students who enroll after 2025.</summary><div class="sol">
+<pre>&Pi;[id2, name2] &sigma;[F] ( Student1 &times; Person2 )
+    where   F  &equiv;  [ sid1 = id2  &and;  yearenroll1 &ge; 2025 ]</pre>
+<p>The first query that needs two relations, and the template for every one that
+follows. The shape never changes: put in the product the relations you need,
+then write one equality per foreign-key link and one condition per adjective in
+the question.</p>
+<p>Here the single link is <code>sid1 = id2</code> and the single adjective is
+<code>yearenroll1 &ge; 2025</code>. Drop the link and you get every student
+paired with every person &mdash; a result that is not merely wrong but silently
+plausible, since it has the right columns and far too many rows.</p>
+<p><strong>Why <code>Person</code> has to be here at all.</strong> The question
+asks for a name, and <code>Student</code> has no name in it &mdash; the
+specialization put every shared attribute on the superclass. That is true of
+almost every query in this section: whenever the answer includes a name, an
+address or a birth year, <code>Person</code> appears in the product even though
+the English never mentions it.</p>
+<p><strong>Which copy to project.</strong> <code>id2</code>, not
+<code>sid1</code>. They are equal, so either gives the same values &mdash; but
+the question asked for the student's id and name as a pair from the person
+record, and keeping the projection list on one copy is the habit that stops you
+losing track in the four-relation queries below.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.11">Find the name and salary of those teacher(s) that chair more than one department.</summary><div class="sol">
+<pre>&Pi;[name2, salary1] &sigma;[F] ( Teacher1 &times; Person2 &times; Department3 &times; Department4 )
+    where   F  &equiv;  [ tid1 = id2  &and;  tid1 = chair3  &and;  tid1 = chair4  &and;  code3 &ne; code4 ]</pre>
+<p>Four relations and four conditions. Build it by counting the nouns in the
+English: one teacher, whose name you need (so a person), and two departments.
+Then one equality per link &mdash; teacher to person, teacher to each department
+&mdash; and finally the one condition the question is actually about.</p>
+<p><strong>The inequality is what makes &ldquo;more than one&rdquo; mean more
+than one.</strong> Without <code>code3 &ne; code4</code>, copies 3 and 4 may be
+the same department and every chair qualifies, paired with themselves. The
+inequality goes on <code>code</code> because that is
+<code>Department</code>'s key.</p>
+<p><strong>Doubling the right relation.</strong> <code>Department</code>, not
+<code>Teacher</code> &mdash; the repeated fact is a department, and the teacher
+is one person. Getting this backwards is the usual error in this family of
+queries, and the test is always the same: double whichever relation holds the
+thing there is more than one of.</p>
+<p><strong>Symmetry.</strong> Every qualifying pair of departments is found
+twice, once in each order, so the product's output is doubled before &Pi; merges
+it. If the question had asked &ldquo;how many such pairs&rdquo;, the algebra
+could not have told you &mdash; and would have been out by a factor of two if it
+could.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.12">Find the names of chairs of those departments in whose classes at least one student failed in year 2026.</summary><div class="sol">
+<pre>&Pi;[name1] &sigma;[F] ( Person1 &times; Department2 &times; GradeSheet3 &times; Section4 )
+    where   F  &equiv;  [ id1 = chair2  &and;  code2 = dcode4  &and;
+                    reqNum3 = reqNum4  &and;  year3 = year4  &and;
+                    grade3 = 'F'  &and;  year4 = 2026 ]</pre>
+<p>The longest chain so far, and every link in it is a foreign key you identified
+in Exercise 4.9. Read the filter formula as a path: a person who is the chair of
+a department, whose code appears on a section, which carries a grade sheet, on
+which the grade is F and the year is 2026.</p>
+<p><strong>The link from grade sheet to section is a pair.</strong>
+<code>GradeSheet</code> references <code>Section</code> on
+<code>(reqNum, year)</code>, because that is <code>Section</code>'s key &mdash;
+a registration number is reused from year to year. So two equalities are needed,
+not one, and omitting <code>year3 = year4</code> matches a 2026 grade sheet
+against a 2025 section with the same registration number. That is a wrong answer
+that looks completely reasonable.</p>
+<p><strong>Why <code>Course</code> is not in the product.</strong> A section
+belongs to a department through its course, so you might expect
+<code>Section &rarr; Course &rarr; Department</code>. But
+<code>Section</code> carries <code>dcode</code> directly &mdash; it has to, as
+half of its composite foreign key &mdash; so the department code is already
+there and the hop through <code>Course</code> is unnecessary. Going through
+<code>Course</code> anyway is not wrong, just longer.</p>
+<p><strong>&ldquo;At least one&rdquo; needs nothing at all.</strong> The product
+supplies one tuple per failing grade sheet, and the final &Pi; collapses them,
+so a department with five failures still reports its chair once. Existential
+quantification is free in this algebra; it is negation and universal
+quantification that cost you a difference.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.13">Find name of all students whose name is also the name of another student.</summary><div class="sol">
+<pre>&Pi;[name1] &sigma;[F] ( Person1 &times; Student2 &times; Person3 &times; Student4 )
+    where   F  &equiv;  [ id1 = sid2  &and;  id3 = sid4  &and;  id1 &ne; id3  &and;  name1 = name3 ]</pre>
+<p>Two students, so two copies of <em>both</em> <code>Person</code> and
+<code>Student</code> &mdash; four relations for what the English describes as
+one comparison. Copies 1 and 2 are one student; copies 3 and 4 are the other.</p>
+<p><strong>The two conditions at the end do opposite jobs.</strong>
+<code>id1 &ne; id3</code> says they are different people;
+<code>name1 = name3</code> says they have the same name. Drop the inequality and
+every student matches themselves and the answer is every student's name. Drop
+the equality and the answer is every student's name again, for a different
+reason. Both are needed, and neither alone is close.</p>
+<p><strong>Why <code>Student</code> appears at all.</strong> Without copies 2
+and 4, the query would find <em>people</em> who share a name, which includes
+teachers. The two <code>Student</code> copies are doing nothing but asserting
+that both people are students &mdash; a relation in a product purely as a
+membership test, with none of its attributes used in the filter formula or the
+projection. That is a perfectly ordinary thing to need, and it is worth being
+comfortable with it.</p>
+<p><strong>A wrinkle in the answer.</strong> The result is a set of
+<em>names</em>, so it cannot tell you which students they belonged to; and if
+three students shared a name, the name still appears once. Projecting onto
+<code>id1, name1</code> instead would be more useful and is a fair thing to
+offer alongside the asked-for answer.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.14">Find names of students that never failed a course.</summary><div class="sol">
+<pre>Fail       &larr;  &Pi;[sid] &sigma;[grade = 'F'] GradeSheet
+NeverFail  &larr;  &Pi;[sid] Student  &minus;  Fail
+Result     &larr;  &Pi;[name1] &sigma;[id1 = sid2] ( Person1 &times; NeverFail2 )</pre>
+<div class="box warn"><span class="bt">The attempt that does not work</span>
+<pre>&Pi;[name1] &sigma;[F] ( Person1 &times; GradeSheet2 )
+    where   F  &equiv;  [ id1 = sid2  &and;  grade2 &ne; 'F' ]</pre>
+<p>This gives you the students who <em>passed at least one</em> course, which is
+a different set. A student who passed two courses and failed a third satisfies
+it, on the strength of either of the passes. The word is <em>never</em>: not one
+single failure, anywhere.</p></div>
+<p><strong>Why no selection can express it.</strong> A selection looks at one
+tuple at a time. &ldquo;Never failed&rdquo; is a claim about <em>all</em> of a
+student's grade sheets at once &mdash; and worse, about the absence of a tuple
+rather than the presence of one. No tuple of <code>GradeSheet</code> knows what
+the student's other grade sheets say. The only available move is to enumerate
+everyone who fails the test, which <em>is</em> expressible because failing needs
+only one bad grade, and subtract.</p>
+<p><strong>Subtract from <code>Student</code>, not from
+<code>GradeSheet</code>.</strong> A student with no grade sheet at all has never
+failed anything, and belongs in the answer.
+<code>&Pi;[sid] GradeSheet &minus; Fail</code> would miss them entirely, and on
+our data it misses exactly one student &mdash; which is the kind of error that
+survives testing.</p>
+<p><strong>And a wrinkle in the answer.</strong> Because the result is projected
+onto <code>name</code>, a name reappears if <em>any</em> student with that name
+qualifies. We have two students called John Chen; one never failed and one did,
+and the name is in the answer. Projecting onto <code>id1, name1</code> gives the
+honest version. The question asked for names, so the answer above is correct
+&mdash; but it is worth a sentence, because the marker will be pleased and
+because in real life somebody would act on this list.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.15">Find name and rank of the teacher(s) with highest salary.</summary><div class="sol">
+<pre>Loser   &larr;  &Pi;[tid1] &sigma;[salary1 &lt; salary2] ( Teacher1 &times; Teacher2 )
+Winner  &larr;  &Pi;[tid] Teacher  &minus;  Loser
+Result  &larr;  &Pi;[name2, rank3] &sigma;[F] ( Winner1 &times; Person2 &times; Teacher3 )
+            where   F  &equiv;  [ tid1 = id2  &and;  tid1 = tid3 ]</pre>
+<p>A superlative, with no maximum operator to reach for. The move is the one in
+&sect;5.5: a teacher is disqualified from being highest-paid exactly when
+somebody out-earns them, so the losers are the teachers for whom such a somebody
+exists &mdash; a product of <code>Teacher</code> with itself. The winners are
+everybody else.</p>
+<p><strong>The comparison must be strict.</strong> With
+<code>salary1 &le; salary2</code> every teacher is a loser against themselves,
+<code>Winner</code> comes back empty, and the query returns nothing. This is the
+most common way to get this query wrong and it fails silently &mdash; an empty
+answer looks like a data problem, not a logic one.</p>
+<p><strong>Ties are handled for free.</strong> If two teachers share the top
+salary, neither out-earns the other, so neither is a loser and both are
+returned. You did not have to ask for that, and in SQL you will have to think
+about it &mdash; <code>ORDER BY salary LIMIT 1</code> would quietly return
+one.</p>
+<p><strong>Step 3 needs two relations, not one.</strong> <code>Winner</code>
+holds bare <code>tid</code>s; the name lives on <code>Person</code> and the rank
+on <code>Teacher</code>, so both have to come back into the product. That is a
+consequence of the specialization mapping, and it is why this query is longer
+than the same question about the Payroll database, where one relation holds
+everything.</p>
+<p>For the lowest salary instead, turn the inequality around:
+<code>salary1 &gt; salary2</code>.</p>
+</div></details>
+
+<h2 id="payroll"><span class="secnum">5.9</span>Exercises: Professor Payroll</h2>
+
+<p>The same techniques against the problem book's database, where membership is
+M&nbsp;:&nbsp;M and the questions get longer. Same restriction: only
+<span class="nb">&sigma;, &Pi;, &times;, &cup;, &cap;, &minus;</span>.</p>
+
+<details class="prob"><summary data-label="Exercise 5.16">(a) Find department name and amount of each issued paycheck. (b) Find department name and serial number of the paychecks whose amount is below 1,000. (c) Find full name and salary of each professor that serves in the rank of <code>Chief Wizard</code>.</summary><div class="sol">
+<pre>(a)  &Pi;[dpt, amount] paycheck
+
+(b)  &Pi;[dpt, serNum] &sigma;[F] paycheck
+         where   F  &equiv;  [ amount &lt; 1000 ]
+
+(c)  &Pi;[firstName, lastName, salary] &sigma;[F] professor
+         where   F  &equiv;  [ rank = 'Chief Wizard' ]</pre>
+<p>Three one-relation queries, to get used to the schema.</p>
+<p><strong>(a)</strong> is a bare projection, and it is already lossy in an
+interesting way: two departments that happened to issue paychecks of the same
+amount collapse to one tuple, because &Pi; deduplicates. Had the question asked
+&ldquo;how much was paid out in total&rdquo;, no expression in this algebra
+would answer it &mdash; there is no aggregation here at all.</p>
+<p><strong>(c)</strong> is a string comparison. Note that the whole rank is the
+value: <code>rank = 'Chief'</code> matches nothing, and there is no
+&ldquo;starts with&rdquo; in the algebra.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.17">(a) Find names and phone numbers of those departments whose chair earns less than 1,000 in salary. (b) Find full names (first and last) of all professors who are members of the department named <code>Potions</code>. (c) Find full names of all professors who serve as department chairs.</summary><div class="sol">
+<pre>(a)  &Pi;[name1, phone1] &sigma;[F] ( department1 &times; professor2 )
+         where   F  &equiv;  [ chairId1 = socSecNum2  &and;  salary2 &lt; 1000 ]
+
+(b)  &Pi;[firstName1, lastName1] &sigma;[F] ( professor1 &times; member2 )
+         where   F  &equiv;  [ socSecNum1 = profId2  &and;  deptName2 = 'Potions' ]
+
+(c)  &Pi;[firstName1, lastName1] &sigma;[F] ( professor1 &times; department2 )
+         where   F  &equiv;  [ socSecNum1 = chairId2 ]</pre>
+<p>The two ways a professor can be attached to a department, and they are not
+symmetrical. Membership lives in its own relation because it is
+M&nbsp;:&nbsp;M; chairing lives in a column of <code>department</code> because
+it is 1&nbsp;:&nbsp;M. So (b) goes through <code>member</code> and (c) does not,
+and knowing which without looking it up is most of what Set 4 was for.</p>
+<p><strong>(c)</strong> has no condition beyond the link, which is worth
+noticing: &ldquo;is a chair&rdquo; is not a property stored on a professor, it is
+the existence of a matching tuple in <code>department</code>. The equality
+<em>is</em> the question.</p>
+<p>Unlike the College database, <code>professor</code> carries its own names, so
+nothing here needs a second relation just to find out what someone is called.
+Compare Exercise 5.10, where it did.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.18">(a) Find the full name of the chairs of those departments that have issued at least one paycheck in the amount higher than 10,000. (b) Find id, first name, and last name of those professors who have received paychecks from (at least) two different departments. (c) Find id, first name, and last name of those professors who have received at least two (different) paychecks from the same department on the same amount.</summary><div class="sol">
+<pre>(a)  &Pi;[firstName1, lastName1] &sigma;[F] ( professor1 &times; department2 &times; paycheck3 )
+         where   F  &equiv;  [ socSecNum1 = chairId2  &and;  name2 = dpt3  &and;  amount3 &ge; 10000 ]
+
+(b)  &Pi;[socSecNum1, firstName1, lastName1] &sigma;[F] ( professor1 &times; paycheck2 &times; paycheck3 )
+         where   F  &equiv;  [ socSecNum1 = prof2  &and;  socSecNum1 = prof3  &and;  dpt2 &ne; dpt3 ]
+
+(c)  &Pi;[socSecNum1, firstName1, lastName1] &sigma;[F] ( professor1 &times; paycheck2 &times; paycheck3 )
+         where   F  &equiv;  [ socSecNum1 = prof2  &and;
+                         socSecNum1 = prof3  &and;
+                         dpt2 = dpt3         &and;
+                         serNum2 &ne; serNum3  &and;
+                         amount2 = amount3 ]</pre>
+<p><strong>(b) and (c)</strong> are the same product twice; only the last three
+conjuncts differ, and they are the whole exercise.</p>
+<p>In (b) the inequality is on the department, because &ldquo;two different
+departments&rdquo; is the condition. In (c) it has to be on the serial number
+&mdash; the department is now required to be the <em>same</em>, and so is the
+amount, so the only thing left that can distinguish the two paychecks is the
+rest of the key. Since <code>paycheck</code> is keyed on
+<code>(dpt, serNum)</code> and the departments agree,
+<code>serNum2 &ne; serNum3</code> is precisely &ldquo;a different tuple&rdquo;.</p>
+<p>That is the general rule, worth stating in an answer: to say &ldquo;two
+different <var>X</var>&rdquo;, put the inequality on the key of <var>X</var>, or
+on whichever part of the key the other conditions have not already pinned
+down.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.19">(a) Find department name and phone number of those departments that have issued a paycheck to Professor named <code>Sybill Trelawney</code> as well as to Professor named <code>Firenze Centaur</code>, but the amount paid on Professor Trelawney's check was higher than the amount paid on Professor Centaur's check. (b) Find full names of all professors who are members of more than one department.</summary><div class="sol">
+<pre>(a)  &Pi;[name1, phone1] &sigma;[F] ( department1 &times; paycheck2 &times; paycheck3 &times; professor4 &times; professor5 )
+         where   F  &equiv;  [ name1 = dpt2  &and;
+                         name1 = dpt3  &and;
+                         prof2 = socSecNum4  &and;
+                         prof3 = socSecNum5  &and;
+                         firstName4 = 'Sybill'  &and;  lastName4 = 'Trelawney'  &and;
+                         firstName5 = 'Firenze' &and;  lastName5 = 'Centaur'    &and;
+                         amount2 &gt; amount3 ]
+
+(b)  &Pi;[firstName3, lastName3] &sigma;[F] ( member1 &times; member2 &times; professor3 )
+         where   F  &equiv;  [ profId1 = profId2  &and;  deptName1 &ne; deptName2  &and;
+                         socSecNum3 = profId1 ]</pre>
+<p><strong>(a)</strong> is the largest product on the page and it is built
+mechanically, by counting the nouns: one department, two paychecks, two
+professors &mdash; five copies. Then one equality per link: the department to
+each paycheck (two), each paycheck to its professor (two), which is four for
+five relations, the minimum. Everything after that is adjectives.</p>
+<p>Writing it in that order &mdash; copies, then links, then adjectives &mdash;
+is the difference between a long answer and a wrong one. Attempting it in
+English order produces a tangle, and a missing link is never visible in the
+result.</p>
+<p><strong>(b)</strong> is Exercise 5.11's shape with <code>member</code>
+doubled instead of <code>Department</code>, because membership is where the
+multiplicity lives here &mdash; there is no column anywhere that holds a
+professor's departments.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.20">(a) Find full name (first and last) of those professors who are members in some department where the chair earns less than 1,000 dollars in salary. (b) Find full name and rank of each professor that earns a higher salary than their department chair.</summary><div class="sol">
+<pre>(a)  &Pi;[firstName1, lastName1] &sigma;[F] ( professor1 &times; member2 &times; department3 &times; professor4 )
+         where   F  &equiv;  [ socSecNum1 = profId2  &and;
+                         deptName2 = name3  &and;
+                         chairId3 = socSecNum4  &and;
+                         salary4 &lt; 1000 ]
+
+(b)  &Pi;[firstName1, lastName1, rank1] &sigma;[F] ( professor1 &times; professor2 &times; member3 &times; department4 )
+         where   F  &equiv;  [ socSecNum1 = profId3  &and;
+                         deptName3 = name4  &and;
+                         chairId4 = socSecNum2  &and;
+                         salary1 &gt; salary2 ]</pre>
+<p>Both need <code>professor</code> twice, and the two copies mean different
+people: copy 1 is the member being reported, the other is the chair being
+tested. They are joined through a chain of three equalities &mdash; member to
+department, department to chair &mdash; and if you lose track of which copy is
+which, the query silently answers a different question. In (a), merging copies 1
+and 4 asks for professors whose <em>own</em> salary is below 1,000.</p>
+<p>Naming the copies as you introduce them helps: <code>professor1</code>
+&ldquo;the member&rdquo;, <code>professor4</code> &ldquo;the chair&rdquo;. The
+problem book does not do this, but nothing stops you, and it costs nothing in an
+exam.</p>
+<p><strong>In (b) the word &ldquo;their&rdquo; is doing all the work.</strong> It
+ties the chair to the professor's <em>own</em> department, and that tie is the
+three-equality chain. Break any link and the query becomes &ldquo;professors who
+earn more than some chair somewhere&rdquo;, which is a much weaker claim and
+returns far too many tuples.</p>
+<p>A professor in two departments is tested against each chair separately and
+qualifies if either comparison holds, since the product produces one tuple per
+membership and &Pi; merges them. That is almost certainly the intended reading,
+but it is worth a sentence under your answer, because the question does not
+settle it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.21">(a) Find the full name and rank of those department chairs that have never received a paycheck from any department which they chair (though they may have been paid by other departments). (b) Find names of all departments that have no members. (c) Find department name and phone number of those departments that have never issued a paycheck.</summary><div class="sol">
+<pre>(a)  Loser   &larr;  &Pi;[prof1] &sigma;[F] ( paycheck1 &times; department2 )
+                 where   F  &equiv;  [ prof1 = chairId2  &and;  dpt1 = name2 ]
+     Winner  &larr;  &Pi;[chairId] department  &minus;  Loser
+     Result  &larr;  &Pi;[firstName1, lastName1, rank1] &sigma;[G] ( professor1 &times; Winner2 )
+                 where   G  &equiv;  [ socSecNum1 = socSecNum2 ]
+
+(b)  &Pi;[name] department  &minus;  &Pi;[deptName] member
+
+(c)  Loser   &larr;  &Pi;[dpt] paycheck
+     Winner  &larr;  &Pi;[name] department  &minus;  Loser
+     Result  &larr;  &Pi;[name1, phone1] &sigma;[F] ( department1 &times; Winner2 )
+                 where   F  &equiv;  [ name1 = name2 ]</pre>
+<p>Three negatives, in increasing order of effort.</p>
+<p><strong>(b)</strong> is the pattern at its smallest: both sides are
+projections onto a single column of the same domain, so the difference
+<em>is</em> the answer and no step 3 is needed. Note why the schemas match
+despite the different attribute names &mdash; union compatibility is about arity
+and domains, and <code>name</code> and <code>deptName</code> both range over
+department names.</p>
+<p><strong>(c)</strong> adds step 3. The winners hold bare department names, but
+the question asked for phone numbers too, so they are put back against
+<code>department</code> to pick up the rest of the tuple.</p>
+<p><strong>(a)</strong> is the one that rewards care, because the losers are not
+simply &ldquo;chairs who were paid&rdquo;. A chair paid by a department they do
+<em>not</em> chair is still a winner &mdash; the parenthesis in the question says
+so &mdash; so the loser formula needs both equalities: the paycheck's professor
+is the chair, <em>and</em> the paycheck's department is the one being chaired.
+Drop <code>dpt1 = name2</code> and the answer quietly becomes &ldquo;chairs who
+have never been paid at all&rdquo;.</p>
+<p>Note also that the losers are projected onto one column, <code>prof</code>, so
+that they are union compatible with
+<code>&Pi;[chairId] department</code>. Projecting onto the pair
+<code>(prof, dpt)</code> would have been natural to write and would not have
+typechecked.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 5.22">(a) Find name and phone number of those departments whose chair is not a member in the department. (b) Find full name and rank of each professor that is not a member in the department named <code>Potions</code>. (c) Find full names (first and last) of all professors who are not members of any department where Professor <code>Dolores Umbridge</code> is a member.</summary><div class="sol">
+<pre>(a)  Loser   &larr;  &Pi;[name1] &sigma;[F] ( department1 &times; member2 )
+                 where   F  &equiv;  [ name1 = deptName2  &and;  profId2 = chairId1 ]
+     Winner  &larr;  &Pi;[name] department  &minus;  Loser
+     Result  &larr;  &Pi;[name1, phone1] &sigma;[G] ( department1 &times; Winner2 )
+                 where   G  &equiv;  [ name1 = name2 ]
+
+(b)  Loser   &larr;  &Pi;[profId] &sigma;[deptName = 'Potions'] member
+     Winner  &larr;  &Pi;[socSecNum] professor  &minus;  Loser
+     Result  &larr;  &Pi;[firstName2, lastName2, rank2] &sigma;[G] ( Winner1 &times; professor2 )
+                 where   G  &equiv;  [ socSecNum1 = socSecNum2 ]
+
+(c)  Loser   &larr;  &Pi;[profId1] &sigma;[F] ( member1 &times; member2 &times; professor3 )
+                 where   F  &equiv;  [ deptName1 = deptName2  &and;
+                                 socSecNum3 = profId2  &and;
+                                 firstName3 = 'Dolores'  &and;  lastName3 = 'Umbridge' ]
+     Winner  &larr;  &Pi;[socSecNum] professor  &minus;  Loser
+     Result  &larr;  &Pi;[firstName2, lastName2] &sigma;[G] ( Winner1 &times; professor2 )
+                 where   G  &equiv;  [ socSecNum1 = socSecNum2 ]</pre>
+<p><strong>(b)</strong> is the bare pattern with a selection inside the loser
+formula &mdash; and note that the selection goes <em>inside</em>, before the
+projection, because <code>deptName</code> is needed to apply it and gone
+afterwards.</p>
+<p><strong>(c)</strong> is the hardest negative on the page, because the thing
+being denied is itself a two-relation condition. The losers are
+&ldquo;professors who share <em>some</em> department with Umbridge&rdquo;, which
+needs two copies of <code>member</code>: copy 2 is Umbridge's membership, copy 1
+is the candidate's, and <code>deptName1 = deptName2</code> is the sharing.</p>
+<p><strong>Why the difference has to come last.</strong> The English is
+&ldquo;not a member of <em>any</em> such department&rdquo; &mdash; a universal
+negative. No tuple of <code>member</code> knows about the professor's other
+memberships, so it cannot be expressed by selecting tuples. The only available
+move is to enumerate everyone who fails the test, which <em>is</em> expressible
+since failing needs only one shared department, and subtract. An attempt at
+<code>&sigma;[deptName1 &ne; deptName2]</code> answers a different and much
+weaker question: professors who have <em>a</em> department Umbridge is not
+in.</p>
+<p><strong>Umbridge herself</strong> shares every one of her departments with
+herself, so she lands among the losers and is excluded. That is the right
+reading of the English and worth a sentence, since the question does not say.
+And if Umbridge belonged to no department, the losers would be empty and the
+answer every professor &mdash; also correct, and a useful sanity check on the
+shape: a vacuous universal is true.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Two things the algebra on this page cannot do. It cannot count, sum or
+average &mdash; there is no aggregation operation, so &ldquo;the total payroll
+of each department&rdquo; and &ldquo;how many courses did this student
+fail&rdquo; have no expression here at all. And it cannot ask for a transitive
+closure: &ldquo;everyone in the chain of command above this person&rdquo; needs
+recursion, which is where Datalog comes in.</p>
+<p>What it can do, it does with five operations and no quantifiers, and that
+economy is why it is the thing query optimisers actually manipulate. Set 6
+translates these queries into SQL and runs them, and the first surprise there is
+how little the translation changes &mdash; a product becomes a comma, a selection
+becomes a <code>WHERE</code>, a projection becomes the <code>SELECT</code> list,
+and the losers-and-winners pattern becomes a subquery you will recognise
+immediately.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-cons.html"><span>Previous</span>Set 4. Relational model constraints</a>
+      <a class="next" href="ex-ra-sql.html"><span>Next</span>Set 6. From algebra to SQL</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

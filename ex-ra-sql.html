@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 6 — From relational algebra to SQL</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 6 &middot; Algebra to SQL</span>
+  <nav class="topnav">
+    <a href="ex-ra.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="setup-sql.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#corr"><span class="t">6.1</span>The correspondence</a></li>
+    <li><a href="#adds"><span class="t">6.2</span>Three things SQL adds</a></li>
+    <li><a href="#difference"><span class="t">6.3</span>Writing a set difference</a></li>
+    <li><a href="#db"><span class="t">6.4</span>The two scratch databases</a></li>
+    <li><a href="#college"><span class="t">6.5</span>Exercises: the College database</a></li>
+    <li><a href="#payroll"><span class="t">6.6</span>Exercises: Professor Payroll</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 6 &middot; Lecture 10</span>
+  <span class="chnum">Algebra to SQL</span>
+  <h1>The same queries, in a language a server will run</h1>
+  <p class="chsum">Twenty-one of the Set 5 queries, each given with its algebra,
+  translated into SQL, and run. Every solution shows the rows the server
+  actually printed, so you can check your own answer against the data rather
+  than against a claim.</p>
+</div>
+
+<p>The relational algebra was designed to be <em>reasoned</em> about; SQL was
+designed to be <em>typed</em>. They express the same queries, and the
+translation in one direction is almost mechanical &mdash; which is the useful
+news, because it means the hard thinking you did in Set 5 transfers intact. What
+does not transfer is the set semantics, and that is where the surprises are.</p>
+
+<div class="box note"><span class="bt">The questions are the lectures' and the book's; the instruction is ours</span>
+<p>Every query below appears in Set 5: the first seven are the examples worked
+in Lectures 8 and 9, the rest are Problems 252&ndash;282 of the problem book.
+Asking for the SQL as well, and showing what it returns, is this page's
+addition.</p></div>
+
+<h2 id="corr"><span class="secnum">6.1</span>The correspondence</h2>
+
+<p>This is the whole of Set 6 in four lines. A query in the relational algebra
+and the SQL statement that runs it:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>query in relational algebra</th><th>SQL</th></tr></thead>
+<tbody>
+<tr><td><code>&Pi;[A1, ..., An]</code></td><td><code>SELECT A1, ..., An</code></td></tr>
+<tr><td><code>&sigma;[F] ( R1 &times; ... &times; Rk )</code></td><td><code>FROM R1, ..., Rk</code></td></tr>
+<tr><td><code>F &equiv; [ condition(s) ]</code></td><td><code>WHERE condition(s);</code></td></tr>
+</tbody></table></div>
+
+<p>Read bottom-up it is the algebra inside-out: the product first, then the
+selection, then the projection. SQL writes them in the opposite order from the
+one in which they happen, which is the single most confusing thing about the
+language and stops being confusing the moment you notice it.</p>
+
+<p>The set operations go across just as directly:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>algebra</th><th>SQL</th><th>note</th></tr></thead>
+<tbody>
+<tr><td><code>R &cup; S</code></td><td><code>UNION</code></td><td>already removes duplicates; <code>UNION ALL</code> does not</td></tr>
+<tr><td><code>R &cap; S</code></td><td><code>INTERSECT</code></td><td>MariaDB 10.3+, PostgreSQL, Oracle</td></tr>
+<tr><td><code>R &minus; S</code></td><td><code>EXCEPT</code></td><td>Oracle spells it <code>MINUS</code>; see &sect;6.3 for the portable form</td></tr>
+<tr><td><code>R1 &times; R2</code> <em>(copies of one relation)</em></td><td><code>FROM R r1, R r2</code></td><td>the numbered copies become table aliases, one per copy</td></tr>
+</tbody></table></div>
+
+<p>Two more details. A condition crosses unchanged except that <code>&and;</code>
+is <code>AND</code>, <code>&or;</code> is <code>OR</code> and <code>&ne;</code>
+is <code>&lt;&gt;</code>. And string literals take single quotes: double quotes
+mean an identifier in standard SQL, and MySQL's willingness to accept them for
+strings is a local dialect not worth relying on.</p>
+
+<p>Finally, two forms worth knowing from the start:</p>
+
+<pre class="asm">SELECT * FROM table_name;                    <span class="c">-- selects the whole table</span>
+SELECT DISTINCT ... FROM ... WHERE ...;      <span class="c">-- selects distinct data</span></pre>
+
+<h2 id="adds"><span class="secnum">6.2</span>Three things SQL adds</h2>
+
+<p><strong>Bags, not sets.</strong> A relation is a set; a SQL table is a bag,
+and <code>SELECT</code> returns a bag. So <code>&Pi;</code> translates to
+<code>SELECT DISTINCT</code>, not <code>SELECT</code>. Leave out the
+<code>DISTINCT</code> and a professor with four qualifying paychecks is listed
+four times &mdash; the answer is not merely untidy, it is a different relation.
+Exercise 6.13 shows exactly this.</p>
+
+<div class="box warn"><span class="bt">The habit to build now</span>
+<p>When translating an algebra expression, write <code>DISTINCT</code> every
+time you see a <code>&Pi;</code>, mechanically, before thinking about whether it
+is needed. It is never wrong, it is occasionally essential, and deciding case by
+case is how the one that mattered gets missed. (In production code the calculus
+is different &mdash; a needless <code>DISTINCT</code> costs a sort &mdash; but
+correctness first.)</p></div>
+
+<p><strong>Three-valued logic.</strong> The algebra as taught here has no nulls.
+SQL does, and a comparison with <code>NULL</code> is neither true nor false but
+unknown, which <code>WHERE</code> discards. The consequence that bites:
+<code>x &lt;&gt; 'Potions'</code> is <em>not</em> satisfied by a row whose
+<code>x</code> is null, so a &ldquo;not in Potions&rdquo; query written with
+<code>&lt;&gt;</code> silently drops those rows. Both schemas here keep their
+relevant columns non-null, so nothing on this page is affected &mdash; but
+almost every real schema has nullable columns, and this is where the
+<code>NOT EXISTS</code> form of &sect;6.3 earns its keep.</p>
+
+<p><strong>Everything the algebra cannot do.</strong> <code>COUNT</code>,
+<code>SUM</code>, <code>AVG</code>, <code>MIN</code>, <code>MAX</code>,
+<code>GROUP BY</code>, <code>HAVING</code>, <code>ORDER BY</code>,
+<code>LIMIT</code>. None of these has an algebraic counterpart, which is why
+Exercise 6.7 goes the long way round to find a maximum: the algebra it is
+translating had no <code>MAX</code> to translate. Doing it the SQL way is a fair
+answer to a different question, and both are worth being able to write.</p>
+
+<p>The other three statements of Lecture 10 need no algebra at all, because the
+algebra has no way to change a database:</p>
+
+<pre class="asm">INSERT INTO table_name VALUES (value1, value2, ...);
+INSERT INTO table_name (column1, column2, ...) VALUES (value1, value2, ...);
+
+UPDATE table_name SET column = new_data WHERE condition(s);
+
+DELETE FROM table_name WHERE condition(s);</pre>
+
+<p>Those are the three update operations of Set 4, now written in SQL &mdash;
+and the constraints of &sect;4.2 are exactly what decides whether each one
+succeeds.</p>
+
+<h2 id="difference"><span class="secnum">6.3</span>Writing a set difference</h2>
+
+<p>The losers-and-winners pattern of Set 5 is the one construct with more than
+one reasonable translation. Three of them:</p>
+
+<pre class="asm"><span class="c">-- 1. EXCEPT — closest to the algebra, reads like the expression</span>
+SELECT name FROM department
+EXCEPT
+SELECT deptName FROM member;
+
+<span class="c">-- 2. NOT IN — portable to every version of everything</span>
+SELECT name FROM department
+ WHERE name NOT IN (SELECT deptName FROM member);
+
+<span class="c">-- 3. NOT EXISTS — correlated, and the only one safe against nulls</span>
+SELECT d.name FROM department d
+ WHERE NOT EXISTS (SELECT 1 FROM member m WHERE m.deptName = d.name);</pre>
+
+<p>The solutions below use <code>EXCEPT</code> where the algebra uses
+<code>&minus;</code>, because the aim is to show the correspondence. For your
+own code the ranking is roughly the reverse: <code>NOT EXISTS</code> first,
+because it is the only one of the three that behaves sanely when the subquery
+can produce a null; <code>NOT IN</code> second for portability; and
+<code>EXCEPT</code> when the query really is a difference of two whole result
+sets rather than a membership test.</p>
+
+<div class="box worked"><span class="bt">Why NOT IN can go wrong</span>
+<p><code>x NOT IN (1, 2, NULL)</code> is never true. If <code>x</code> is 3, SQL
+must decide whether 3 equals the null, and &ldquo;unknown&rdquo; propagates
+through the <code>AND</code> to make the whole condition unknown &mdash; so the
+row is dropped, and a query that should have returned everything returns
+nothing. A single null in a subquery's output silently empties the result.
+<code>NOT EXISTS</code> has no such behaviour, because it asks about the
+existence of rows rather than the equality of values.</p></div>
+
+<p>Where the final step of the pattern puts the winners back against the full
+relation, the SQL is usually shorter than the algebra: the difference goes in a
+subquery inside the <code>WHERE</code>, and the outer query does both the
+product and the projection in one statement. Several solutions below do that,
+and the algebra beside them shows what was folded together.</p>
+
+<h2 id="db"><span class="secnum">6.4</span>The two scratch databases</h2>
+
+<p>The schemas and their keys are in &sect;5.6 and Exercise 4.9. What follows is
+the content, which is what the answers below depend on. Both are small enough to
+check every answer by hand.</p>
+
+<pre class="asm"><span class="c">-- load them, then run any query below</span>
+mysql -u root &lt; sql/college.sql
+mysql -u root &lt; sql/profpay.sql
+mysql -u root -t &lt; sql/set6.sql      <span class="c"># every answer on this page, in order</span></pre>
+
+<h3>The College database</h3>
+
+<p><strong><code>Person</code></strong> &mdash; <code>T01</code>&ndash;<code>T05</code>
+are the teachers, <code>S11</code>&ndash;<code>S17</code> the students.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>id</th><th>name</th><th>yearborn</th><th></th><th>id</th><th>name</th><th>yearborn</th></tr></thead>
+<tbody>
+<tr><td>T01</td><td>Alan Turing</td><td>1962</td><td></td><td>S12</td><td>Maria Lopez</td><td>2006</td></tr>
+<tr><td>T02</td><td>Grace Hopper</td><td>1958</td><td></td><td>S13</td><td>John Chen</td><td>2007</td></tr>
+<tr><td>T03</td><td>Ada Lovelace</td><td>1971</td><td></td><td>S14</td><td>Wei Zhang</td><td>2006</td></tr>
+<tr><td>T04</td><td>Donald Knuth</td><td>1965</td><td></td><td>S15</td><td>Aisha Khan</td><td>2008</td></tr>
+<tr><td>T05</td><td>Barbara Liskov</td><td>1980</td><td></td><td>S16</td><td>Maria Lopez</td><td>2005</td></tr>
+<tr><td>S11</td><td>John Chen</td><td>2005</td><td></td><td>S17</td><td>Omar Haddad</td><td>2007</td></tr>
+</tbody></table></div>
+
+<div class="grid2">
+<div>
+<p><strong><code>Teacher</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>tid</th><th>rank</th><th>salary</th></tr></thead>
+<tbody>
+<tr><td>T01</td><td>Professor</td><td>132000</td></tr>
+<tr><td>T02</td><td>Professor</td><td>118000</td></tr>
+<tr><td>T03</td><td>Associate Professor</td><td>96000</td></tr>
+<tr><td>T04</td><td>Professor</td><td>104000</td></tr>
+<tr><td>T05</td><td>Assistant Professor</td><td>88000</td></tr>
+</tbody></table></div>
+<p><strong><code>Student</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>sid</th><th>yearenroll</th><th></th><th>sid</th><th>yearenroll</th></tr></thead>
+<tbody>
+<tr><td>S11</td><td>2023</td><td></td><td>S15</td><td>2026</td></tr>
+<tr><td>S12</td><td>2024</td><td></td><td>S16</td><td>2024</td></tr>
+<tr><td>S13</td><td>2025</td><td></td><td>S17</td><td>2026</td></tr>
+<tr><td>S14</td><td>2026</td><td></td><td></td><td></td></tr>
+</tbody></table></div>
+</div>
+<div>
+<p><strong><code>Department</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>code</th><th>name</th><th>chair</th></tr></thead>
+<tbody>
+<tr><td>CS</td><td>Computer Science</td><td>T01</td></tr>
+<tr><td>MATH</td><td>Mathematics</td><td>T01</td></tr>
+<tr><td>PHYS</td><td>Physics</td><td>T02</td></tr>
+<tr><td>ART</td><td>Art History</td><td>T04</td></tr>
+</tbody></table></div>
+<p><strong><code>Course</code></strong> &mdash; ART offers none.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>dcode</th><th>number</th><th>name</th><th>credit</th></tr></thead>
+<tbody>
+<tr><td>CS</td><td>111</td><td>Intro to Programming</td><td>3</td></tr>
+<tr><td>CS</td><td>331</td><td>Database Systems</td><td>3</td></tr>
+<tr><td>MATH</td><td>231</td><td>Linear Algebra</td><td>3</td></tr>
+<tr><td>PHYS</td><td>121</td><td>Mechanics</td><td>4</td></tr>
+</tbody></table></div>
+</div>
+</div>
+
+<div class="grid2">
+<div>
+<p><strong><code>Section</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>reqNum</th><th>dcode</th><th>cnum</th><th>year</th></tr></thead>
+<tbody>
+<tr><td>1001</td><td>CS</td><td>111</td><td>2026</td></tr>
+<tr><td>1002</td><td>CS</td><td>331</td><td>2026</td></tr>
+<tr><td>1003</td><td>MATH</td><td>231</td><td>2026</td></tr>
+<tr><td>1004</td><td>PHYS</td><td>121</td><td>2025</td></tr>
+<tr><td>1005</td><td>CS</td><td>111</td><td>2025</td></tr>
+<tr><td>1006</td><td>PHYS</td><td>121</td><td>2026</td></tr>
+</tbody></table></div>
+</div>
+<div>
+<p><strong><code>GradeSheet</code></strong> &mdash; S17 has none.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>sid</th><th>reqNum</th><th>year</th><th>grade</th></tr></thead>
+<tbody>
+<tr><td>S11</td><td>1001</td><td>2026</td><td>A</td></tr>
+<tr><td>S11</td><td>1002</td><td>2026</td><td>B</td></tr>
+<tr><td>S12</td><td>1001</td><td>2026</td><td>F</td></tr>
+<tr><td>S12</td><td>1003</td><td>2026</td><td>A</td></tr>
+<tr><td>S13</td><td>1003</td><td>2026</td><td>F</td></tr>
+<tr><td>S14</td><td>1002</td><td>2026</td><td>C</td></tr>
+<tr><td>S14</td><td>1004</td><td>2025</td><td>F</td></tr>
+<tr><td>S15</td><td>1005</td><td>2025</td><td>B</td></tr>
+<tr><td>S15</td><td>1006</td><td>2026</td><td>F</td></tr>
+<tr><td>S16</td><td>1004</td><td>2025</td><td>A</td></tr>
+</tbody></table></div>
+</div>
+</div>
+
+<h3>The Professor Payroll database</h3>
+
+<p><strong><code>professor</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>socSecNum</th><th>firstName</th><th>lastName</th><th>salary</th><th>rank</th><th>wizardID</th></tr></thead>
+<tbody>
+<tr><td>100000001</td><td>Albus</td><td>Dumbledore</td><td>1200.00</td><td>Chief Wizard</td><td>GCW-0001</td></tr>
+<tr><td>100000002</td><td>Minerva</td><td>McGonagall</td><td>1640.00</td><td>Senior Wizard</td><td>GCW-0002</td></tr>
+<tr><td>100000003</td><td>Severus</td><td>Snape</td><td>1140.00</td><td>Senior Wizard</td><td>GCW-0003</td></tr>
+<tr><td>100000004</td><td>Pomona</td><td>Sprout</td><td>1310.00</td><td>Wizard</td><td>GCW-0004</td></tr>
+<tr><td>100000005</td><td>Filius</td><td>Flitwick</td><td>1275.00</td><td>Wizard</td><td>GCW-0005</td></tr>
+<tr><td>100000006</td><td>Sybill</td><td>Trelawney</td><td>940.00</td><td>Wizard</td><td>GCW-0006</td></tr>
+<tr><td>100000007</td><td>Firenze</td><td>Centaur</td><td>880.00</td><td>Apprentice</td><td>GCW-0007</td></tr>
+<tr><td>100000008</td><td>Dolores</td><td>Umbridge</td><td>960.00</td><td>Chief Wizard</td><td>GCW-0008</td></tr>
+<tr><td>100000009</td><td>Dean</td><td>Thomas</td><td>850.00</td><td>Apprentice</td><td>GCW-0009</td></tr>
+<tr><td>100000010</td><td>Cedric</td><td>Diggory</td><td>1120.00</td><td>Wizard</td><td>GCW-0010</td></tr>
+</tbody></table></div>
+
+<div class="grid2">
+<div>
+<p><strong><code>department</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>name</th><th>phone</th><th>chairId</th></tr></thead>
+<tbody>
+<tr><td>Divination</td><td>017-555-0103</td><td>…008 <em>Umbridge</em></td></tr>
+<tr><td>Herbology</td><td>017-555-0104</td><td>…004 <em>Sprout</em></td></tr>
+<tr><td>Muggle Studies</td><td>017-555-0105</td><td>…008 <em>Umbridge</em></td></tr>
+<tr><td>Potions</td><td>017-555-0101</td><td>…003 <em>Snape</em></td></tr>
+<tr><td>Transfiguration</td><td>017-555-0102</td><td>…002 <em>McGonagall</em></td></tr>
+</tbody></table></div>
+<p><strong><code>member</code></strong> &mdash; Muggle Studies has none.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>deptName</th><th>profId</th></tr></thead>
+<tbody>
+<tr><td>Divination</td><td>Trelawney, Centaur, Diggory</td></tr>
+<tr><td>Herbology</td><td>Sprout, Flitwick, Umbridge</td></tr>
+<tr><td>Potions</td><td>Dumbledore, Snape, Thomas</td></tr>
+<tr><td>Transfiguration</td><td>Dumbledore, McGonagall, Diggory</td></tr>
+</tbody></table></div>
+</div>
+<div>
+<p><strong><code>paycheck</code></strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>dpt</th><th>serNum</th><th>amount</th><th>prof</th></tr></thead>
+<tbody>
+<tr><td>Divination</td><td>1</td><td>760.00</td><td>Trelawney</td></tr>
+<tr><td>Divination</td><td>2</td><td>520.00</td><td>Centaur</td></tr>
+<tr><td>Herbology</td><td>1</td><td>12400.00</td><td>Sprout</td></tr>
+<tr><td>Herbology</td><td>2</td><td>410.00</td><td>Flitwick</td></tr>
+<tr><td>Potions</td><td>1</td><td>1150.00</td><td>Snape</td></tr>
+<tr><td>Potions</td><td>2</td><td>1150.00</td><td>Snape</td></tr>
+<tr><td>Potions</td><td>3</td><td>920.00</td><td>Dumbledore</td></tr>
+<tr><td>Potions</td><td>4</td><td>640.00</td><td>Thomas</td></tr>
+<tr><td>Transfiguration</td><td>1</td><td>11500.00</td><td>McGonagall</td></tr>
+<tr><td>Transfiguration</td><td>2</td><td>980.00</td><td>Dumbledore</td></tr>
+</tbody></table></div>
+</div>
+</div>
+
+<h2 id="college"><span class="secnum">6.5</span>Exercises: the College database</h2>
+
+<p>Each exercise gives the English and the algebra from Set 5. Write the SQL,
+run it, and compare your rows with the ones in the solution. Where your SQL
+differs from the one shown but your rows agree, you are probably right &mdash;
+but read the commentary, because two of these agree on this data and would
+diverge on other data.</p>
+
+<details class="prob"><summary data-label="Exercise 6.1">(a) Find Person born after 2005. (b) Find id of teachers where their salary is greater than $100,000.
+<pre>(a)  &sigma;[yearborn &gt; 2005] Person
+
+(b)  &Pi;[tid] &sigma;[F] Teacher
+         where   F  &equiv;  [ salary &gt; 100000 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT * FROM Person WHERE yearborn &gt; 2005;
+
+SELECT DISTINCT tid FROM Teacher WHERE salary &gt; 100000;</pre>
+<pre>+-----+-------------+-------------------+----------+     +-----+
+| id  | name        | address           | yearborn |     | tid |
++-----+-------------+-------------------+----------+     +-----+
+| S12 | Maria Lopez | 12 Main St        |     2006 |     | T01 |
+| S13 | John Chen   | 13 Union St       |     2007 |     | T02 |
+| S14 | Wei Zhang   | 14 Parsons Blvd   |     2006 |     | T04 |
+| S15 | Aisha Khan  | 15 Jewel Ave      |     2008 |     +-----+
+| S17 | Omar Haddad | 17 Horace Harding |     2007 |
++-----+-------------+-------------------+----------+</pre>
+<p><strong>(a)</strong> A bare selection is <code>SELECT *</code>: no projection
+in the algebra, so no column list in the SQL. The schema of the result is the
+whole of <code>Person</code>, and the four columns come out in the order the
+table declares them.</p>
+<p><strong>(b)</strong> Selection becomes <code>WHERE</code>, projection becomes
+the select list, and the order reverses on the page while staying the same in
+the machine. The <code>DISTINCT</code> changes nothing here, because
+<code>tid</code> is the primary key of <code>Teacher</code> and cannot repeat
+&mdash; which is the general rule: a projection that keeps a key never needs it,
+and one that drops part of a key always might. Write it anyway.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.2">Find the id and name of students who enroll after 2025.
+<pre>&Pi;[id2, name2] &sigma;[F] ( Student1 &times; Person2 )
+    where   F  &equiv;  [ sid1 = id2  &and;  yearenroll1 &ge; 2025 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p2.id, p2.name
+  FROM Student s1, Person p2
+ WHERE s1.sid = p2.id
+   AND s1.yearenroll &gt;= 2025;</pre>
+<pre>+-----+-------------+
+| id  | name        |
++-----+-------------+
+| S13 | John Chen   |
+| S14 | Wei Zhang   |
+| S15 | Aisha Khan  |
+| S17 | Omar Haddad |
++-----+-------------+</pre>
+<p>The first translated product, and the template for everything that follows.
+<code>Student1 &times; Person2</code> becomes
+<code>FROM Student s1, Person p2</code>; the numbered copies become the aliases
+<code>s1</code> and <code>p2</code>; the two conjuncts become two lines of the
+<code>WHERE</code>, one the link and one the real condition.</p>
+<p>Written as a modern join it is the same query:</p>
+<pre class="asm">SELECT DISTINCT p.id, p.name
+  FROM Student s JOIN Person p ON s.sid = p.id
+ WHERE s.yearenroll &gt;= 2025;</pre>
+<p>which separates the link from the filter and is better style in anything
+long. The comma form is used throughout this page because it matches the
+algebra line for line, and that correspondence is the thing being taught.</p>
+<p><strong>Qualify every column in a multi-table query.</strong> Unqualified,
+<code>name</code> would work here, since only one table has it &mdash; and would
+break the first time someone added a <code>name</code> to <code>Student</code>.
+Three characters remove a whole class of silent breakage.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.3">Find the name and salary of those teacher(s) that chair more than one department.
+<pre>&Pi;[name2, salary1] &sigma;[F] ( Teacher1 &times; Person2 &times; Department3 &times; Department4 )
+    where   F  &equiv;  [ tid1 = id2  &and;  tid1 = chair3  &and;  tid1 = chair4  &and;  code3 &ne; code4 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p2.name, t1.salary
+  FROM Teacher t1, Person p2, Department d3, Department d4
+ WHERE t1.tid = p2.id
+   AND t1.tid = d3.chair
+   AND t1.tid = d4.chair
+   AND d3.code &lt;&gt; d4.code;</pre>
+<pre>+-------------+-----------+
+| name        | salary    |
++-------------+-----------+
+| Alan Turing | 132000.00 |
++-------------+-----------+</pre>
+<p>Two copies of <code>Department</code> in the <code>FROM</code>, which is what
+the numbered copies <code>Department3</code> and <code>Department4</code> mean.
+Without the aliases the query is a syntax error; with them it is exactly the
+algebra, conjunct for conjunct.</p>
+<p><strong>This is a <code>DISTINCT</code> exercise.</strong> Turing chairs CS
+and MATH, so the pair qualifies in both orders &mdash;
+<code>(CS, MATH)</code> and <code>(MATH, CS)</code> &mdash; and without
+<code>DISTINCT</code> he appears twice. Had he chaired three departments it
+would be six times. The algebra's <code>&Pi;</code> deduplicates silently; SQL
+does not.</p>
+<p>The idiomatic SQL is shorter and has no algebraic counterpart at all:</p>
+<pre class="asm">SELECT p.name, t.salary
+  FROM Teacher t JOIN Person p ON t.tid = p.id
+                 JOIN Department d ON d.chair = t.tid
+ GROUP BY p.name, t.salary
+HAVING COUNT(*) &gt;= 2;</pre>
+<p>There is no <code>COUNT</code> in the algebra, which is why the long way
+round exists &mdash; and why &ldquo;at least <var>k</var>&rdquo; for a
+<var>k</var> larger than two or three is painful in algebra and trivial in
+SQL.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.4">Find the names of chairs of those departments in whose classes at least one student failed in year 2026.
+<pre>&Pi;[name1] &sigma;[F] ( Person1 &times; Department2 &times; GradeSheet3 &times; Section4 )
+    where   F  &equiv;  [ id1 = chair2  &and;  code2 = dcode4  &and;
+                    reqNum3 = reqNum4  &and;  year3 = year4  &and;
+                    grade3 = 'F'  &and;  year4 = 2026 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p1.name
+  FROM Person p1, Department d2, GradeSheet g3, Section s4
+ WHERE p1.id      = d2.chair
+   AND d2.code    = s4.dcode
+   AND g3.reqNum  = s4.reqNum
+   AND g3.year    = s4.year
+   AND g3.grade   = 'F'
+   AND s4.year    = 2026;</pre>
+<pre>+--------------+
+| name         |
++--------------+
+| Alan Turing  |
+| Grace Hopper |
++--------------+</pre>
+<p>Four tables, four links, two filters &mdash; and the longest
+<code>WHERE</code> on the page is still just the filter formula written out one
+conjunct per line. Laying it out that way, with the equals signs aligned, makes
+a missing link visible; crammed onto one line it is not.</p>
+<p><strong>The composite foreign key is two lines, not one.</strong>
+<code>GradeSheet</code> references <code>Section</code> on
+<code>(reqNum, year)</code>, so both <code>g3.reqNum = s4.reqNum</code> and
+<code>g3.year = s4.year</code> are needed. Drop the second and a 2026 grade
+sheet matches a 2025 section with the same registration number &mdash; our
+<code>reqNum</code> 1004 and 1006 are both PHYS 121, in different years, so this
+is not hypothetical.</p>
+<p>Turing chairs CS (S12 failed section 1001) and MATH (S13 failed 1003); Hopper
+chairs PHYS (S15 failed 1006). Knuth chairs ART, which has no courses and so no
+sections and so no failures. The <code>DISTINCT</code> is what stops Turing
+appearing twice.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.5">Find name of all students whose name is also the name of another student.
+<pre>&Pi;[name1] &sigma;[F] ( Person1 &times; Student2 &times; Person3 &times; Student4 )
+    where   F  &equiv;  [ id1 = sid2  &and;  id3 = sid4  &and;  id1 &ne; id3  &and;  name1 = name3 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p1.name
+  FROM Person p1, Student s2, Person p3, Student s4
+ WHERE p1.id   = s2.sid
+   AND p3.id   = s4.sid
+   AND p1.id  &lt;&gt; p3.id
+   AND p1.name = p3.name;</pre>
+<pre>+-------------+
+| name        |
++-------------+
+| John Chen   |
+| Maria Lopez |
++-------------+</pre>
+<p>Four tables for what the English describes as one comparison, and two of them
+&mdash; <code>s2</code> and <code>s4</code> &mdash; contribute no column to the
+select list and no value to any comparison except through their
+<code>sid</code>. They are there purely to assert that both people are students.
+A table in the <code>FROM</code> as a membership test is an ordinary thing to
+need, and it is worth being comfortable with it.</p>
+<p><strong>The two conditions do opposite jobs.</strong>
+<code>p1.id &lt;&gt; p3.id</code> says they are different people;
+<code>p1.name = p3.name</code> says they have the same name. Drop either and the
+answer becomes every student's name, for two different reasons.</p>
+<p>The answer is a set of <em>names</em>, so it cannot tell you which students
+they belonged to, and if three students shared a name it would still appear
+once. <code>SELECT DISTINCT p1.id, p1.name</code> is the more useful query and a
+fair thing to offer alongside.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.6">Find names of students that never failed a course.
+<pre>Fail       &larr;  &Pi;[sid] &sigma;[grade = 'F'] GradeSheet
+NeverFail  &larr;  &Pi;[sid] Student  &minus;  Fail
+Result     &larr;  &Pi;[name1] &sigma;[id1 = sid2] ( Person1 &times; NeverFail2 )</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p1.name
+  FROM Person p1
+ WHERE p1.id IN ( SELECT sid FROM Student            <span class="c">-- everyone who could qualify</span>
+                  EXCEPT
+                  SELECT sid FROM GradeSheet         <span class="c">-- minus the losers</span>
+                   WHERE grade = 'F' );</pre>
+<pre>+-------------+
+| name        |
++-------------+
+| John Chen   |
+| Maria Lopez |
+| Omar Haddad |
++-------------+</pre>
+<p>The losers-and-winners pattern, with two of its three steps folded together:
+the <code>EXCEPT</code> is <code>Fail</code> and <code>NeverFail</code>, and the
+enclosing <code>WHERE ... IN</code> is step 3, putting the winners back against
+<code>Person</code> to recover the names.</p>
+<p><strong>The attempt that does not work</strong>, and what it returns:</p>
+<pre class="asm">SELECT DISTINCT p1.name
+  FROM Person p1, GradeSheet g2
+ WHERE p1.id = g2.sid AND g2.grade &lt;&gt; 'F';</pre>
+<pre>+-------------+
+| name        |
++-------------+
+| John Chen   |
+| Maria Lopez |
+| Wei Zhang   |
+| Aisha Khan  |
++-------------+</pre>
+<p>That is the students who <em>passed at least one</em> course. Zhang failed
+PHYS 121 in 2025 and still appears, on the strength of his C in CS 331; Khan
+failed in 2026 and appears on the strength of her B. And Haddad, who has never
+taken anything, is missing. Two kinds of wrong in one query.</p>
+<p><strong>Subtract from <code>Student</code>, not from
+<code>GradeSheet</code>.</strong> That is what keeps Haddad in: he has no grade
+sheet at all, so he is in <code>Student</code>, not in <code>Fail</code>, and
+therefore in the answer. <code>SELECT sid FROM GradeSheet EXCEPT ...</code>
+would have lost him, and that error survives casual testing because the result
+still looks reasonable.</p>
+<p><strong>A wrinkle worth reporting.</strong> Projecting onto
+<code>name</code> means a name appears if <em>any</em> student with it qualifies.
+There are two John Chens &mdash; S11 never failed, S13 failed MATH 231 &mdash;
+and the name is in the answer. By id:</p>
+<pre>+-----+-------------+
+| id  | name        |
++-----+-------------+
+| S11 | John Chen   |
+| S16 | Maria Lopez |
+| S17 | Omar Haddad |
++-----+-------------+</pre>
+<p>Three students, not the three-or-more the name list suggests. The question
+asked for names, so the first answer is correct &mdash; but this is the kind of
+list somebody would act on, and the id version is the one to hand over.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.7">Find name and rank of the teacher(s) with highest salary.
+<pre>Loser   &larr;  &Pi;[tid1] &sigma;[salary1 &lt; salary2] ( Teacher1 &times; Teacher2 )
+Winner  &larr;  &Pi;[tid] Teacher  &minus;  Loser
+Result  &larr;  &Pi;[name2, rank3] &sigma;[F] ( Winner1 &times; Person2 &times; Teacher3 )
+            where   F  &equiv;  [ tid1 = id2  &and;  tid1 = tid3 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p2.name, t3.rank
+  FROM Person p2, Teacher t3
+ WHERE t3.tid = p2.id
+   AND t3.tid IN ( SELECT tid FROM Teacher
+                   EXCEPT
+                   SELECT t1.tid                     <span class="c">-- teachers out-earned by somebody</span>
+                     FROM Teacher t1, Teacher t2
+                    WHERE t1.salary &lt; t2.salary );</pre>
+<pre>+-------------+-----------+
+| name        | rank      |
++-------------+-----------+
+| Alan Turing | Professor |
++-------------+-----------+</pre>
+<p>A superlative with no <code>MAX</code>, because the algebra being translated
+had none. The losers are the teachers somebody out-earns; everyone else is tied
+for the maximum. Turing at 132,000 is the only teacher nobody out-earns.</p>
+<p>In SQL you would of course write:</p>
+<pre class="asm">SELECT p.name, t.rank FROM Person p, Teacher t
+ WHERE p.id = t.tid AND t.salary = (SELECT MAX(salary) FROM Teacher);</pre>
+<p>which returns the same row, is obviously correct, and is the answer to give
+if the question says &ldquo;in SQL&rdquo; without qualification. The long form
+is here because it is what the algebra can express &mdash; and the two agree on
+an important point: both return <em>every</em> teacher tied for the top salary,
+not an arbitrary one. The version people reach for instead,
+<code>ORDER BY salary DESC LIMIT 1</code>, does not; it silently returns one row
+where the right answer may be three.</p>
+<p><strong>Note the strictness.</strong> With <code>&lt;=</code> in the loser
+subquery, every teacher is out-earned by themselves, the difference is empty,
+and the query returns nothing.</p>
+</div></details>
+
+<h2 id="payroll"><span class="secnum">6.6</span>Exercises: Professor Payroll</h2>
+
+<details class="prob"><summary data-label="Exercise 6.8">(a) Find department name and amount of each issued paycheck. (b) Find department name and serial number of the paychecks whose amount is below 1,000.
+<pre>(a)  &Pi;[dpt, amount] paycheck
+
+(b)  &Pi;[dpt, serNum] &sigma;[F] paycheck
+         where   F  &equiv;  [ amount &lt; 1000 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT dpt, amount FROM paycheck;
+
+SELECT DISTINCT dpt, serNum FROM paycheck WHERE amount &lt; 1000;</pre>
+<pre>+-----------------+----------+     +-----------------+--------+
+| dpt             | amount   |     | dpt             | serNum |
++-----------------+----------+     +-----------------+--------+
+| Divination      |   760.00 |     | Divination      |      1 |
+| Divination      |   520.00 |     | Divination      |      2 |
+| Herbology       | 12400.00 |     | Herbology       |      2 |
+| Herbology       |   410.00 |     | Potions         |      3 |
+| Potions         |  1150.00 |     | Potions         |      4 |
+| Potions         |   920.00 |     | Transfiguration |      2 |
+| Potions         |   640.00 |     +-----------------+--------+
+| Transfiguration | 11500.00 |
+| Transfiguration |   980.00 |
++-----------------+----------+</pre>
+<p><strong>(a)</strong> Nine rows from ten paychecks. The two Potions cheques of
+1,150.00 are <em>different paychecks</em> &mdash; serial numbers 1 and 2 &mdash;
+but the projection throws the serial number away, so what remains is one tuple,
+and <code>DISTINCT</code> is what makes SQL agree with the algebra. Drop it and
+you get ten rows, which is a correct answer to a question nobody asked.</p>
+<p>This is the smallest possible demonstration that <code>&Pi;</code> loses
+information, and worth keeping in mind for the rest of the page.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.9">Find full name and salary of each professor that serves in the rank of <code>Chief Wizard</code>.
+<pre>&Pi;[firstName, lastName, salary] &sigma;[F] professor
+    where   F  &equiv;  [ rank = 'Chief Wizard' ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT firstName, lastName, salary
+  FROM professor
+ WHERE rank = 'Chief Wizard';</pre>
+<pre>+-----------+------------+---------+
+| firstName | lastName   | salary  |
++-----------+------------+---------+
+| Albus     | Dumbledore | 1200.00 |
+| Dolores   | Umbridge   |  960.00 |
++-----------+------------+---------+</pre>
+<p>Two things about the string comparison that are easy to assume wrongly.</p>
+<p>It is <strong>case-insensitive here</strong> &mdash; MariaDB's default
+collation for these columns folds case, so <code>'chief wizard'</code> matches
+too. That is a property of the collation, not of SQL, and PostgreSQL would have
+returned nothing. Never rely on it either way.</p>
+<p>And <code>rank</code> is a <strong>reserved word</strong> in recent MySQL and
+MariaDB, where it is a window function. It works unquoted in this position, but
+a schema that uses it is one awkward query away from trouble, and
+<code>`rank`</code> is the safe spelling.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.10">Find names and phone numbers of those departments whose chair earns less than 1,000 in salary.
+<pre>&Pi;[name1, phone1] &sigma;[F] ( department1 &times; professor2 )
+    where   F  &equiv;  [ chairId1 = socSecNum2  &and;  salary2 &lt; 1000 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT d.name, d.phone
+  FROM department d, professor p
+ WHERE d.chairId = p.socSecNum
+   AND p.salary &lt; 1000;</pre>
+<pre>+----------------+--------------+
+| name           | phone        |
++----------------+--------------+
+| Divination     | 017-555-0103 |
+| Muggle Studies | 017-555-0105 |
++----------------+--------------+</pre>
+<p>One link, one filter &mdash; and the link is the thing to check first. Drop
+<code>d.chairId = p.socSecNum</code> and every department is paired with every
+underpaid professor, so every department qualifies: five rows instead of two,
+with the right columns and nothing visibly wrong.</p>
+<p>Both departments in the answer are Umbridge's, who earns 960. A professor
+chairing two departments produces two rows here, correctly.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.11">Find full names (first and last) of all professors who are members of the department named <code>Potions</code>.
+<pre>&Pi;[firstName1, lastName1] &sigma;[F] ( professor1 &times; member2 )
+    where   F  &equiv;  [ socSecNum1 = profId2  &and;  deptName2 = 'Potions' ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.firstName, p.lastName
+  FROM professor p, member m
+ WHERE p.socSecNum = m.profId
+   AND m.deptName = 'Potions';</pre>
+<pre>+-----------+------------+
+| firstName | lastName   |
++-----------+------------+
+| Albus     | Dumbledore |
+| Severus   | Snape      |
+| Dean      | Thomas     |
++-----------+------------+</pre>
+<p>Membership is M&nbsp;:&nbsp;M, so it has its own table and this query goes
+through it. Compare Exercise 6.3, where chairing &mdash; 1&nbsp;:&nbsp;M &mdash;
+needed no such table because the reference sits in a column of
+<code>Department</code>. Which of the two a query needs is decided entirely by
+the mapping you did in Set 4.</p>
+<p>Unlike the College database, <code>professor</code> carries its own names, so
+nothing here needs a second table just to find out what someone is called.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.12">Find the full name of the chairs of those departments that have issued at least one paycheck in the amount higher than 10,000.
+<pre>&Pi;[firstName1, lastName1] &sigma;[F] ( professor1 &times; department2 &times; paycheck3 )
+    where   F  &equiv;  [ socSecNum1 = chairId2  &and;  name2 = dpt3  &and;  amount3 &ge; 10000 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.firstName, p.lastName
+  FROM professor p, department d, paycheck c
+ WHERE p.socSecNum = d.chairId
+   AND d.name = c.dpt
+   AND c.amount &gt;= 10000;</pre>
+<pre>+-----------+------------+
+| firstName | lastName   |
++-----------+------------+
+| Minerva   | McGonagall |
+| Pomona    | Sprout     |
++-----------+------------+</pre>
+<p>Three tables, two links, one filter, and the links chain rather than branch:
+professor to department, department to paycheck.</p>
+<p><strong>&ldquo;At least one&rdquo; needs no special construct.</strong>
+Existential quantification is what a product plus a condition <em>is</em>: a row
+appears in the result exactly when some matching row exists. A department that
+had issued three large cheques would list its chair three times before
+<code>DISTINCT</code> collapsed them. It is &ldquo;no&rdquo; and
+&ldquo;every&rdquo; that cost you a subquery.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.13">Find id, first name, and last name of those professors who have received paychecks from (at least) two different departments.
+<pre>&Pi;[socSecNum1, firstName1, lastName1] &sigma;[F] ( professor1 &times; paycheck2 &times; paycheck3 )
+    where   F  &equiv;  [ socSecNum1 = prof2  &and;  socSecNum1 = prof3  &and;  dpt2 &ne; dpt3 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.socSecNum, p.firstName, p.lastName
+  FROM professor p, paycheck c2, paycheck c3
+ WHERE p.socSecNum = c2.prof
+   AND p.socSecNum = c3.prof
+   AND c2.dpt &lt;&gt; c3.dpt;</pre>
+<pre>+-----------+-----------+------------+
+| socSecNum | firstName | lastName   |
++-----------+-----------+------------+
+| 100000001 | Albus     | Dumbledore |
++-----------+-----------+------------+</pre>
+<p><strong>This is the <code>DISTINCT</code> exercise.</strong> Dumbledore was
+paid by Potions and by Transfiguration, so the pair qualifies in both orders and
+without <code>DISTINCT</code> he appears twice &mdash; the query returns two
+rows for one professor. Had he been paid by three departments it would be six.
+The algebra's <code>&Pi;</code> deduplicates silently; SQL does not, and this is
+the query where you would have noticed.</p>
+<p>The idiomatic SQL is different and shorter:</p>
+<pre class="asm">SELECT p.socSecNum, p.firstName, p.lastName
+  FROM professor p JOIN paycheck c ON c.prof = p.socSecNum
+ GROUP BY p.socSecNum, p.firstName, p.lastName
+HAVING COUNT(DISTINCT c.dpt) &gt;= 2;</pre>
+<p>which returns the same row and has no algebraic counterpart at all.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.14">Find id, first name, and last name of those professors who have received at least two (different) paychecks from the same department on the same amount.
+<pre>&Pi;[socSecNum1, firstName1, lastName1] &sigma;[F] ( professor1 &times; paycheck2 &times; paycheck3 )
+    where   F  &equiv;  [ socSecNum1 = prof2  &and;  socSecNum1 = prof3  &and;
+                    dpt2 = dpt3  &and;  serNum2 &ne; serNum3  &and;  amount2 = amount3 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.socSecNum, p.firstName, p.lastName
+  FROM professor p, paycheck c2, paycheck c3
+ WHERE p.socSecNum = c2.prof
+   AND p.socSecNum = c3.prof
+   AND c2.dpt    =  c3.dpt
+   AND c2.serNum &lt;&gt; c3.serNum
+   AND c2.amount =  c3.amount;</pre>
+<pre>+-----------+-----------+----------+
+| socSecNum | firstName | lastName |
++-----------+-----------+----------+
+| 100000003 | Severus   | Snape    |
++-----------+-----------+----------+</pre>
+<p>The same product as Exercise 6.13 with a different tail. The inequality has
+moved from the department to the serial number, because the department is now
+required to be the same and <code>(dpt, serNum)</code> is the key, so
+<code>serNum</code> is the only thing left that can make the two rows different
+rows.</p>
+<p>Snape's Potions cheques 1 and 2 are both 1,150.00. The condition finds the
+pair twice, once in each order, and <code>DISTINCT</code> collapses it.</p>
+<p><strong>The common error</strong> is to omit
+<code>c2.serNum &lt;&gt; c3.serNum</code>, which lets each paycheck match itself.
+Run that version and it returns eight professors &mdash; everyone who has ever
+been paid. It is worth running once, because an answer that large is obviously
+wrong and the same mistake in a bigger query is not.</p>
+<p>Writing <code>c2 &lt;&gt; c3</code> instead is not valid SQL: there is no
+row-identity comparison, which is precisely why the algebra made you name a key
+attribute too.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.15">Find first name, last name, and salary of those professors that chair more than one department.
+<pre>&Pi;[firstName1, lastName1, salary1] &sigma;[F] ( professor1 &times; department2 &times; department3 )
+    where   F  &equiv;  [ socSecNum1 = chairId2  &and;  socSecNum1 = chairId3  &and;  name2 &ne; name3 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.firstName, p.lastName, p.salary
+  FROM professor p, department d2, department d3
+ WHERE p.socSecNum = d2.chairId
+   AND p.socSecNum = d3.chairId
+   AND d2.name &lt;&gt; d3.name;</pre>
+<pre>+-----------+----------+--------+
+| firstName | lastName | salary |
++-----------+----------+--------+
+| Dolores   | Umbridge | 960.00 |
++-----------+----------+--------+</pre>
+<p>Exercise 6.3 on the other database, and shorter by one table, because
+<code>professor</code> holds its own name and salary where the College schema
+put them on <code>Person</code>. Same shape otherwise: double the relation that
+holds the repeated fact, and put the inequality on its key.</p>
+<p>Umbridge chairs Divination and Muggle Studies. Note that she is <em>not</em>
+a member of either &mdash; she is a member of Herbology &mdash; which the schema
+permits and Exercise 6.18 goes looking for.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.16">Find full names (first and last) of all professors who are members of more than one department.
+<pre>&Pi;[firstName3, lastName3] &sigma;[F] ( member1 &times; member2 &times; professor3 )
+    where   F  &equiv;  [ profId1 = profId2  &and;  deptName1 &ne; deptName2  &and;  socSecNum3 = profId1 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.firstName, p.lastName
+  FROM member m1, member m2, professor p
+ WHERE m1.profId    =  m2.profId
+   AND m1.deptName &lt;&gt; m2.deptName
+   AND p.socSecNum  =  m1.profId;</pre>
+<pre>+-----------+------------+
+| firstName | lastName   |
++-----------+------------+
+| Albus     | Dumbledore |
+| Cedric    | Diggory    |
++-----------+------------+</pre>
+<p>The membership counterpart of 6.15, and the relation that gets doubled is
+<code>member</code> rather than <code>department</code> &mdash; because a
+professor's departments are not recorded anywhere else. Choosing which table to
+double is the one real decision in this family, and the test is always the same:
+double whichever relation holds the repeated fact.</p>
+<p>Dumbledore is in Potions and Transfiguration; Diggory in Transfiguration and
+Divination. Umbridge, who chairs two departments, is a member of only one and
+correctly does not appear &mdash; a useful reminder that chairing and membership
+are independent here.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.17">Find full name and rank of each professor that earns a higher salary than their department chair.
+<pre>&Pi;[firstName1, lastName1, rank1] &sigma;[F] ( professor1 &times; professor2 &times; member3 &times; department4 )
+    where   F  &equiv;  [ socSecNum1 = profId3  &and;  deptName3 = name4  &and;
+                    chairId4 = socSecNum2  &and;  salary1 &gt; salary2 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p1.firstName, p1.lastName, p1.rank
+  FROM professor p1, professor p2, member m3, department d4
+ WHERE p1.socSecNum = m3.profId
+   AND m3.deptName  = d4.name
+   AND d4.chairId   = p2.socSecNum
+   AND p1.salary    &gt; p2.salary;</pre>
+<pre>+-----------+------------+--------------+
+| firstName | lastName   | rank         |
++-----------+------------+--------------+
+| Albus     | Dumbledore | Chief Wizard |
+| Cedric    | Diggory    | Wizard       |
++-----------+------------+--------------+</pre>
+<p>Two copies of <code>professor</code> meaning two different people, and a
+comparison between them. Comparing a column of one alias with the same column of
+another is how SQL compares two rows of a table; there is no other way.</p>
+<p>Check it against the data. Dumbledore earns 1,200; he is in Potions, chaired
+by Snape at 1,140, so he qualifies there &mdash; and in Transfiguration, chaired
+by McGonagall at 1,640, where he does not. One qualifying membership is enough,
+and <code>DISTINCT</code> would have mattered had he out-earned both chairs.
+Diggory at 1,120 out-earns Umbridge at 960 in Divination.</p>
+<p><strong>The word &ldquo;their&rdquo; is carried entirely by the
+three-equality chain.</strong> Drop <code>m3.deptName = d4.name</code> and the
+query becomes &ldquo;professors who out-earn some chair somewhere&rdquo;, which
+returns six rows here and is a different claim.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.18">Find the full name and rank of those department chairs that have never received a paycheck from any department which they chair (though they may have been paid by other departments).
+<pre>Loser   &larr;  &Pi;[prof1] &sigma;[F] ( paycheck1 &times; department2 )
+            where   F  &equiv;  [ prof1 = chairId2  &and;  dpt1 = name2 ]
+Winner  &larr;  &Pi;[chairId] department  &minus;  Loser
+Result  &larr;  &Pi;[firstName1, lastName1, rank1] &sigma;[G] ( professor1 &times; Winner2 )
+            where   G  &equiv;  [ socSecNum1 = socSecNum2 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.firstName, p.lastName, p.rank
+  FROM professor p
+ WHERE p.socSecNum IN (
+         SELECT chairId FROM department        <span class="c">-- all chairs</span>
+         EXCEPT
+         SELECT c.prof                         <span class="c">-- minus the losers</span>
+           FROM paycheck c, department d
+          WHERE c.prof = d.chairId
+            AND c.dpt  = d.name );</pre>
+<pre>+-----------+----------+--------------+
+| firstName | lastName | rank         |
++-----------+----------+--------------+
+| Dolores   | Umbridge | Chief Wizard |
++-----------+----------+--------------+</pre>
+<p><strong>The two conditions inside the loser subquery are both
+essential.</strong> <code>c.prof = d.chairId</code> says the cheque went to a
+chair; <code>c.dpt = d.name</code> says it came from the department that person
+chairs. Drop the second and the losers become &ldquo;chairs who have ever been
+paid by anyone&rdquo;, and the query answers a different question. The
+parenthesis in the English &mdash; &ldquo;though they may have been paid by
+other departments&rdquo; &mdash; is there precisely to warn you.</p>
+<p>By hand: Snape chairs Potions and was paid by Potions; McGonagall chairs
+Transfiguration and was paid by Transfiguration; Sprout chairs Herbology and was
+paid by Herbology. All three are losers. Umbridge chairs Divination and Muggle
+Studies and has never been paid by anybody, so she is the one winner.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.19">(a) Find names of all departments that have no members. (b) Find department name and phone number of those departments that have never issued a paycheck.
+<pre>(a)  &Pi;[name] department  &minus;  &Pi;[deptName] member
+
+(b)  Loser   &larr;  &Pi;[dpt] paycheck
+     Winner  &larr;  &Pi;[name] department  &minus;  Loser
+     Result  &larr;  &Pi;[name1, phone1] &sigma;[F] ( department1 &times; Winner2 )
+                 where   F  &equiv;  [ name1 = name2 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT name FROM department
+EXCEPT
+SELECT deptName FROM member;
+
+SELECT DISTINCT d.name, d.phone
+  FROM department d
+ WHERE d.name IN ( SELECT name FROM department
+                   EXCEPT
+                   SELECT dpt  FROM paycheck );</pre>
+<pre>+----------------+     +----------------+--------------+
+| name           |     | name           | phone        |
++----------------+     +----------------+--------------+
+| Muggle Studies |     | Muggle Studies | 017-555-0105 |
++----------------+     +----------------+--------------+</pre>
+<p><strong>(a)</strong> is the pattern at its smallest &mdash; one line of
+algebra, one statement of SQL, no step 3, because the question asks only for the
+names and the difference already holds them. No <code>DISTINCT</code> is needed
+on either side: <code>EXCEPT</code> removes duplicates by definition, exactly as
+<code>UNION</code> does.</p>
+<p><strong>(b)</strong> adds step 3: the difference produces bare names, the
+question asked for phone numbers as well, so the names are fed back into a query
+over <code>department</code>. Written directly, and better:</p>
+<pre class="asm">SELECT d.name, d.phone FROM department d
+ WHERE NOT EXISTS (SELECT 1 FROM paycheck c WHERE c.dpt = d.name);</pre>
+<p>One pass, no intermediate set, and the correlation makes the intent obvious.
+This is the form to reach for in your own code; the <code>EXCEPT</code> version
+is here because it maps onto the algebra line by line. It is also the single
+most common shape in practical SQL &mdash; customers who never ordered, students
+with no grade, files with no owner.</p>
+<p>The two answers coincide here for a structural reason: Muggle Studies has no
+members, and by the foreign key on <code>paycheck</code> a department can only
+pay its own members, so it could not have issued a cheque even if it tried. On a
+department that had members but had not yet paid them, (a) and (b) would
+differ.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.20">Find full name and rank of each professor that is not the chair of any department, but earns a higher salary than Professor <code>Albus Dumbledore</code>.
+<pre>notChair  &larr;  &Pi;[socSecNum] professor  &minus;  &Pi;[chairId] department
+Result    &larr;  &Pi;[firstName2, lastName2, rank2] &sigma;[F] ( notChair1 &times; professor2 &times; professor3 )
+              where   F  &equiv;  [ socSecNum1 = socSecNum2  &and;
+                              firstName3 = 'Albus'  &and;  lastName3 = 'Dumbledore'  &and;
+                              salary2 &gt; salary3 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p2.firstName, p2.lastName, p2.rank
+  FROM professor p2, professor p3
+ WHERE p2.socSecNum IN ( SELECT socSecNum FROM professor
+                         EXCEPT
+                         SELECT chairId   FROM department )
+   AND p3.firstName = 'Albus'
+   AND p3.lastName  = 'Dumbledore'
+   AND p2.salary    &gt; p3.salary;</pre>
+<pre>+-----------+----------+--------+
+| firstName | lastName | rank   |
++-----------+----------+--------+
+| Filius    | Flitwick | Wizard |
++-----------+----------+--------+</pre>
+<p>A negative and a comparison in one query, each with its own mechanism: the
+difference handles &ldquo;not a chair&rdquo;, the second copy of
+<code>professor</code> handles &ldquo;than Dumbledore&rdquo;.</p>
+<p>The non-chairs are Dumbledore, Flitwick, Trelawney, Centaur, Thomas and
+Diggory. Of those, only Flitwick at 1,275 earns more than Dumbledore's 1,200
+&mdash; and Dumbledore cannot qualify against himself, since <code>&gt;</code>
+is strict.</p>
+<p>The idiomatic version replaces the second copy with a scalar subquery:</p>
+<pre class="asm">SELECT p.firstName, p.lastName, p.rank FROM professor p
+ WHERE NOT EXISTS (SELECT 1 FROM department d WHERE d.chairId = p.socSecNum)
+   AND p.salary &gt; (SELECT salary FROM professor
+                    WHERE firstName = 'Albus' AND lastName = 'Dumbledore');</pre>
+<p>A scalar subquery must return exactly one value, and the server raises an
+error if it returns more &mdash; a genuine difference from the algebra, where a
+second Albus Dumbledore would quietly have produced two comparisons and the
+union of their results. The SQL is stricter, and here that is a feature.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 6.21">Find first name, last name, and rank of those professors that do not chair any department.
+<pre>Loser   &larr;  &Pi;[chairId] department
+Winner  &larr;  &Pi;[socSecNum] professor  &minus;  Loser
+Result  &larr;  &Pi;[firstName1, lastName1, rank1] &sigma;[F] ( professor1 &times; Winner2 )
+            where   F  &equiv;  [ socSecNum1 = socSecNum2 ]</pre></summary><div class="sol">
+<pre class="asm">SELECT DISTINCT p.firstName, p.lastName, p.rank
+  FROM professor p
+ WHERE p.socSecNum IN ( SELECT socSecNum FROM professor
+                        EXCEPT
+                        SELECT chairId   FROM department );</pre>
+<pre>+-----------+------------+--------------+
+| firstName | lastName   | rank         |
++-----------+------------+--------------+
+| Albus     | Dumbledore | Chief Wizard |
+| Filius    | Flitwick   | Wizard       |
+| Sybill    | Trelawney  | Wizard       |
+| Firenze   | Centaur    | Apprentice   |
+| Dean      | Thomas     | Apprentice   |
+| Cedric    | Diggory    | Wizard       |
++-----------+------------+--------------+</pre>
+<p>Six of the ten; the other four are Snape, McGonagall, Sprout and Umbridge,
+who between them chair the five departments.</p>
+<p>And the one you would actually write:</p>
+<pre class="asm">SELECT p.firstName, p.lastName, p.rank FROM professor p
+ WHERE NOT EXISTS (SELECT 1 FROM department d WHERE d.chairId = p.socSecNum);</pre>
+<p><strong>This is also the version to prefer on a real schema, and here is
+why.</strong> <code>chairId</code> happens to be <code>NOT NULL</code> in this
+database. Had it been nullable &mdash; a department between chairs &mdash; then
+a single null in <code>SELECT chairId FROM department</code> would make the
+<code>NOT IN</code> form of this query return <em>no rows at all</em>, silently,
+because <code>x NOT IN (..., NULL)</code> is never true. The
+<code>EXCEPT</code> form survives that, since set difference treats nulls as
+values rather than comparing them; <code>NOT EXISTS</code> survives it too, and
+for the clearest reason: it asks whether a matching row exists, which is a
+question with an answer even when the values are unknown.</p>
+<p>That is the last and most practical thing the algebra does not prepare you
+for. The algebra on these pages has no nulls in it, so every translation here is
+exact &mdash; and the first schema you meet with a nullable foreign key will be
+the one where the exact translation is wrong. In the College database, the
+nullable column to watch is <code>Department.chair</code>.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Nothing on this page uses <code>GROUP BY</code> except in passing, and that
+is deliberate: every query here is the translation of an algebra expression, and
+the algebra cannot aggregate. The moment the question becomes &ldquo;how much
+did each department pay out&rdquo;, or &ldquo;how many courses did this student
+fail&rdquo;, you leave the algebra behind entirely and the answer has no
+counterpart to check against. That is the next topic, and the reason it is
+taught after this one is that <code>GROUP BY</code> is much easier to understand
+as a thing SQL adds than as a thing SQL has.</p>
+<p>In the other direction, the queries the algebra cannot reach at all are the
+recursive ones &mdash; reporting chains, ancestry, reachability. SQL grew a
+<code>WITH RECURSIVE</code> for those, and Datalog was designed around them from
+the start.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-ra.html"><span>Previous</span>Set 5. Relational algebra</a>
+      <a class="next" href="setup-sql.html"><span>Next</span>Appendix A. Setting up SQL</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

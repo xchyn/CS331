@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 4 — Relational model constraints</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 4 &middot; Constraints</span>
+  <nav class="topnav">
+    <a href="ex-rel.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-ra.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#categories"><span class="t">4.1</span>Three categories of constraint</a></li>
+    <li><a href="#five"><span class="t">4.2</span>The five schema-based constraints</a></li>
+    <li><a href="#keys"><span class="t">4.3</span>Key, superkey, candidate, primary</a></li>
+    <li><a href="#ops"><span class="t">4.4</span>The three update operations</a></li>
+    <li><a href="#app"><span class="t">4.5</span>Application-based constraints</a></li>
+    <li><a href="#lab"><span class="t">4.6</span>The Research Lab database</a></li>
+    <li><a href="#exercises"><span class="t">4.7</span>Exercises</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 4 &middot; Lectures 6 and 7</span>
+  <span class="chnum">Constraints</span>
+  <h1>Will this operation succeed?</h1>
+  <p class="chsum">The five schema-based constraints in the order the lectures
+  give them &mdash; domain, key, nulls, entity integrity, referential integrity
+  &mdash; and then the question the exam actually asks: given a schema and a
+  sequence of operations, does each one succeed, and if not, which constraint
+  does it violate? Fourteen exercises.</p>
+</div>
+
+<p>Set 3 produced schemas. This set asks what those schemas will and will not
+hold. Nearly every wrong answer in this topic comes from one of three places:
+confusing a key violation with a referential one, forgetting that a foreign key
+<em>may</em> be null, and forgetting that a key attribute may not.</p>
+
+
+<h2 id="categories"><span class="secnum">4.1</span>Three categories of constraint</h2>
+
+<p>Constraints on a database divide into three kinds, and knowing which kind you
+are looking at tells you who is responsible for enforcing it.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>category</th><th>also called</th><th>who enforces it</th></tr></thead>
+<tbody>
+<tr><td><strong>inherent model-based</strong></td><td>implicit constraints</td><td>nobody has to &mdash; they are built into the data model itself</td></tr>
+<tr><td><strong>schema-based</strong></td><td>explicit constraints</td><td>the DBMS, because you wrote them in the DDL</td></tr>
+<tr><td><strong>application-based</strong></td><td>semantic constraints, business rules</td><td>the application program, or a human, because the schema cannot say them</td></tr>
+</tbody></table></div>
+
+<p>An <strong>inherent</strong> constraint is one the relational model gives you
+free: a relation is a set, so it cannot contain the same tuple twice; a tuple's
+attributes are unordered; a relation cannot have two attributes of the same
+name. You never declare these and you cannot violate them &mdash; there is no
+way to express the violation.</p>
+
+<p>A <strong>schema-based</strong> constraint is one you declare, and the server
+then refuses any operation that would break it. These are the five of
+&sect;4.2, and they are the whole of what this set drills.</p>
+
+<p>An <strong>application-based</strong> constraint is a true statement about the
+enterprise that no DDL can carry &mdash; &ldquo;a student may not enroll in more
+than five courses a term&rdquo;, &ldquo;every item must appear on some
+purchase&rdquo;. It is not less real for being undeclarable; it is just
+somebody else's job. &sect;4.5 is about recognising these, because an exam will
+ask you to, and because in practice they are where the data actually goes
+wrong.</p>
+
+<h2 id="five"><span class="secnum">4.2</span>The five schema-based constraints</h2>
+
+<p>In the order the lectures introduce them. The abbreviations are the ones used
+in class, and they are what an answer should name.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>constraint</th><th>short</th><th>the test applied to a row</th><th>typical server error</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>domain constraint</td><td><strong>D.C.</strong></td><td>Is every value atomic, and of the attribute's declared type and range?</td><td><code>Incorrect integer value</code>, <code>Data too long</code></td></tr>
+<tr><td>2</td><td>key constraint</td><td><strong>K.C.</strong></td><td>Does some existing tuple already carry this key value?</td><td><code>Duplicate entry</code></td></tr>
+<tr><td>3</td><td>constraint on NULLs</td><td><strong>N.C.</strong></td><td>Is an attribute declared <code>NOT NULL</code> being given a null?</td><td><code>Column 'x' cannot be null</code></td></tr>
+<tr><td>4</td><td>entity integrity</td><td><strong>E.I.C.</strong></td><td>Is <em>any</em> attribute of the primary key null?</td><td><code>Column 'x' cannot be null</code></td></tr>
+<tr><td>5</td><td>referential integrity</td><td><strong>R.I.C.</strong></td><td>For each foreign key: is it null, or does its value occur as a primary key in the referenced relation?</td><td><code>a foreign key constraint fails</code></td></tr>
+</tbody></table></div>
+
+<p><strong>Domain constraint.</strong> Two separate requirements live here. Every
+value must be <em>atomic</em> &mdash; which is why composite and multivalued
+attributes cannot survive into a table and had to be flattened or given their
+own relation back in Set 3. And every value must match the type declared for its
+attribute, including any width or range: a four-digit <code>eid</code> does not
+accept <code>'BBBB'</code>, and an <code>INT</code> column does not accept
+<code>'CD'</code>.</p>
+
+<p><strong>Key constraint.</strong> No two tuples may agree on the key. Stated
+the other way round, which is more useful when you are checking a row: the
+operation fails if the key value you are inserting is already present.</p>
+
+<p><strong>Constraint on NULLs.</strong> Simply whether an attribute was
+declared <code>NOT NULL</code>. It is listed separately from entity integrity
+because it is a choice the designer makes about an ordinary attribute, whereas
+entity integrity is forced.</p>
+
+<p><strong>Entity integrity.</strong> No primary-key value may be null &mdash;
+and the word to notice is <em>any</em>. In a composite key, one null component
+is enough. This is not an arbitrary rule: the primary key is what identifies the
+tuple, and a tuple with no identity is not a tuple.</p>
+
+<p><strong>Referential integrity.</strong> The value of a foreign key either
+occurs as a primary-key value in the referenced relation, or is null. Two rules
+come with it: the attributes of the foreign key in <var>R</var> must have the
+same domains as the primary key of <var>S</var>, and a value of the foreign key
+either occurs there or is null. <var>R</var> is then the <em>referencing</em>
+relation and <var>S</var> the <em>referenced</em> one.</p>
+
+<div class="box warn"><span class="bt">The one people get backwards</span>
+<p>A duplicate primary key is <em>not</em> a referential-integrity violation,
+and a dangling foreign key is <em>not</em> a key violation. They are different
+constraints with different error numbers and different fixes. If you find
+yourself writing &ldquo;integrity would be violated&rdquo; without naming which,
+you have not answered the question.</p></div>
+
+<div class="box note"><span class="bt">Null in a foreign key: allowed. Null in a key: never.</span>
+<p>Referential integrity <em>explicitly permits</em> a null foreign key &mdash;
+a tuple that refers to nothing yet. So a total participation constraint from Set
+1 does not survive the mapping by itself; it needs an N.C., a
+<code>NOT NULL</code> written on top of the foreign key by hand, because you
+knew to. But if that foreign key is also part of the primary key, entity
+integrity wins and no null is possible. Exercises 4.6 and 4.7 are exactly this
+pair.</p></div>
+
+<h2 id="keys"><span class="secnum">4.3</span>Key, superkey, candidate, primary</h2>
+
+<p>A <strong>key</strong> is a set of attributes that uniquely identifies each
+tuple in a relation &mdash; no two tuples can carry the same value on the key
+attributes. A key satisfies two properties:</p>
+
+<ol>
+<li>Two tuples cannot have identical values for all the attributes in the key.
+<em>(This also applies to a superkey.)</em></li>
+<li>It is a minimal superkey &mdash; the one with fewest attributes.</li>
+</ol>
+
+<p>A <strong>superkey</strong> is a subset of attributes that identifies each
+tuple, i.e. no two tuples share the same combination of values on it. Property 1
+holds of every superkey; property 2 is what separates a key from a superkey. Add
+any attribute to a superkey and you get another superkey, so most relations have
+a great many &mdash; including, always, the set of all attributes.</p>
+
+<p>A <strong>candidate key</strong> is a minimal superkey. A
+<strong>primary key</strong> is a designated candidate key: the one whose values
+are used to identify tuples in the relation, and the one that gets underlined in
+the schema.</p>
+
+<p>That last distinction does real work. If a relation has two candidate keys,
+only the designated one is protected by entity integrity. A null in the other
+candidate key is perfectly legal; uniqueness on it has to be asked for
+separately, with <code>UNIQUE</code>.</p>
+
+<h2 id="ops"><span class="secnum">4.4</span>The three update operations</h2>
+
+<p>Which constraints an operation can break depends on the operation, and the
+asymmetry is worth memorising because it halves the work on an exam question.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>operation</th><th>can violate</th><th>why</th></tr></thead>
+<tbody>
+<tr><td><strong>INSERT</strong></td><td>D.C., K.C., N.C., E.I.C., R.I.C.</td><td>a new tuple is a new value for every attribute, and a new reference out of the relation</td></tr>
+<tr><td><strong>DELETE</strong></td><td>R.I.C. only</td><td>removing a tuple cannot create a bad value or a duplicate key; it can only strand a foreign key that was pointing at it</td></tr>
+<tr><td><strong>UPDATE / MODIFY</strong></td><td>depends on the attribute changed</td><td>changing an ordinary attribute risks D.C. and N.C.; changing a key risks K.C. and E.I.C., and R.I.C. from anything that referenced it; changing a foreign key risks R.I.C.</td></tr>
+</tbody></table></div>
+
+<p>So for a <code>DELETE</code> there is only one question to ask: does any
+foreign key anywhere point at the tuple being removed? If no, it succeeds.</p>
+
+<div class="box worked"><span class="bt">The worked example from Lecture 7</span>
+<p>Given the schemas below, with the database initially empty, determine for
+each operation in sequence whether it succeeds, and if not which constraint it
+violates. <code>eid</code> is a four-digit number.</p>
+<pre>Employee (<u>eid</u>, ename, dcode)      FK:  dcode in Employee  &rarr;  Department
+Department (<u>dcode</u>, dname)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>operation</th><th></th><th>why</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>INSERT &lt;1111, 'Alex', 'CSCI'&gt; into Employee</code></td><td><strong>R.I.C.</strong></td><td>the database is empty, so <code>Department</code> has no tuple with <code>dcode = 'CSCI'</code></td></tr>
+<tr><td>2</td><td><code>INSERT &lt;'CSCI', 'Computer Science'&gt; into Department</code></td><td>succeeds</td><td>new key, no nulls, no references out</td></tr>
+<tr><td>3</td><td><code>INSERT &lt;2222, 'Max', NULL&gt; into Employee</code></td><td>succeeds</td><td><code>dcode</code> is a foreign key and not part of the primary key, so a null is permitted</td></tr>
+<tr><td>4</td><td><code>INSERT &lt;2222, 'John', 'CSCI'&gt; into Employee</code></td><td><strong>K.C.</strong></td><td><code>eid = 2222</code> is already present, from operation 3</td></tr>
+<tr><td>5</td><td><code>INSERT &lt;NULL, 'Undecided'&gt; into Department</code></td><td><strong>E.I.C.</strong></td><td><code>dcode</code> is the primary key of <code>Department</code></td></tr>
+<tr><td>6</td><td><code>INSERT &lt;'BBBB', 'Blue', 'CSCI'&gt; into Employee</code></td><td><strong>D.C.</strong></td><td><code>'BBBB'</code> is not a four-digit number</td></tr>
+<tr><td>7</td><td><code>DELETE &lt;'CSCI', 'Computer Science'&gt; from Department</code></td><td>succeeds</td><td>a delete can only violate R.I.C., and nothing references <code>'CSCI'</code>: operation 1 failed, 4 failed, 6 failed, and the one employee that did go in &mdash; Max &mdash; has a null <code>dcode</code></td></tr>
+</tbody></table></div>
+<p>Operation 7 is the one that catches people, and it catches them because they
+answered the operations independently. The sequence is cumulative: what is in
+the database when operation 7 runs depends on which of operations 1 to 6
+succeeded. Work down the list keeping track of the actual contents, not the
+intended ones.</p></div>
+
+<h2 id="app"><span class="secnum">4.5</span>Application-based constraints</h2>
+
+<p>Some true statements about the enterprise fit in no DDL. These are the
+application-based constraints, and the exam question is usually
+&ldquo;which constraint from the diagram does your schema fail to
+enforce?&rdquo;</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>the diagram or narrative says</th><th>the DDL can say</th><th>the gap</th></tr></thead>
+<tbody>
+<tr><td>total participation on the <var>M</var> side</td><td><code>NOT NULL</code> on the foreign key</td><td>none &mdash; this one does survive, as an N.C.</td></tr>
+<tr><td>total participation on the <var>1</var> side</td><td>nothing</td><td>&ldquo;every item appears on some purchase&rdquo; is a claim about the <em>absence</em> of a gap in another table; no column can carry it</td></tr>
+<tr><td>a disjoint specialization</td><td>a type column, if you mapped it that way</td><td>options (a) and (b) of Set 3 enforce nothing</td></tr>
+<tr><td>a 1&nbsp;:&nbsp;1 relationship</td><td><code>UNIQUE</code> on the foreign key</td><td>none, if you remember the <code>UNIQUE</code></td></tr>
+<tr><td>a range or a list of permitted values</td><td><code>CHECK</code>, where the server honours it</td><td>MySQL ignored <code>CHECK</code> until 8.0.16; MariaDB enforces it from 10.2</td></tr>
+<tr><td>&ldquo;at most five per term&rdquo;, &ldquo;no two on the same day&rdquo;</td><td>nothing</td><td>a constraint over a <em>set</em> of tuples, not over one</td></tr>
+</tbody></table></div>
+
+<p>Rows two and six are the ones worth memorising, and they fail for the same
+reason. Every mechanism in the DDL &mdash; <code>NOT NULL</code>,
+<code>UNIQUE</code>, <code>CHECK</code>, a foreign key &mdash; constrains the
+row being written, using values present in that row. A constraint that depends
+on which <em>other</em> rows exist is outside what a column can express, and
+becomes a trigger, an assertion, or application code.</p>
+
+<h2 id="lab"><span class="secnum">4.6</span>The Research Lab database</h2>
+
+<p>Exercises 4.2&ndash;4.8 all run against this one database &mdash; the
+Research Lab schema of Problem 126. Read the keys carefully before you start,
+because every one of the seven questions turns on them.</p>
+
+<pre>employee (<u>empId</u>, name, address, yearBorn, salary)
+project  (<u>projId</u>, name, yearDone)
+agency   (<u>agenId</u>, name, location, yearEstablished)
+assign   (<u>pId</u>, <u>eId</u>)
+manage   (<u>pId</u>, eId)
+fund     (<u>aId</u>, <u>pId</u>, amount)</pre>
+
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>pId</code></td><td><code>assign</code></td><td><code>project</code></td></tr>
+<tr><td><code>eId</code></td><td><code>assign</code></td><td><code>employee</code></td></tr>
+<tr><td><code>pId</code></td><td><code>manage</code></td><td><code>project</code></td></tr>
+<tr><td><code>eId</code></td><td><code>manage</code></td><td><code>employee</code></td></tr>
+<tr><td><code>aId</code></td><td><code>fund</code></td><td><code>agency</code></td></tr>
+<tr><td><code>pId</code></td><td><code>fund</code></td><td><code>project</code></td></tr>
+</tbody></table></div>
+
+<p>Two asymmetries are deliberate. <code>assign</code> has a two-attribute
+primary key &mdash; an employee may be assigned to several projects and a
+project has several employees &mdash; while <code>manage</code> is keyed on
+<code>pId</code> alone, because a project has one manager. And in every operation
+below, the values appear left to right in the order the schema lists the
+attributes.</p>
+
+<div class="box note"><span class="bt">How to answer these</span>
+<p>Unlike the worked example in &sect;4.4, Exercises 4.2&ndash;4.8 are
+<em>independent</em> of one another: assume the database is empty at the start of
+each. A bare &ldquo;no&rdquo; earns nothing &mdash; name the constraint and show
+it applies to the actual values in front of you. <code>NULL</code> means no
+value has been assigned to that field.</p></div>
+
+<h2 id="exercises"><span class="secnum">4.7</span>Exercises</h2>
+
+<details class="prob"><summary data-label="Exercise 4.1">For the relation below, (a) list four different superkeys; (b) say which of them are candidate keys; (c) say which single attribute could not be a key, and why the current content is not enough to prove that it could not.
+<div class="tablewrap"><table>
+<thead><tr><th><code>Student</code>: id</th><th>name</th><th>age</th><th>address</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>A</td><td>18</td><td>NY</td></tr>
+<tr><td>2</td><td>B</td><td>19</td><td>NY</td></tr>
+<tr><td>3</td><td>C</td><td>18</td><td>NJ</td></tr>
+<tr><td>4</td><td>D</td><td>19</td><td>NJ</td></tr>
+<tr><td>5</td><td>B</td><td>18</td><td>NJ</td></tr>
+</tbody></table></div></summary><div class="sol">
+<div class="box note"><span class="bt">From the lecture</span>
+<p>This is the <code>Student</code> table of Lecture 6, with the questions
+written out.</p></div>
+<p><strong>(a) Four superkeys.</strong> <code>{id}</code>,
+<code>{id, name}</code>, <code>{name, age, address}</code>,
+<code>{id, name, age, address}</code>. Any set containing <code>{id}</code> is a
+superkey, and the set of all attributes always is.</p>
+<p><strong>(b) Which are candidate keys.</strong> Only <code>{id}</code> of the
+four. A candidate key is a <em>minimal</em> superkey, and
+<code>{id, name}</code> and <code>{id, name, age, address}</code> both properly
+contain <code>{id}</code>.</p>
+<p><code>{name, age, address}</code> is worth working through rather than
+dismissing. On this content its five values are all distinct, so it is a
+superkey &mdash; but it is not minimal, because the pair <code>{name, age}</code>
+inside it is already unique: <code>(A,18)</code>, <code>(B,19)</code>,
+<code>(C,18)</code>, <code>(D,19)</code>, <code>(B,18)</code>, no repeats. So on
+this content the candidate key hiding in there is <code>{name, age}</code>, and
+<code>{name, age, address}</code> is not one. Whether
+<code>{name, age}</code> is <em>really</em> a key is a different question, and
+it is the point of part (c).</p>
+<p><strong>(c) The attribute that cannot be a key</strong> is <code>name</code>,
+and it can be ruled out from the content: rows 2 and 5 both carry
+<code>B</code>, so <code>name</code> fails property 1 outright.</p>
+<p><strong>Why the content is not enough in the other direction.</strong> Content
+can <em>disprove</em> a key and can never prove one. <code>{name, age}</code>
+happens to be unique in these five rows; nothing stops a sixth student called
+<code>B</code>, aged 18, from enrolling tomorrow. A key is a statement about
+every state the relation can ever be in, which is a fact about the enterprise,
+not about today's rows &mdash; which is why the designer declares it and the
+server then enforces it, rather than the server inferring it.</p>
+<p>Row 5 of this table is exactly the kind of row that arrives later and
+invalidates a key someone read off the data.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.2">The database is empty. Will this sequence succeed? If not, which constraint does it violate?
+<pre>INSERT &lt;'12345', 'funny', 'Queens',  '1999'&gt; into agency
+INSERT &lt;'12345', 'silly', 'College', '1991'&gt; into agency</pre></summary><div class="sol">
+<p><strong>No &mdash; K.C.</strong> Primary-key uniqueness would be violated:
+two distinct tuples of <code>agency</code> would carry <code>'12345'</code>
+under the primary key <code>agenId</code>.</p>
+<p>Note what is <em>not</em> wrong with them. The two tuples differ in three of
+their four fields; none of their fields is null; neither refers to any other
+relation. Only the first field matters, because only the first field is the
+key.</p>
+<pre>INSERT INTO agency VALUES ('12345','funny','Queens',1999);     -- accepted
+INSERT INTO agency VALUES ('12345','silly','College',1991);
+ERROR 1062 (23000): Duplicate entry '12345' for key 'PRIMARY'</pre>
+<p>The first operation succeeds. That is worth saying out loud: the pair does
+not fail as a unit, it fails on the second operation, and the database is left
+holding the first one.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.3">Is it possible for the relation <code>fund</code> to contain these two tuples simultaneously?
+<pre>'12345', 'funny', 1999
+'12345', 'silly', 1991</pre></summary><div class="sol">
+<p><strong>Yes.</strong> The primary key of <code>fund</code> is the pair
+<code>(aId, pId)</code>, and these two tuples carry
+<code>('12345','funny')</code> and <code>('12345','silly')</code> &mdash;
+distinct values. One agency funding two projects is exactly what the relation is
+for.</p>
+<pre>+-------+-------+---------+
+| aId   | pId   | amount  |
++-------+-------+---------+
+| 12345 | funny | 1999.00 |
+| 12345 | silly | 1991.00 |
++-------+-------+---------+</pre>
+<p>Compare this with Exercise 4.2 and you have the whole of the key constraint:
+the same repeated value <code>'12345'</code> is fatal in one relation and
+harmless in the other, and nothing about the <em>value</em> decides which. The
+key does.</p>
+<p>The content does of course need an <code>agency</code> with
+<code>agenId = '12345'</code> and projects <code>'funny'</code> and
+<code>'silly'</code> to exist first, or R.I.C. would stop it. The question asks
+whether the content is possible, so we supply those and the answer stands.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.4">Is it possible for the relation <code>manage</code> to contain these two tuples simultaneously?
+<pre>'12345', 'funny'
+'12345', 'silly'</pre></summary><div class="sol">
+<p><strong>No &mdash; K.C.</strong> Two distinct tuples of <code>manage</code>
+would carry <code>'12345'</code> under the primary key <code>pId</code>.</p>
+<p>This is Exercise 4.3 with one attribute moved out of the key, and the answer
+flips. <code>manage</code> is keyed on <code>pId</code> alone because a project
+has a single manager, so the pair above is precisely what the key was chosen to
+forbid &mdash; one project, two managers.</p>
+<pre>INSERT INTO manage VALUES ('12345','funny');     -- accepted
+INSERT INTO manage VALUES ('12345','silly');
+ERROR 1062 (23000): Duplicate entry '12345' for key 'PRIMARY'</pre>
+<p>If the enterprise later allows co-managers this is not a data problem but a
+schema problem: the key has to grow to <code>(pId, eId)</code>, and
+<code>manage</code> becomes another <code>assign</code>.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.5">The database is empty. Will this sequence succeed? If not, which constraint does it violate?
+<pre>INSERT &lt;'12345', 'funny'&gt; into assign
+INSERT &lt;'12346', 'silly'&gt; into assign</pre></summary><div class="sol">
+<p><strong>No &mdash; R.I.C.</strong>, twice over in each tuple.</p>
+<p><code>assign</code> would hold tuples with the non-null values
+<code>'12345'</code> and <code>'12346'</code> under <code>pId</code>, which is a
+foreign key referencing <code>project</code>; but the database is empty, so
+<code>project</code> has no tuple whose primary key equals <code>'12345'</code>
+or <code>'12346'</code>. Likewise the two tuples would hold the non-null values
+<code>'funny'</code> and <code>'silly'</code> under <code>eId</code>, a foreign
+key referencing <code>employee</code>, and <code>employee</code> has no tuple
+with either of those primary keys.</p>
+<pre>INSERT INTO assign VALUES ('12345','funny');
+ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint
+fails (`assign`, CONSTRAINT `assign_ibfk_1` FOREIGN KEY (`pId`)
+REFERENCES `project` (`projId`))</pre>
+<p>The server names only the first constraint it checks. Your answer should name
+both, because both are violated and the marking is on the reasoning, not the
+error message.</p>
+<p>Note also that the two tuples are fine as a <em>pair</em>: distinct primary
+keys, no nulls. Nothing is wrong inside <code>assign</code>. Everything is wrong
+about what it points at.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.6">The database is empty. Will this sequence succeed? If not, which constraint does it violate?
+<pre>INSERT &lt;'12344', NULL, NULL&gt; into project
+INSERT &lt;'12344', NULL&gt;       into manage</pre></summary><div class="sol">
+<p><strong>Yes</strong> &mdash; both operations succeed, and it is worth taking
+each null separately.</p>
+<p>In <code>project</code>, the two nulls land in <code>name</code> and
+<code>yearDone</code>. Neither belongs to the primary key and neither is
+declared <code>NOT NULL</code>, so neither N.C. nor E.I.C. has anything to say.
+The key field <code>projId</code> carries <code>'12344'</code>, which is not
+null and not a duplicate &mdash; the relation is empty.</p>
+<p>In <code>manage</code>, <code>pId</code> is <code>'12344'</code>: not null,
+unique, and it now has a matching <code>project</code> tuple, so K.C., E.I.C.
+and R.I.C. all pass. The null lands in <code>eId</code>, which is a foreign key
+referencing <code>employee</code> but is <em>not</em> part of the primary key of
+<code>manage</code>. Referential integrity explicitly permits a null foreign
+key, and nothing declares this one <code>NOT NULL</code>.</p>
+<pre>+-------+------+
+| pId   | eId  |
++-------+------+
+| 12344 | NULL |
++-------+------+</pre>
+<p>Read semantically, the tuple says: project 12344 exists and has no manager
+recorded. Whether the enterprise should allow that is a design question &mdash;
+if it should not, the schema needs <code>eId CHAR(12) NOT NULL</code>, and no
+amount of integrity theory will supply it for you.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.7">The database is empty. Will this sequence succeed? If not, which constraint does it violate?
+<pre>INSERT &lt;'12333', NULL, NULL&gt; into project
+INSERT &lt;'12333', NULL&gt;       into assign</pre></summary><div class="sol">
+<p><strong>No &mdash; E.I.C.</strong> <code>assign</code> would hold a tuple with
+<code>NULL</code> under <code>eId</code>, which is a <em>component of the
+primary key</em>.</p>
+<pre>INSERT INTO project VALUES ('12333',NULL,NULL);   -- accepted
+INSERT INTO assign  VALUES ('12333',NULL);
+ERROR 1048 (23000): Column 'eId' cannot be null</pre>
+<p>Put this next to Exercise 4.6 and you have the whole of the null rule. The
+same null, in a field of the same name, referencing the same relation: legal in
+<code>manage</code>, illegal in <code>assign</code>. The only difference is that
+<code>assign</code> is keyed on <code>(pId, eId)</code> and <code>manage</code>
+on <code>pId</code> alone, so in <code>assign</code> the null falls inside the
+primary key and entity integrity overrides the permission referential integrity
+would otherwise give it.</p>
+<p>Semantically the rejected tuple is nonsense anyway: it would mean
+&ldquo;project 12333 is assigned to no employee&rdquo;, which is not a fact
+about an assignment but the absence of one.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.8">The database is empty. Will this sequence succeed? If not, which constraint does it violate?
+<pre>INSERT &lt;'12333', NULL, NULL&gt;                   into project
+INSERT &lt;'silly', 'sillier', 'Queens', '2000'&gt;  into agency
+INSERT &lt;'12333', 'silly', '1000'&gt;              into fund</pre></summary><div class="sol">
+<p><strong>No &mdash; R.I.C.</strong>, twice.</p>
+<p>The <code>fund</code> tuple is <code>aId = '12333'</code>,
+<code>pId = 'silly'</code>, <code>amount = 1000</code> &mdash; the values go in
+schema order, and the schema is <code>fund (aId, pId, amount)</code>. So the
+tuple holds the non-null value <code>'silly'</code> under <code>pId</code>, a
+foreign key referencing <code>project</code>, but <code>project</code> has no
+tuple with primary key <code>'silly'</code>; its only tuple is
+<code>'12333'</code>. Likewise the tuple holds the non-null value
+<code>'12333'</code> under <code>aId</code>, a foreign key referencing
+<code>agency</code>, but <code>agency</code> has no tuple with primary key
+<code>'12333'</code>; its only tuple is <code>'silly'</code>.</p>
+<pre>INSERT INTO fund VALUES ('12333','silly',1000);
+ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint
+fails (`fund`, CONSTRAINT `fund_ibfk_1` FOREIGN KEY (`aId`)
+REFERENCES `agency` (`agenId`))</pre>
+<p>The trap is that both values <em>do</em> exist in the database &mdash; just
+in the wrong relations. The tuple has its two identifiers the wrong way round,
+and the only thing that catches it is reading the schema's field order rather
+than guessing from the look of the values. <code>'12333'</code> looks like an id
+and <code>'silly'</code> looks like a name, and in this schema that intuition is
+exactly backwards.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.9">Given the following relational schemas, identify the primary key(s) and foreign key(s) for each schema.
+<pre>Person     (id, name, address, yearborn)
+Teacher    (tid, rank, salary)
+Student    (sid, yearenroll)
+Department (code, name, chair)
+Course     (dcode, number, name, credit)
+Section    (reqNum, dcode, cnum, year)
+GradeSheet (sid, reqNum, year, grade)</pre></summary><div class="sol">
+<div class="box note"><span class="bt">From the lecture</span>
+<p>This is the exercise posed in Lectures 8 and 9, and the schema that Sets 5
+and 6 query. Worth doing before you go on, because every join condition in the
+next two sets is one of the foreign keys below.</p></div>
+<pre>Person     (<u>id</u>, name, address, yearborn)
+Teacher    (<u>tid</u>, rank, salary)
+Student    (<u>sid</u>, yearenroll)
+Department (<u>code</u>, name, chair)
+Course     (<u>dcode</u>, <u>number</u>, name, credit)
+Section    (<u>reqNum</u>, dcode, cnum, <u>year</u>)
+GradeSheet (<u>sid</u>, <u>reqNum</u>, <u>year</u>, grade)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field(s)</th><th>in schema</th><th>references field(s)</th><th>in schema</th></tr></thead>
+<tbody>
+<tr><td><code>tid</code></td><td><code>Teacher</code></td><td><code>id</code></td><td><code>Person</code></td></tr>
+<tr><td><code>sid</code></td><td><code>Student</code></td><td><code>id</code></td><td><code>Person</code></td></tr>
+<tr><td><code>chair</code></td><td><code>Department</code></td><td><code>tid</code></td><td><code>Teacher</code></td></tr>
+<tr><td><code>dcode</code></td><td><code>Course</code></td><td><code>code</code></td><td><code>Department</code></td></tr>
+<tr><td><code>dcode</code>, <code>cnum</code></td><td><code>Section</code></td><td><code>dcode</code>, <code>number</code></td><td><code>Course</code></td></tr>
+<tr><td><code>sid</code></td><td><code>GradeSheet</code></td><td><code>sid</code></td><td><code>Student</code></td></tr>
+<tr><td><code>reqNum</code>, <code>year</code></td><td><code>GradeSheet</code></td><td><code>reqNum</code>, <code>year</code></td><td><code>Section</code></td></tr>
+</tbody></table></div>
+<p>The diagram these came from:</p>
+<figure class="fig" style="--figmax:46rem">
+<svg viewBox="0 -9 940 629" role="img" aria-label="ER diagram of the College database with persons, teachers, students, departments, courses, sections and grade sheets">
+<rect x="240" y="51" width="120" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="300" y="70" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Person</text>
+<ellipse cx="120" cy="25" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="25" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id</text>
+<path d="M120.0 42.0L258.0 51.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="252" cy="18" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="252" y="18" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M252.0 35.0L284.0 51.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="382" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="382" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M382.0 39.0L322.0 51.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="520" cy="62" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="520" y="62" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">yearborn</text>
+<path d="M473.8 62.0L360.0 70.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M300.0 89.0L300.0 121.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<circle cx="300" cy="132" r="11" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="300" y="132" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;">d</text>
+<path d="M292.2 139.8L228.0 176.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M307.8 139.8L374.4 176.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M253 151.8A9 9 0 0 0 271 151.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<path d="M329 151.8A9 9 0 0 0 347 151.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="135" y="176" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Teacher</text>
+<rect x="365" y="176" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="420" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Student</text>
+<ellipse cx="70" cy="148" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="148" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">trank</text>
+<path d="M115.0 148.0L135.0 177.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="62" cy="238" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="62" y="238" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M107.0 238.0L135.0 212.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="430" cy="272" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="430" y="272" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">yearenroll</text>
+<path d="M430.0 255.0L420.0 214.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="135,295 190,268 245,295 190,322" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="295" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">chair</text>
+<path d="M190.0 214.0L190.0 268.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="176" y="241" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="125" y="376" width="130" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="190" y="395" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Department</text>
+<path d="M190.0 322.0L190.0 376.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="160" y="349" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1 or M</text>
+<ellipse cx="80" cy="475" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="80" y="475" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">code</text>
+<path d="M80.0 458.0L155.0 414.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="235" cy="485" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="235" y="485" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M235.0 468.0L225.0 414.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="342,395 390,368 438,395 390,422" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<polygon points="349,395 390,375 431,395 390,415" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="395" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;"></text>
+<path d="M255.0 395.0L342.0 395.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="298.5" y="380" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="505" y="376" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="560" y="395" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Course</text>
+<path d="M434.1 397.2L505.0 397.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M434.1 392.8L505.0 392.8" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="471.5" y="380" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="545" cy="470" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="545" y="470" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;text-decoration-style:dashed;">number</text>
+<path d="M545.0 453.0L545.0 414.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="690" cy="455" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="690" y="455" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">credit</text>
+<path d="M690.0 438.0L585.0 414.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="700" cy="395" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="700" y="395" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M655.0 395.0L615.0 395.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="605,330 660,303 715,330 660,357" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="660" y="330" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">of</text>
+<path d="M560.0 376.0L605.0 330.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="582.5" y="367" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="720" y="181" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="775" y="200" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">Section</text>
+<path d="M715.0 330.0L775.0 219.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="759" y="274.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="760" cy="128" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="760" y="128" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">reqNum</text>
+<path d="M760.0 145.0L760.0 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="885" cy="208" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="885" y="208" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">year</text>
+<path d="M840.0 208.0L830.0 200.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="532,197 597,170 662,197 597,224" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="597" y="197" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">GradeSheet</text>
+<path d="M475.0 195.0L532.0 197.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="503.5" y="181" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M662.0 197.0L720.0 200.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="691" y="183.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="597" cy="110" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="597" y="110" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">grade</text>
+<path d="M597.0 127.0L597.0 170.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 65: the College database of Lecture 9. <b>Course</b> is weak, identified by its department, so its key is (code, number); <b>Section</b> is keyed on (reqNum, year).</figcaption></figure>
+<p><strong>The three that are not obvious.</strong></p>
+<p><code>Teacher</code> and <code>Student</code> are subclasses of
+<code>Person</code>, mapped as one relation each keyed on the superclass key. So
+<code>tid</code> is simultaneously the primary key of <code>Teacher</code> and a
+foreign key into <code>Person</code> &mdash; the same attribute doing both jobs,
+which is the signature of this mapping and is why neither subclass repeats
+<code>name</code> or <code>address</code>.</p>
+<p><code>Course</code> is a <em>weak</em> entity set, identified by its
+department: the double diamond, and <code>number</code> dashed as a partial key.
+So its primary key is the pair <code>(dcode, number)</code> &mdash; course
+number 111 means nothing until you say whose 111 it is. That in turn forces
+<code>Section</code>'s reference to <code>Course</code> to be the
+<em>pair</em> <code>(dcode, cnum)</code>, a composite foreign key, which is why
+<code>Section</code> carries a department code it otherwise would not need.</p>
+<p><code>Section</code> is keyed on <code>(reqNum, year)</code>, not on
+<code>reqNum</code> alone &mdash; both are underlined in the diagram, so a
+registration number is reused from year to year. And that pair then propagates
+into <code>GradeSheet</code>, whose key is all three of
+<code>(sid, reqNum, year)</code>: one grade per student per section per year.</p>
+<p><strong>What it tells you about nulls.</strong> Every foreign key above except
+<code>chair</code> is part of its own relation's primary key, so by entity
+integrity none of them can ever be null. <code>Department.chair</code> is the one
+that can &mdash; a department between chairs &mdash; unless someone declares it
+<code>NOT NULL</code>. That single exception is worth remembering, because it is
+the only place in this schema where a query has to think about nulls at all.</p>
+</div></details>
+
+<figure class="fig" style="--figmax:44rem">
+<svg viewBox="0 -5 840 574" role="img" aria-label="ER diagram of the Treatment Database with suppliers, medications, patients and source books">
+<rect x="415" y="76" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="95" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">supplier</text>
+<ellipse cx="305" cy="30" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="305" y="30" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M305.0 47.0L430.0 76.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="450" cy="22" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="450" y="22" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M450.0 39.0L470.0 76.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="640" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="640" cy="32" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="640" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M640.0 49.0L512.0 76.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="415,185 470,158 525,185 470,212" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="185" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">offer</text>
+<path d="M470.0 114.0L470.0 158.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="136" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="680" cy="150" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="680" y="150" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">price</text>
+<path d="M635.0 150.0L525.0 185.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="690" cy="212" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="690" y="212" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">brand name</text>
+<path d="M636.0 212.0L510.4 192.2" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="409.5" y="256" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="275" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">medication</text>
+<path d="M470.0 212.0L470.0 256.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="234" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="690" cy="275" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="690" y="275" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">gen. name</text>
+<path d="M639.9 275.0L530.5 275.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="415,362 470,335 525,362 470,389" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="362" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">take</text>
+<path d="M470.0 294.0L470.0 335.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="314.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="670" cy="362" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="670" y="362" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">schedule</text>
+<path d="M623.8 362.0L525.0 362.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="415" y="431" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="470" y="450" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">patient</text>
+<path d="M470.0 389.0L470.0 431.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="456" y="410" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="400" cy="535" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="400" y="535" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M400.0 518.0L442.9 469.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="510" cy="542" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="510" y="542" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M510.0 525.0L470.0 469.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="650" cy="525" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="650" y="525" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">id #</text>
+<path d="M650.0 508.0L501.7 469.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="180.9,275 250,248 319.1,275 250,302" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="250" y="275" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">explanation</text>
+<path d="M409.5 275.0L319.1 275.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="364.3" y="260" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="250" cy="195" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="250" y="195" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">page #</text>
+<path d="M250.0 212.0L250.0 248.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="184.95" y="343" width="130.1" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="250" y="362" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">source book</text>
+<path d="M250.0 302.0L250.0 343.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="236" y="322.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<ellipse cx="80" cy="300" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="80" y="300" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">title</text>
+<path d="M125.0 300.0L184.9 348.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="60" cy="362" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="362" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M105.0 362.0L184.9 362.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="70" cy="425" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="70" y="425" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">ISBN</text>
+<path d="M115.0 425.0L184.9 376.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="250" cy="450" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="250" y="450" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">author</text>
+<path d="M250.0 381.0L250.0 433.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="115" cy="515" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="115" y="515" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">firstName</text>
+<path d="M115.0 498.0L226.0 464.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="285" cy="528" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="285" y="528" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">lastName</text>
+<path d="M285.0 511.0L271.4 465.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 62: the Treatment Database. <b>author</b> is composite; <b>phone&nbsp;#</b> is multivalued.</figcaption></figure>
+
+<details class="prob"><summary data-label="Exercise 4.10">Write a set of relational schemas for the Treatment Database specified by the ER diagram in Figure 62. For each relational schema, define precisely the primary key (if any) and the foreign key(s) if any.</summary><div class="sol">
+<p>Eight relations. The two that are easy to miss are <code>phone</code>, forced
+by the multivalued attribute, and <code>explanation</code>, which is a
+relationship set in its own right because it carries <code>pageNum</code>.</p>
+<pre>patient    (<u>idNumber</u>, address, name)
+medication (<u>genericName</u>)
+supplier   (<u>name</u>, address)
+phone      (<u>supName</u>, <u>number</u>)
+sourceBook (<u>ISBN</u>, name, title, firstName, lastName)
+take       (<u>patientID</u>, <u>genericName</u>, schedule)
+offer      (<u>genericName</u>, <u>supName</u>, <u>brandName</u>, price)
+explanation(<u>genericName</u>, ISBN, pageNum)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references field</th><th>in schema</th></tr></thead>
+<tbody>
+<tr><td><code>supName</code></td><td><code>phone</code></td><td><code>name</code></td><td><code>supplier</code></td></tr>
+<tr><td><code>patientID</code></td><td><code>take</code></td><td><code>idNumber</code></td><td><code>patient</code></td></tr>
+<tr><td><code>genericName</code></td><td><code>take</code></td><td><code>genericName</code></td><td><code>medication</code></td></tr>
+<tr><td><code>genericName</code></td><td><code>offer</code></td><td><code>genericName</code></td><td><code>medication</code></td></tr>
+<tr><td><code>supName</code></td><td><code>offer</code></td><td><code>name</code></td><td><code>supplier</code></td></tr>
+<tr><td><code>genericName</code></td><td><code>explanation</code></td><td><code>genericName</code></td><td><code>medication</code></td></tr>
+<tr><td><code>ISBN</code></td><td><code>explanation</code></td><td><code>ISBN</code></td><td><code>sourceBook</code></td></tr>
+</tbody></table></div>
+<p><strong>Where each decision came from.</strong></p>
+<p><code>medication</code> has a single attribute because <code>gen. name</code>
+is its only one; a one-column relation looks odd but is correct, and it is what
+makes the three foreign keys pointing at it legal.</p>
+<p><code>author</code> is a composite attribute, so it flattens &mdash; no
+relation of its own, just <code>firstName</code> and <code>lastName</code> as
+columns of <code>sourceBook</code>. <code>phone&nbsp;#</code> is multivalued, so
+the opposite happens: its own relation, with the owner's key and the value
+<em>both</em> in the primary key. Both moves are forced by the domain
+constraint, which requires every value to be atomic.</p>
+<p><code>offer</code> is the one to read twice. It is M&nbsp;:&nbsp;M, so its
+primary key would normally be the two owners' keys; but <code>brand name</code>
+is underlined in the diagram, so the same supplier may offer the same medication
+under more than one brand, and the key is all three. <code>price</code> then
+depends on the brand, not merely on the pair.</p>
+<p><code>explanation</code> is M&nbsp;:&nbsp;1 from medication to source book:
+each medication is explained in one book, a book explains many medications. By
+the Set 3 rule that gives a foreign key on the M side &mdash; which would put
+<code>ISBN</code> and <code>pageNum</code> straight into
+<code>medication</code>. Keeping it as a separate relation, as the problem book
+does, is the alternative mapping: it leaves <code>medication</code> free of
+nulls for the medications no book explains, at the cost of a join. Either is
+defensible; what is not defensible is making it M&nbsp;:&nbsp;M, because the
+<code>1</code> in the diagram says a medication has one explanation.</p>
+</div></details>
+
+<figure class="fig" style="--figmax:34rem">
+<svg viewBox="-10 0 800 375" role="img" aria-label="ER diagram of the Professor Payroll database">
+<rect x="119.05" y="156" width="111.9" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="175" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">professor</text>
+<ellipse cx="60" cy="45" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="60" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">firstName</text>
+<path d="M60.0 62.0L150.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="215" cy="35" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="215" y="35" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">socSecN</text>
+<path d="M215.0 52.0L185.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="48" cy="105" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="48" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">lastName</text>
+<path d="M94.2 105.0L119.1 157.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="45" cy="245" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="45" y="245" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">salary</text>
+<path d="M45.0 228.0L130.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="55" cy="305" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="55" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">rank</text>
+<path d="M55.0 288.0L155.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="185" cy="340" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="185" y="340" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">wizID</text>
+<path d="M185.0 323.0L175.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<rect x="539.5" y="156" width="121" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="600" y="175" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">department</text>
+<ellipse cx="620" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="620" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">name</text>
+<path d="M620.0 62.0L612.0 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="730" cy="105" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="730" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">office</text>
+<path d="M685.0 105.0L660.5 156.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="650" cy="305" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="650" y="305" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone</text>
+<path d="M650.0 288.0L620.0 194.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="335,105 390,78 445,105 390,132" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="105" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">chair</text>
+<path d="M230.9 160.4L346.3 110.6" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="263.75" y="132.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<path d="M431.1 111.8L539.5 160.3" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/><path d="M436.2 109.3L540.7 156.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="516.25" y="132.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<polygon points="335,248 390,221 445,248 390,275" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="390" y="248" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">member</text>
+<path d="M230.9 189.6L346.3 242.4" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="268.5" y="222.7" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<path d="M433.7 242.4L539.5 192.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="511.5" y="222.7" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+</svg>
+<figcaption>Figure 64: the Professor Payroll database, Part (I). <b>chair</b> is 1&nbsp;:&nbsp;M and total on the department side; <b>member</b> is M&nbsp;:&nbsp;M.</figcaption></figure>
+
+<details class="prob"><summary data-label="Exercise 4.11">Write a set of relational schemas for the database represented by the ER diagram in Figure 64 and identify precisely all the primary key(s) (if any) and the foreign key(s) (if any).</summary><div class="sol">
+<pre>professor  (<u>socSecNum</u>, name, rank, salary)
+department (<u>name</u>, roomNumber, phoneNumber, chair)
+member     (<u>deptName</u>, <u>profId</u>)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references field</th><th>in schema</th></tr></thead>
+<tbody>
+<tr><td><code>chair</code></td><td><code>department</code></td><td><code>socSecNum</code></td><td><code>professor</code></td></tr>
+<tr><td><code>profId</code></td><td><code>member</code></td><td><code>socSecNum</code></td><td><code>professor</code></td></tr>
+<tr><td><code>deptName</code></td><td><code>member</code></td><td><code>name</code></td><td><code>department</code></td></tr>
+</tbody></table></div>
+<p>Three relations for two entity sets and two relationship sets, because the
+two relationships are mapped differently and the diagram tells you which is
+which.</p>
+<p><strong><code>chair</code> is 1&nbsp;:&nbsp;M</strong> from professor to
+department &mdash; one professor may chair several departments, each department
+has one chair. The foreign key therefore goes on the M side, as a column of
+<code>department</code>, and no third relation appears. Because the diagram puts
+a double line on the department side, every department must have a chair, so
+<code>chair</code> additionally wants <code>NOT NULL</code> &mdash; an N.C. that
+you have to add deliberately, since the foreign key alone would permit the
+null.</p>
+<p><strong><code>member</code> is M&nbsp;:&nbsp;M</strong>, so it gets its own
+relation whose primary key is both owners' keys. It has no attributes of its own
+&mdash; a perfectly ordinary outcome, and the relation is still necessary.</p>
+<p>Worth noticing: <code>professor</code> has <em>no</em> foreign key, even
+though professors plainly relate to departments. Both relationships are recorded
+on the other side. A relation with no foreign keys is not a sign that something
+was missed.</p>
+<p>This is the schema Sets 5 and 6 use for their second group of queries.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.12">Write a set of relational schemas for the database of PLANET (Planetary Computer Network), specified by the narrative below. Implement all applicable constraints. Your design must have an adequate level of normalization. For each relational schema, specify the primary key (if any) and the foreign keys (if any).
+<p>The firm PLANET owns and operates a large number of computers connected into a world-wide network. PLANET owns a large database where it stores data about all of its computers. Each computer is identified by its NIC (network interface card) identifier, and further characterized by several properties. All of these properties are determined by the model (code) assigned by the manufacturer to the computer. Precisely, the model determines the number of CPUs, clock frequency, core memory size, local disk capacity, and local disk speed. The year when that model appeared on the market is also recorded, and so is the manufacturer.</p>
+<p>PLANET identifies computer manufacturers by internal names, and stores about each such manufacturer only one data item: a pointer (lookup key) into a large external database facility where all data about manufacturers (and companies and businesses in general) can be looked up via this lookup key.</p>
+<p>PLANET owns very many IP addresses. An IP address is a unique name of a node in the global public INTERNET where a computer can be connected. A computer is connected to the INTERNET by receiving one IP address. An IP address is identified by a string. For each of its IP addresses, PLANET needs to know the name of the GSP (global service provider) which delivers connection to this address, and the approximate geographic location of the IP address. Very much like computer manufacturers, GSPs are also identified by internal name and characterized by a pointer to the same external comprehensive database. Additionally, PLANET rates GSPs based on the quality of service they provide. The rating process is confidential, and only the final internal rating is stored.</p></summary><div class="sol">
+<pre>manufacturer (<u>name</u>, lookupKey)
+model        (<u>code</u>, <u>manufacturerName</u>, numberCPU, clockFrequency,
+              memorySize, diskCapacity, diskSpeed)
+computer     (<u>NIC</u>, modelCode, manufacturerName)
+GSP          (<u>name</u>, lookupKey, rating)
+IPaddress    (<u>id</u>, gspName, location)
+connection   (<u>computerId</u>, IpId)</pre>
+<div class="tablewrap"><table>
+<thead><tr><th>field (composition)</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>manufacturerName</code></td><td><code>model</code></td><td><code>manufacturer</code></td></tr>
+<tr><td><code>modelCode, manufacturerName</code></td><td><code>computer</code></td><td><code>model</code></td></tr>
+<tr><td><code>gspName</code></td><td><code>IPaddress</code></td><td><code>GSP</code></td></tr>
+<tr><td><code>computerId</code></td><td><code>connection</code></td><td><code>computer</code></td></tr>
+<tr><td><code>IpId</code></td><td><code>connection</code></td><td><code>IPaddress</code></td></tr>
+</tbody></table></div>
+<p><strong>The sentence that decides the whole design</strong> is &ldquo;All of
+these properties are determined by the model&rdquo;. It is a functional
+dependency stated in English, and it says the five hardware properties must not
+live in <code>computer</code>. Put them there and every computer of the same
+model repeats them, and one careless update makes the database contradict
+itself. They belong in <code>model</code>, and <code>computer</code> keeps only
+a reference.</p>
+<p><strong>Why <code>model</code>'s key is a pair.</strong> The model code is
+assigned <em>by the manufacturer</em>, so two manufacturers may perfectly well
+use the same code. The key is therefore <code>(code, manufacturerName)</code>,
+and the foreign key in <code>computer</code> is the corresponding
+<em>pair</em> of fields &mdash; a composite foreign key, which is why
+<code>computer</code> carries <code>manufacturerName</code> even though it looks
+redundant. It is not redundant; it is half of a key. Compare
+<code>Section</code> in Exercise 4.9, which carries a department code for
+exactly the same reason.</p>
+<p><strong><code>connection</code> as its own relation.</strong> The narrative
+says a computer is connected by receiving <em>one</em> IP address, and an IP
+address names one node, so the relationship is 1&nbsp;:&nbsp;1 and could have
+been a foreign key on either side. Keeping it separate avoids nulls for the
+computers that are not currently connected and for the addresses PLANET owns but
+has not used &mdash; and the narrative says PLANET owns &ldquo;very many&rdquo;
+addresses, which strongly implies there are such. Mapped this way,
+<code>computerId</code> alone is a candidate key and so is <code>IpId</code>;
+whichever you choose as primary, the other wants a <code>UNIQUE</code>, or the
+1&nbsp;:&nbsp;1 is not enforced.</p>
+<p><strong>What the narrative does not let you store.</strong> The rating
+process is confidential and only the final rating is kept, so there is no
+relation for the process &mdash; a single <code>rating</code> column on
+<code>GSP</code>. Resist the urge to design the thing the narrative explicitly
+refuses to record.</p>
+</div></details>
+
+<figure class="fig" style="--figmax:38rem">
+<svg viewBox="0 0 720 564" role="img" aria-label="ER diagram with customers, purchases and items">
+<rect x="295" y="101" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="120" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">customer</text>
+<ellipse cx="120" cy="45" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="120" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">catalog #</text>
+<path d="M120.0 62.0L300.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="275" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="275" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">name</text>
+<path d="M275.0 49.0L330.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="415" cy="32" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="415" y="32" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">address</text>
+<path d="M415.0 49.0L370.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="580" cy="45" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<ellipse cx="580" cy="45" rx="40.5" ry="12.5" style="fill:none;stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="580" y="45" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">phone #</text>
+<path d="M580.0 62.0L400.0 101.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="295,208 350,181 405,208 350,235" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="208" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">by</text>
+<path d="M350.0 139.0L350.0 181.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="336" y="160" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">1</text>
+<rect x="295" y="276" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="295" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">purchase</text>
+<path d="M350.0 235.0L350.0 276.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="336" y="255.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="130" cy="232" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="232" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">invoice #</text>
+<path d="M180.1 232.0L295.0 280.1" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="115" cy="295" rx="54" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="115" y="295" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">order date</text>
+<path d="M169.0 295.0L295.0 295.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="130" cy="358" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="130" y="358" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">card #</text>
+<path d="M175.0 358.0L295.0 309.9" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="575" cy="295" rx="50.1" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="575" y="295" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">ship date</text>
+<path d="M524.9 295.0L405.0 295.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<polygon points="295,382 350,355 405,382 350,409" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="382" text-anchor="middle" dominant-baseline="central" style="font-size:13.5px;font-weight:600;">of</text>
+<path d="M350.0 314.0L350.0 355.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="336" y="334.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<rect x="295" y="446" width="110" height="38" rx="2" style="fill:var(--panel);stroke:currentColor;stroke-width:1.9;stroke-linejoin:round"/>
+<text class="lbl" x="350" y="465" text-anchor="middle" dominant-baseline="central" style="font-size:15px;font-weight:600;">item</text>
+<path d="M350.0 409.0L350.0 446.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<text class="lbl" x="336" y="427.5" text-anchor="middle" dominant-baseline="central" style="font-size:14px;font-weight:700;">M</text>
+<ellipse cx="205" cy="530" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="205" y="530" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;text-decoration:underline;">number</text>
+<path d="M205.0 513.0L318.3 484.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="350" cy="537" rx="45" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="350" y="537" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">price</text>
+<path d="M350.0 520.0L350.0 484.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+<ellipse cx="495" cy="530" rx="46.2" ry="17" style="fill:var(--panel);stroke:currentColor;stroke-width:1.6"/>
+<text class="lbl" x="495" y="530" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:400;">quantity</text>
+<path d="M495.0 513.0L381.7 484.0" style="fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round"/>
+</svg>
+<figcaption>Figure 63: Items and Purchases. Every purchase is made <em>by</em> exactly one customer; a purchase may be <em>of</em> many items and an item may appear on many purchases.</figcaption></figure>
+
+<details class="prob"><summary data-label="Exercise 4.13">Write SQL code that creates the database represented by the ER diagram in Figure 63. Be sure to implement all the constraints expressed in the diagram.</summary><div class="sol">
+<pre class="asm">create table item (
+    itemnum char (10),
+    price decimal (12,2),
+    quantity decimal (10,0),
+    primary key (itemnum));
+
+create table customer (
+    catalognum char (12),
+    name varchar (36),
+    address varchar (54),
+    primary key (catalognum));
+
+create table phonebook (
+    person char (12),
+    phonenum varchar (16),
+    primary key (person, phonenum),
+    foreign key (person) references customer);
+
+create table purchase (
+    invoicenum char (14),
+    orderdate date,
+    shipdate date,
+    cardnumber char (16),
+    buyer char (12) not null,          <span class="c">-- the double line, in SQL</span>
+    primary key (invoicenum),
+    foreign key (buyer) references customer);
+
+create table orderfor (
+    itemnum char (10),
+    invoicenum char (14),
+    primary key (itemnum, invoicenum),
+    foreign key (itemnum) references item,
+    foreign key (invoicenum) references purchase);</pre>
+<p><strong>Five relations for three entity sets and two relationship
+sets.</strong> <code>phonebook</code> exists because <code>phone&nbsp;#</code>
+is multivalued; <code>orderfor</code> exists because <code>of</code> is
+M&nbsp;:&nbsp;M. The <code>by</code> relationship gets no relation at all
+&mdash; it is 1&nbsp;:&nbsp;M, so it collapses into the <code>buyer</code>
+column of <code>purchase</code>.</p>
+<p><strong>The one line that is easy to leave out</strong> is
+<code>not null</code> on <code>buyer</code> &mdash; an N.C., not a consequence
+of the foreign key. The diagram puts <code>M</code> on the purchase side of
+<code>by</code> and <code>1</code> on the customer side, and a purchase with no
+buyer is not a thing the enterprise has; the foreign key alone would permit it,
+because referential integrity allows a null foreign key. Tested:</p>
+<pre>INSERT INTO purchase VALUES ('INV-0002','2026-09-02',NULL,NULL,NULL);
+ERROR 1048 (23000): Column 'buyer' cannot be null
+
+INSERT INTO purchase VALUES ('INV-0003','2026-09-02',NULL,NULL,'C-9999');
+ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint
+fails (`purchase`, CONSTRAINT `purchase_ibfk_1` FOREIGN KEY (`buyer`)
+REFERENCES `customer` (`catalognum`))</pre>
+<p>Two different refusals, from two different constraints, on the same column:
+the first is the N.C., because the value is missing; the second is the R.I.C.,
+because it points at nothing. Being able to say which is which is most of this
+exercise.</p>
+<p><strong>On the other columns.</strong> <code>orderdate</code>,
+<code>shipdate</code> and <code>cardnumber</code> are left nullable on purpose:
+an order placed today has no ship date yet, and the diagram does not say every
+purchase carries a card. Declaring them <code>not null</code> would be adding a
+constraint the diagram never made &mdash; as much an error as omitting one it
+did.</p>
+<p>Column types are a judgement call the diagram cannot make for you; they are
+your domain constraints, and any reasonable width passes. What is marked is the
+keys, the foreign keys and the <code>not null</code>.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 4.14">Name a constraint expressed by Figure 63 that your answer to Exercise 4.13 does <em>not</em> enforce. Which of the three categories of &sect;4.1 does it fall into, and why can no column carry it?</summary><div class="sol">
+<div class="box note"><span class="bt">Not from the problem book</span>
+<p>Exercises 4.2&ndash;4.13 are the problem book's and the lectures'. This one is
+ours: the diagram and the DDL are Problem 135's, and only the question asked
+about them is new.</p></div>
+<p>Figure 63 marks the <code>of</code> relationship <code>M</code> on the
+<em>item</em> side as well as the purchase side. Read together with the
+cardinality on the other end, that is a claim that every item appears on some
+purchase &mdash; and the DDL of Exercise 4.13 lets an item sit in the catalogue
+untouched forever:</p>
+<pre>INSERT INTO item VALUES ('I-003', 2.25, 10);      -- accepted
+
+SELECT itemnum FROM item
+ WHERE itemnum NOT IN (SELECT itemnum FROM orderfor);
++---------+
+| itemnum |
++---------+
+| I-002   |
+| I-003   |
++---------+</pre>
+<p><strong>The category is application-based</strong> &mdash; a semantic
+constraint that is true of the enterprise and undeclarable in the schema. Some
+program, or some person, has to enforce it.</p>
+<p><strong>Why no column can carry it.</strong> The reason is structural rather
+than a limitation of SQL. A constraint of the form &ldquo;this tuple must be
+<em>referenced</em> by at least one tuple elsewhere&rdquo; is a statement about
+the absence of a gap in another relation. Every mechanism in the DDL constrains
+the tuple being written, using values present in that tuple. Nothing in a tuple
+of <code>item</code> can be inspected to decide whether some tuple of
+<code>orderfor</code> mentions it &mdash; and even if it could, the constraint
+would have to be re-checked every time an unrelated <code>orderfor</code> tuple
+was deleted. That is the work of a trigger or an assertion, not of a column.</p>
+<p>Hence the asymmetry worth memorising, and it is the same one as &sect;4.5:
+total participation on the <var>M</var> side of a 1&nbsp;:&nbsp;<var>M</var>
+relationship becomes an N.C. and is enforced; total participation on the
+<var>1</var> side becomes a comment.</p>
+<p>A second answer would also have earned the marks: nothing in the DDL says the
+<code>quantity</code> of an item cannot be negative, or that
+<code>shipdate</code> cannot precede <code>orderdate</code>. Those are domain
+constraints that a <code>check</code> clause <em>can</em> express &mdash; so
+they are schema-based constraints you omitted, not application-based ones. The
+difference between &ldquo;undeclarable&rdquo; and &ldquo;declarable but not
+declared&rdquo; is exactly what &sect;4.1 is asking you to notice.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Everything on this page is a constraint the server can check one tuple at a
+time. Nothing here stops you from storing the same fact twice &mdash; a schema
+can satisfy all five schema-based constraints and still let an update leave the
+database contradicting itself. That is what functional dependencies and
+normalization are about, and it is the one remaining question the relational
+model asks of a design.</p>
+<p>In the other direction: from here the question stops being &ldquo;what may
+the database hold?&rdquo; and becomes &ldquo;what can I get out of it?&rdquo;.
+Set 5 answers that with the relational algebra, and the keys and foreign keys
+you have been writing down finally start earning their keep &mdash; every
+selection condition in the next two sets is one of them.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-rel.html"><span>Previous</span>Set 3. The relational model: from diagram to tables</a>
+      <a class="next" href="ex-ra.html"><span>Next</span>Set 5. Relational algebra</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
