@@ -14,7 +14,7 @@
   <nav class="topnav">
     <a href="ex-ra.html">&larr; Prev</a>
     <a href="index.html">Contents</a>
-    <a href="setup-sql.html">Next &rarr;</a>
+    <a href="ex-sql.html">Next &rarr;</a>
     <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
   </nav>
 </div></header>
@@ -74,15 +74,15 @@ language and stops being confusing the moment you notice it.</p>
 <div class="tablewrap"><table>
 <thead><tr><th>algebra</th><th>SQL</th><th>note</th></tr></thead>
 <tbody>
-<tr><td><code>R &cup; S</code></td><td><code>UNION</code></td><td>already removes duplicates; <code>UNION ALL</code> does not</td></tr>
-<tr><td><code>R &cap; S</code></td><td><code>INTERSECT</code></td><td>MariaDB 10.3+, PostgreSQL, Oracle</td></tr>
-<tr><td><code>R &minus; S</code></td><td><code>EXCEPT</code></td><td>Oracle spells it <code>MINUS</code>; see &sect;6.3 for the portable form</td></tr>
+<tr><td><code>R &cup; S</code></td><td><em>no form in the lectures</em></td><td>SQL has <code>UNION</code>; nothing on these pages needs it</td></tr>
+<tr><td><code>R &cap; S</code></td><td><code>WHERE ... IN (SELECT ...)</code></td><td>SQL also has <code>INTERSECT</code>; the lectures do not use it</td></tr>
+<tr><td><code>R &minus; S</code></td><td><code>WHERE ... NOT IN (SELECT ...)</code></td><td>SQL also has <code>EXCEPT</code>; see &sect;6.3</td></tr>
 <tr><td><code>R1 &times; R2</code> <em>(copies of one relation)</em></td><td><code>FROM R r1, R r2</code></td><td>the numbered copies become table aliases, one per copy</td></tr>
 </tbody></table></div>
 
 <p>Two more details. A condition crosses unchanged except that <code>&and;</code>
 is <code>AND</code>, <code>&or;</code> is <code>OR</code> and <code>&ne;</code>
-is <code>&lt;&gt;</code>. And string literals take single quotes: double quotes
+is <code>!=</code>. And string literals take single quotes: double quotes
 mean an identifier in standard SQL, and MySQL's willingness to accept them for
 strings is a local dialect not worth relying on.</p>
 
@@ -111,17 +111,17 @@ correctness first.)</p></div>
 <p><strong>Three-valued logic.</strong> The algebra as taught here has no nulls.
 SQL does, and a comparison with <code>NULL</code> is neither true nor false but
 unknown, which <code>WHERE</code> discards. The consequence that bites:
-<code>x &lt;&gt; 'Potions'</code> is <em>not</em> satisfied by a row whose
+<code>x != 'Potions'</code> is <em>not</em> satisfied by a row whose
 <code>x</code> is null, so a &ldquo;not in Potions&rdquo; query written with
-<code>&lt;&gt;</code> silently drops those rows. Both schemas here keep their
+<code>!=</code> silently drops those rows. Both schemas here keep their
 relevant columns non-null, so nothing on this page is affected &mdash; but
-almost every real schema has nullable columns, and this is where the
-<code>NOT EXISTS</code> form of &sect;6.3 earns its keep.</p>
+almost every real schema has nullable columns, and &sect;6.3 shows what that
+does to a <code>NOT IN</code>.</p>
 
 <p><strong>Everything the algebra cannot do.</strong> <code>COUNT</code>,
 <code>SUM</code>, <code>AVG</code>, <code>MIN</code>, <code>MAX</code>,
-<code>GROUP BY</code>, <code>HAVING</code>, <code>ORDER BY</code>,
-<code>LIMIT</code>. None of these has an algebraic counterpart, which is why
+<code>GROUP BY</code>, <code>HAVING</code> and <code>ORDER BY</code> &mdash; the
+whole of Lecture 12. None of these has an algebraic counterpart, which is why
 Exercise 6.7 goes the long way round to find a maximum: the algebra it is
 translating had no <code>MAX</code> to translate. Doing it the SQL way is a fair
 answer to a different question, and both are worth being able to write.</p>
@@ -143,43 +143,46 @@ succeeds.</p>
 <h2 id="difference"><span class="secnum">6.3</span>Writing a set difference</h2>
 
 <p>The losers-and-winners pattern of Set 5 is the one construct with more than
-one reasonable translation. Three of them:</p>
+one reasonable translation. The form used throughout this page is the one
+Lecture 11 uses &mdash; the difference goes into a subquery, and
+<code>NOT IN</code> tests against it:</p>
 
-<pre class="asm"><span class="c">-- 1. EXCEPT — closest to the algebra, reads like the expression</span>
-SELECT name FROM department
-EXCEPT
-SELECT deptName FROM member;
+<pre class="asm">SELECT name FROM department
+ WHERE name NOT IN (SELECT deptName FROM member);</pre>
 
-<span class="c">-- 2. NOT IN — portable to every version of everything</span>
-SELECT name FROM department
- WHERE name NOT IN (SELECT deptName FROM member);
+<p>Read it the way the algebra reads: the subquery is <em>S</em>, the outer
+query is <em>R</em>, and <code>NOT IN</code> is the minus sign. Intersection is
+the same statement with <code>IN</code>. Everything on this page, and on Sets 7
+and 8, is built from those two.</p>
 
-<span class="c">-- 3. NOT EXISTS — correlated, and the only one safe against nulls</span>
-SELECT d.name FROM department d
- WHERE NOT EXISTS (SELECT 1 FROM member m WHERE m.deptName = d.name);</pre>
+<p>Where the pattern has a third step &mdash; putting the winners back against
+a bigger relation to recover columns the difference threw away &mdash; the
+<code>NOT IN</code> simply moves inside a larger <code>WHERE</code> clause, and
+the outer query does the product and the projection in one statement. Several
+solutions below do that, and the algebra beside them shows what was folded
+together.</p>
 
-<p>The solutions below use <code>EXCEPT</code> where the algebra uses
-<code>&minus;</code>, because the aim is to show the correspondence. For your
-own code the ranking is roughly the reverse: <code>NOT EXISTS</code> first,
-because it is the only one of the three that behaves sanely when the subquery
-can produce a null; <code>NOT IN</code> second for portability; and
-<code>EXCEPT</code> when the query really is a difference of two whole result
-sets rather than a membership test.</p>
-
-<div class="box worked"><span class="bt">Why NOT IN can go wrong</span>
+<div class="box warn"><span class="bt">The one thing NOT IN cannot survive</span>
 <p><code>x NOT IN (1, 2, NULL)</code> is never true. If <code>x</code> is 3, SQL
 must decide whether 3 equals the null, and &ldquo;unknown&rdquo; propagates
-through the <code>AND</code> to make the whole condition unknown &mdash; so the
-row is dropped, and a query that should have returned everything returns
-nothing. A single null in a subquery's output silently empties the result.
-<code>NOT EXISTS</code> has no such behaviour, because it asks about the
-existence of rows rather than the equality of values.</p></div>
+through to make the whole condition unknown &mdash; so the row is dropped, and a
+query that should have returned everything returns <em>nothing</em>, silently
+and without an error.</p>
+<p>So before writing <code>NOT IN</code>, look at the column the subquery
+selects and satisfy yourself it cannot be null. A primary key never is; a
+foreign key declared <code>NOT NULL</code> never is; anything else can be. Both
+schemas on this page are safe, and Exercise 6.21 shows exactly which column
+would stop being safe if the schema changed.</p></div>
 
-<p>Where the final step of the pattern puts the winners back against the full
-relation, the SQL is usually shorter than the algebra: the difference goes in a
-subquery inside the <code>WHERE</code>, and the outer query does both the
-product and the projection in one statement. Several solutions below do that,
-and the algebra beside them shows what was folded together.</p>
+<div class="box note"><span class="bt">What SQL has that the lectures do not</span>
+<p>SQL can also write a difference as <code>SELECT name FROM department EXCEPT
+SELECT deptName FROM member</code>, which is nearer still to the algebra, or as
+<code>NOT EXISTS</code> with a correlated subquery, which is the only form that
+is safe against nulls without your having to check. Neither is used here: the
+lectures do not introduce them, and the problem book's own instruction for
+these exercises is that the code <em>must not contain union, intersection,
+except, or any of the join operators</em>. Worth knowing they exist; not worth
+using until the course gets to them.</p></div>
 
 <h2 id="db"><span class="secnum">6.4</span>The two scratch databases</h2>
 
@@ -421,7 +424,7 @@ Three characters remove a whole class of silent breakage.</p>
  WHERE t1.tid = p2.id
    AND t1.tid = d3.chair
    AND t1.tid = d4.chair
-   AND d3.code &lt;&gt; d4.code;</pre>
+   AND d3.code != d4.code;</pre>
 <pre>+-------------+-----------+
 | name        | salary    |
 +-------------+-----------+
@@ -492,7 +495,7 @@ appearing twice.</p>
   FROM Person p1, Student s2, Person p3, Student s4
  WHERE p1.id   = s2.sid
    AND p3.id   = s4.sid
-   AND p1.id  &lt;&gt; p3.id
+   AND p1.id  != p3.id
    AND p1.name = p3.name;</pre>
 <pre>+-------------+
 | name        |
@@ -507,7 +510,7 @@ select list and no value to any comparison except through their
 A table in the <code>FROM</code> as a membership test is an ordinary thing to
 need, and it is worth being comfortable with it.</p>
 <p><strong>The two conditions do opposite jobs.</strong>
-<code>p1.id &lt;&gt; p3.id</code> says they are different people;
+<code>p1.id != p3.id</code> says they are different people;
 <code>p1.name = p3.name</code> says they have the same name. Drop either and the
 answer becomes every student's name, for two different reasons.</p>
 <p>The answer is a set of <em>names</em>, so it cannot tell you which students
@@ -522,10 +525,9 @@ NeverFail  &larr;  &Pi;[sid] Student  &minus;  Fail
 Result     &larr;  &Pi;[name1] &sigma;[id1 = sid2] ( Person1 &times; NeverFail2 )</pre></summary><div class="sol">
 <pre class="asm">SELECT DISTINCT p1.name
   FROM Person p1
- WHERE p1.id IN ( SELECT sid FROM Student            <span class="c">-- everyone who could qualify</span>
-                  EXCEPT
-                  SELECT sid FROM GradeSheet         <span class="c">-- minus the losers</span>
-                   WHERE grade = 'F' );</pre>
+ WHERE p1.id IN     ( SELECT sid FROM Student )      <span class="c">-- everyone who could qualify</span>
+   AND p1.id NOT IN ( SELECT sid FROM GradeSheet     <span class="c">-- minus the losers</span>
+                       WHERE grade = 'F' );</pre>
 <pre>+-------------+
 | name        |
 +-------------+
@@ -533,14 +535,19 @@ Result     &larr;  &Pi;[name1] &sigma;[id1 = sid2] ( Person1 &times; NeverFail2 
 | Maria Lopez |
 | Omar Haddad |
 +-------------+</pre>
-<p>The losers-and-winners pattern, with two of its three steps folded together:
-the <code>EXCEPT</code> is <code>Fail</code> and <code>NeverFail</code>, and the
-enclosing <code>WHERE ... IN</code> is step 3, putting the winners back against
-<code>Person</code> to recover the names.</p>
+<p>The losers-and-winners pattern, with all three steps folded into one
+statement: the <code>NOT IN</code> line is <code>Fail</code> subtracted, the
+<code>IN</code> line above it is the <code>&Pi;[sid] Student</code> it is
+subtracted <em>from</em>, and the outer query over <code>Person</code> is step 3,
+recovering the names.</p>
+<p><strong>Both lines are needed.</strong> Drop the <code>IN</code> and the
+query answers &ldquo;people who never failed&rdquo;, which includes every
+teacher in the database. The algebra says <code>&Pi;[sid] Student</code> and
+means it.</p>
 <p><strong>The attempt that does not work</strong>, and what it returns:</p>
 <pre class="asm">SELECT DISTINCT p1.name
   FROM Person p1, GradeSheet g2
- WHERE p1.id = g2.sid AND g2.grade &lt;&gt; 'F';</pre>
+ WHERE p1.id = g2.sid AND g2.grade != 'F';</pre>
 <pre>+-------------+
 | name        |
 +-------------+
@@ -556,9 +563,9 @@ taken anything, is missing. Two kinds of wrong in one query.</p>
 <p><strong>Subtract from <code>Student</code>, not from
 <code>GradeSheet</code>.</strong> That is what keeps Haddad in: he has no grade
 sheet at all, so he is in <code>Student</code>, not in <code>Fail</code>, and
-therefore in the answer. <code>SELECT sid FROM GradeSheet EXCEPT ...</code>
-would have lost him, and that error survives casual testing because the result
-still looks reasonable.</p>
+therefore in the answer. Writing the first line as <code>p1.id IN (SELECT sid
+FROM GradeSheet)</code> would have lost him, and that error survives casual
+testing because the result still looks reasonable.</p>
 <p><strong>A wrinkle worth reporting.</strong> Projecting onto
 <code>name</code> means a name appears if <em>any</em> student with it qualifies.
 There are two John Chens &mdash; S11 never failed, S13 failed MATH 231 &mdash;
@@ -583,11 +590,9 @@ Result  &larr;  &Pi;[name2, rank3] &sigma;[F] ( Winner1 &times; Person2 &times; 
 <pre class="asm">SELECT DISTINCT p2.name, t3.rank
   FROM Person p2, Teacher t3
  WHERE t3.tid = p2.id
-   AND t3.tid IN ( SELECT tid FROM Teacher
-                   EXCEPT
-                   SELECT t1.tid                     <span class="c">-- teachers out-earned by somebody</span>
-                     FROM Teacher t1, Teacher t2
-                    WHERE t1.salary &lt; t2.salary );</pre>
+   AND t3.tid NOT IN ( SELECT t1.tid                 <span class="c">-- teachers out-earned by somebody</span>
+                         FROM Teacher t1, Teacher t2
+                        WHERE t1.salary &lt; t2.salary );</pre>
 <pre>+-------------+-----------+
 | name        | rank      |
 +-------------+-----------+
@@ -741,7 +746,7 @@ had issued three large cheques would list its chair three times before
   FROM professor p, paycheck c2, paycheck c3
  WHERE p.socSecNum = c2.prof
    AND p.socSecNum = c3.prof
-   AND c2.dpt &lt;&gt; c3.dpt;</pre>
+   AND c2.dpt != c3.dpt;</pre>
 <pre>+-----------+-----------+------------+
 | socSecNum | firstName | lastName   |
 +-----------+-----------+------------+
@@ -770,7 +775,7 @@ HAVING COUNT(DISTINCT c.dpt) &gt;= 2;</pre>
  WHERE p.socSecNum = c2.prof
    AND p.socSecNum = c3.prof
    AND c2.dpt    =  c3.dpt
-   AND c2.serNum &lt;&gt; c3.serNum
+   AND c2.serNum != c3.serNum
    AND c2.amount =  c3.amount;</pre>
 <pre>+-----------+-----------+----------+
 | socSecNum | firstName | lastName |
@@ -785,11 +790,11 @@ rows.</p>
 <p>Snape's Potions cheques 1 and 2 are both 1,150.00. The condition finds the
 pair twice, once in each order, and <code>DISTINCT</code> collapses it.</p>
 <p><strong>The common error</strong> is to omit
-<code>c2.serNum &lt;&gt; c3.serNum</code>, which lets each paycheck match itself.
+<code>c2.serNum != c3.serNum</code>, which lets each paycheck match itself.
 Run that version and it returns eight professors &mdash; everyone who has ever
 been paid. It is worth running once, because an answer that large is obviously
 wrong and the same mistake in a bigger query is not.</p>
-<p>Writing <code>c2 &lt;&gt; c3</code> instead is not valid SQL: there is no
+<p>Writing <code>c2 != c3</code> instead is not valid SQL: there is no
 row-identity comparison, which is precisely why the algebra made you name a key
 attribute too.</p>
 </div></details>
@@ -801,7 +806,7 @@ attribute too.</p>
   FROM professor p, department d2, department d3
  WHERE p.socSecNum = d2.chairId
    AND p.socSecNum = d3.chairId
-   AND d2.name &lt;&gt; d3.name;</pre>
+   AND d2.name != d3.name;</pre>
 <pre>+-----------+----------+--------+
 | firstName | lastName | salary |
 +-----------+----------+--------+
@@ -822,7 +827,7 @@ permits and Exercise 6.18 goes looking for.</p>
 <pre class="asm">SELECT DISTINCT p.firstName, p.lastName
   FROM member m1, member m2, professor p
  WHERE m1.profId    =  m2.profId
-   AND m1.deptName &lt;&gt; m2.deptName
+   AND m1.deptName != m2.deptName
    AND p.socSecNum  =  m1.profId;</pre>
 <pre>+-----------+------------+
 | firstName | lastName   |
@@ -879,13 +884,13 @@ Result  &larr;  &Pi;[firstName1, lastName1, rank1] &sigma;[G] ( professor1 &time
             where   G  &equiv;  [ socSecNum1 = socSecNum2 ]</pre></summary><div class="sol">
 <pre class="asm">SELECT DISTINCT p.firstName, p.lastName, p.rank
   FROM professor p
- WHERE p.socSecNum IN (
-         SELECT chairId FROM department        <span class="c">-- all chairs</span>
-         EXCEPT
-         SELECT c.prof                         <span class="c">-- minus the losers</span>
-           FROM paycheck c, department d
-          WHERE c.prof = d.chairId
-            AND c.dpt  = d.name );</pre>
+ WHERE p.socSecNum IN
+         ( SELECT chairId FROM department )    <span class="c">-- all chairs</span>
+   AND p.socSecNum NOT IN
+         ( SELECT c.prof                       <span class="c">-- minus the losers</span>
+             FROM paycheck c, department d
+            WHERE c.prof = d.chairId
+              AND c.dpt  = d.name );</pre>
 <pre>+-----------+----------+--------------+
 | firstName | lastName | rank         |
 +-----------+----------+--------------+
@@ -912,14 +917,11 @@ Studies and has never been paid by anybody, so she is the one winner.</p>
      Result  &larr;  &Pi;[name1, phone1] &sigma;[F] ( department1 &times; Winner2 )
                  where   F  &equiv;  [ name1 = name2 ]</pre></summary><div class="sol">
 <pre class="asm">SELECT name FROM department
-EXCEPT
-SELECT deptName FROM member;
+ WHERE name NOT IN ( SELECT deptName FROM member );
 
 SELECT DISTINCT d.name, d.phone
   FROM department d
- WHERE d.name IN ( SELECT name FROM department
-                   EXCEPT
-                   SELECT dpt  FROM paycheck );</pre>
+ WHERE d.name NOT IN ( SELECT dpt FROM paycheck );</pre>
 <pre>+----------------+     +----------------+--------------+
 | name           |     | name           | phone        |
 +----------------+     +----------------+--------------+
@@ -927,19 +929,18 @@ SELECT DISTINCT d.name, d.phone
 +----------------+     +----------------+--------------+</pre>
 <p><strong>(a)</strong> is the pattern at its smallest &mdash; one line of
 algebra, one statement of SQL, no step 3, because the question asks only for the
-names and the difference already holds them. No <code>DISTINCT</code> is needed
-on either side: <code>EXCEPT</code> removes duplicates by definition, exactly as
-<code>UNION</code> does.</p>
-<p><strong>(b)</strong> adds step 3: the difference produces bare names, the
-question asked for phone numbers as well, so the names are fed back into a query
-over <code>department</code>. Written directly, and better:</p>
-<pre class="asm">SELECT d.name, d.phone FROM department d
- WHERE NOT EXISTS (SELECT 1 FROM paycheck c WHERE c.dpt = d.name);</pre>
-<p>One pass, no intermediate set, and the correlation makes the intent obvious.
-This is the form to reach for in your own code; the <code>EXCEPT</code> version
-is here because it maps onto the algebra line by line. It is also the single
+names and the difference already holds them. <code>name</code> is
+<code>department</code>'s primary key, so no <code>DISTINCT</code> is needed on
+the outside, and a subquery's duplicates make no difference to
+<code>NOT IN</code>.</p>
+<p><strong>(b)</strong> looks as though it needs step 3 and does not. The
+algebra computes the set of surviving names and then rejoins
+<code>department</code> to pick up the phone number; SQL takes the phone number
+from the row it is already looking at, so the difference collapses into the
+<code>WHERE</code> clause and the extra product disappears. That is the single
 most common shape in practical SQL &mdash; customers who never ordered, students
-with no grade, files with no owner.</p>
+with no grade, files with no owner &mdash; and it is worth being able to see it
+in both notations.</p>
 <p>The two answers coincide here for a structural reason: Muggle Studies has no
 members, and by the foreign key on <code>paycheck</code> a department can only
 pay its own members, so it could not have issued a cheque even if it tried. On a
@@ -955,9 +956,7 @@ Result    &larr;  &Pi;[firstName2, lastName2, rank2] &sigma;[F] ( notChair1 &tim
                               salary2 &gt; salary3 ]</pre></summary><div class="sol">
 <pre class="asm">SELECT DISTINCT p2.firstName, p2.lastName, p2.rank
   FROM professor p2, professor p3
- WHERE p2.socSecNum IN ( SELECT socSecNum FROM professor
-                         EXCEPT
-                         SELECT chairId   FROM department )
+ WHERE p2.socSecNum NOT IN ( SELECT chairId FROM department )
    AND p3.firstName = 'Albus'
    AND p3.lastName  = 'Dumbledore'
    AND p2.salary    &gt; p3.salary;</pre>
@@ -973,9 +972,17 @@ difference handles &ldquo;not a chair&rdquo;, the second copy of
 Diggory. Of those, only Flitwick at 1,275 earns more than Dumbledore's 1,200
 &mdash; and Dumbledore cannot qualify against himself, since <code>&gt;</code>
 is strict.</p>
-<p>The idiomatic version replaces the second copy with a scalar subquery:</p>
+<p><strong>The <code>IN</code> line of the algebra vanished.</strong>
+<code>&Pi;[socSecNum] professor &minus; &Pi;[chairId] department</code> is
+&ldquo;a professor who is not a chair&rdquo;, and <code>p2</code> is already
+known to be a professor, so only the subtraction has to be written. The algebra
+needs the first half because a difference has to have something to subtract
+from; the SQL does not, because the <code>FROM</code> clause has already said
+it.</p>
+<p>The shorter version replaces the second copy of <code>professor</code> with a
+subquery that returns one value:</p>
 <pre class="asm">SELECT p.firstName, p.lastName, p.rank FROM professor p
- WHERE NOT EXISTS (SELECT 1 FROM department d WHERE d.chairId = p.socSecNum)
+ WHERE p.socSecNum NOT IN (SELECT chairId FROM department)
    AND p.salary &gt; (SELECT salary FROM professor
                     WHERE firstName = 'Albus' AND lastName = 'Dumbledore');</pre>
 <p>A scalar subquery must return exactly one value, and the server raises an
@@ -991,9 +998,7 @@ Result  &larr;  &Pi;[firstName1, lastName1, rank1] &sigma;[F] ( professor1 &time
             where   F  &equiv;  [ socSecNum1 = socSecNum2 ]</pre></summary><div class="sol">
 <pre class="asm">SELECT DISTINCT p.firstName, p.lastName, p.rank
   FROM professor p
- WHERE p.socSecNum IN ( SELECT socSecNum FROM professor
-                        EXCEPT
-                        SELECT chairId   FROM department );</pre>
+ WHERE p.socSecNum NOT IN ( SELECT chairId FROM department );</pre>
 <pre>+-----------+------------+--------------+
 | firstName | lastName   | rank         |
 +-----------+------------+--------------+
@@ -1006,19 +1011,17 @@ Result  &larr;  &Pi;[firstName1, lastName1, rank1] &sigma;[F] ( professor1 &time
 +-----------+------------+--------------+</pre>
 <p>Six of the ten; the other four are Snape, McGonagall, Sprout and Umbridge,
 who between them chair the five departments.</p>
-<p>And the one you would actually write:</p>
-<pre class="asm">SELECT p.firstName, p.lastName, p.rank FROM professor p
- WHERE NOT EXISTS (SELECT 1 FROM department d WHERE d.chairId = p.socSecNum);</pre>
-<p><strong>This is also the version to prefer on a real schema, and here is
-why.</strong> <code>chairId</code> happens to be <code>NOT NULL</code> in this
-database. Had it been nullable &mdash; a department between chairs &mdash; then
-a single null in <code>SELECT chairId FROM department</code> would make the
-<code>NOT IN</code> form of this query return <em>no rows at all</em>, silently,
-because <code>x NOT IN (..., NULL)</code> is never true. The
-<code>EXCEPT</code> form survives that, since set difference treats nulls as
-values rather than comparing them; <code>NOT EXISTS</code> survives it too, and
-for the clearest reason: it asks whether a matching row exists, which is a
-question with an answer even when the values are unknown.</p>
+<p>The pattern at its plainest: the whole of the algebra is one
+<code>NOT IN</code>, because <code>&Pi;[socSecNum] professor</code> is the
+relation the outer query is already over.</p>
+<p><strong>And this is the query &sect;6.3 warned about.</strong>
+<code>chairId</code> happens to be <code>NOT NULL</code> in this database. Had
+it been nullable &mdash; a department between chairs &mdash; then a single null
+in <code>SELECT chairId FROM department</code> would make this query return
+<em>no rows at all</em>, silently, because <code>x NOT IN (..., NULL)</code> is
+never true. Six professors would become none, with no error and nothing in the
+output to suggest why. Adding <code>WHERE chairId IS NOT NULL</code> to the
+subquery is the fix, and checking whether it is needed is the habit.</p>
 <p>That is the last and most practical thing the algebra does not prepare you
 for. The algebra on these pages has no nulls in it, so every translation here is
 exact &mdash; and the first schema you meet with a nullable foreign key will be
@@ -1042,7 +1045,7 @@ the start.</p></div>
 
     <nav class="pagenav">
       <a class="prev" href="ex-ra.html"><span>Previous</span>Set 5. Relational algebra</a>
-      <a class="next" href="setup-sql.html"><span>Next</span>Appendix A. Setting up SQL</a>
+      <a class="next" href="ex-sql.html"><span>Next</span>Set 7. SQL: creating, changing, querying</a>
     </nav>
     <footer class="site">
       <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
