@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 7 — SQL: creating, changing, querying</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 7 &middot; SQL</span>
+  <nav class="topnav">
+    <a href="ex-ra-sql.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-sql2.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#types"><span class="t">7.1</span>Data types</a></li>
+    <li><a href="#create"><span class="t">7.2</span>Creating a database and its tables</a></li>
+    <li><a href="#change"><span class="t">7.3</span>Inserting, updating, deleting</a></li>
+    <li><a href="#retrieve"><span class="t">7.4</span>Retrieving: the algebra, in SQL</a></li>
+    <li><a href="#other"><span class="t">7.5</span>Ordering, aggregation, grouping</a></li>
+    <li><a href="#db"><span class="t">7.6</span>The databases</a></li>
+    <li><a href="#company"><span class="t">7.7</span>Exercises: the Company Database</a></li>
+    <li><a href="#member"><span class="t">7.8</span>Exercises: Department Membership</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 7 &middot; Lectures 11 and 12</span>
+  <span class="chnum">SQL</span>
+  <h1>Creating, changing, querying</h1>
+  <p class="chsum">The commands of Lectures 11 and 12 in the order they were
+  given &mdash; data types, <code>CREATE</code>, <code>INSERT</code>,
+  <code>UPDATE</code>, <code>DELETE</code>, then <code>ORDER BY</code>, the
+  aggregate functions, <code>GROUP BY</code> and <code>HAVING</code> &mdash;
+  each with the lecture's own query worked through beside it. Then twelve
+  fresh exercises from the problem book, on two databases you have not seen
+  before. No <code>JOIN</code> keyword anywhere.</p>
+</div>
+
+<p>Set 6 translated the relational algebra into SQL and stopped where the
+algebra stops. This set is everything SQL has that the algebra does not: a way
+to create a database, a way to change one, a way to sort the answer, and a way
+to count, total and average over groups of rows.</p>
+
+<div class="box note"><span class="bt">How this page is arranged</span>
+<p>Sections 7.1 to 7.5 are the lectures: each command, and then the lecture's
+own query using it, worked through with the rows it returns. Nothing there is
+an exercise &mdash; your notes already have those answers, and they are
+reproduced here so that the explanation sits next to them.</p>
+<p>The exercises are &sect;7.7 and &sect;7.8, and all twelve come from the
+problem book. They use two databases you have not met: the Company Database of
+Appendix B.9, whose content the book supplies in full, and the Department
+Membership Database of Appendix B.19.</p></div>
+
+<div class="box note"><span class="bt">The one rule this set works under</span>
+<p>No <code>JOIN</code>. Relations go in the <code>FROM</code> clause separated
+by commas &mdash; that comma is the cartesian product &mdash; and every
+condition linking them is written out in the <code>WHERE</code> clause. That is
+how both lectures write every query, and it is the restriction the problem book
+imposes on the two sections these exercises come from: <em>your code must not
+contain union, intersection, except, or any of the join operators.</em> The
+reason is the one from Set 5: a join decides for itself which columns to match
+on, so an answer written with one never has to state the condition that links
+two tables &mdash; which is the thing being marked.</p></div>
+
+<h2 id="types"><span class="secnum">7.1</span>Data types</h2>
+
+<div class="tablewrap"><table>
+<thead><tr><th>type</th><th>holds</th><th>notes</th></tr></thead>
+<tbody>
+<tr><td><code>CHAR(size)</code></td><td>a fixed-length string</td><td>size 0 to 255, default 1; short, known-width codes</td></tr>
+<tr><td><code>VARCHAR(size)</code></td><td>a string of at most <code>size</code></td><td>names, addresses, anything of varying length</td></tr>
+<tr><td><code>INTEGER</code> / <code>INT</code> / <code>FLOAT</code> / <code>DOUBLE</code></td><td>numbers</td><td><code>FLOAT</code> and <code>DOUBLE</code> are approximate &mdash; never money</td></tr>
+<tr><td><code>DECIMAL(size, d)</code> / <code>DEC(size, d)</code></td><td>an exact number</td><td><code>size</code> = total digits, 0&ndash;65, default 10; <code>d</code> = digits after the point, 0&ndash;30, default 0</td></tr>
+<tr><td><code>DATE</code></td><td>a date</td><td>format <code>YYYY-MM-DD</code></td></tr>
+<tr><td><code>TIME</code></td><td>a time</td><td>format <code>hh:mm:ss</code></td></tr>
+<tr><td><code>DATETIME</code></td><td>both</td><td>format <code>YYYY-MM-DD hh:mm:ss</code></td></tr>
+<tr><td><code>YEAR</code></td><td>a year</td><td>four-digit format</td></tr>
+</tbody></table></div>
+
+<p>These are your <strong>domain constraints</strong> from Set 4 &mdash; the
+first of the five, and the only one you express by choosing a type rather than
+by writing a clause. <code>DEC(4,0)</code> for a four-digit id is a domain
+constraint; so is <code>VARCHAR(40)</code> for a name.</p>
+
+<div class="box warn"><span class="bt">Money is DECIMAL, never FLOAT</span>
+<p><code>DEC(8,2)</code> holds a salary exactly. <code>FLOAT</code> holds it
+approximately, so two salaries that should be equal can compare unequal and a
+total can come out a penny short. The lecture's schema uses
+<code>DEC(8,2)</code> for <code>salary</code> for this reason.</p></div>
+
+<h2 id="create"><span class="secnum">7.2</span>Creating a database and its tables</h2>
+
+<pre class="asm">CREATE DATABASE databasename;     <span class="c">-- creates database</span>
+DROP DATABASE databasename;       <span class="c">-- deletes existing database</span>
+SHOW DATABASES;                   <span class="c">-- shows all the databases</span>
+USE databasename;                 <span class="c">-- selects database</span>
+
+SHOW TABLES;                      <span class="c">-- shows all the tables in the DB</span>
+
+CREATE TABLE table_name (
+    column1 datatype,
+    column2 datatype,
+    column3 datatype NOT NULL,    <span class="c">-- force the column NOT to accept NULL</span>
+    ...
+    PRIMARY KEY (column_name),    <span class="c">-- defines primary key</span>
+    FOREIGN KEY (column_name) REFERENCES referenced_table(referenced_column)
+                                  <span class="c">-- defines foreign key</span>
+);
+
+DESC table_name;                  <span class="c">-- shows description of created table</span>
+DROP TABLE table_name;            <span class="c">-- deletes table</span></pre>
+
+<p>Three of the five schema-based constraints of Set 4 appear in that one
+statement: the domain constraint in each <code>datatype</code>, the key
+constraint and entity integrity in <code>PRIMARY KEY</code>, referential
+integrity in <code>FOREIGN KEY ... REFERENCES</code>. The fourth,
+<code>NOT NULL</code>, is the constraint on nulls. Only the application-based
+constraints have nowhere to go.</p>
+
+<div class="box worked"><span class="bt">Example &mdash; creating collegeDB</span>
+<p>The four schemas of Lecture 11, as a database:</p>
+<pre class="asm">CREATE DATABASE collegeDB;
+USE collegeDB;
+
+CREATE TABLE Person (
+    id        DEC(4,0),
+    name      VARCHAR(40) NOT NULL,
+    yearBorn  YEAR,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE Teacher (
+    tid     DEC(4,0),
+    trank   VARCHAR(30),
+    salary  DEC(8,2),
+    PRIMARY KEY (tid),
+    FOREIGN KEY (tid) REFERENCES Person(id)
+);
+
+CREATE TABLE Department (
+    code   CHAR(4),
+    name   VARCHAR(40),
+    chair  DEC(4,0),
+    PRIMARY KEY (code),
+    FOREIGN KEY (chair) REFERENCES Teacher(tid)
+);
+
+CREATE TABLE Discipline (
+    tid    DEC(4,0),
+    dcode  CHAR(4),
+    PRIMARY KEY (tid, dcode),
+    FOREIGN KEY (tid)   REFERENCES Teacher(tid),
+    FOREIGN KEY (dcode) REFERENCES Department(code)
+);</pre>
+<p><strong>The order is forced.</strong> Teacher references Person, Department
+references Teacher, Discipline references both &mdash; so any other order fails
+on the first foreign key that points at a table not yet created:</p>
+<pre>ERROR 1005 (HY000): Can't create table `collegeDB`.`Teacher`
+(errno: 150 "Foreign key constraint is incorrectly formed")</pre>
+<p>which is an unhelpful way of saying &ldquo;there is no such table&rdquo;.</p>
+<p><strong><code>tid</code> does two jobs</strong> in <code>Teacher</code>: it
+is the primary key and a foreign key into <code>Person</code>. That is the
+signature of a subclass mapped as its own table, and it is why
+<code>Teacher</code> holds no name &mdash; the name is on <code>Person</code>,
+once.</p>
+<p><strong><code>Discipline</code>'s key is the pair.</strong> A teacher teaches
+in several departments and a department has several teachers, so neither column
+alone is unique. Both being in the primary key also means neither can ever be
+null, by entity integrity.</p>
+<p>The only constraint here that you have to <em>decide</em> rather than read
+off the schemas is <code>NOT NULL</code> on <code>name</code>.</p></div>
+
+<div class="box note"><span class="bt">Dropping goes the other way</span>
+<p><code>DROP TABLE Person</code> is refused while Teacher still references it,
+so tables are dropped children-first &mdash; exactly backwards from the order
+they were created. The same asymmetry governs the deletion example in
+&sect;7.3, where it applies to rows rather than tables.</p></div>
+
+<h2 id="change"><span class="secnum">7.3</span>Inserting, updating, deleting</h2>
+
+<pre class="asm"><span class="c">-- insert, two forms</span>
+INSERT INTO table_name VALUES (value1, value2, value3, ...);
+INSERT INTO table_name (column1, column2, column3, ...)
+       VALUES (value1, value2, value3, ...);
+
+<span class="c">-- update</span>
+UPDATE table_name
+   SET column = new_data
+ WHERE condition(s);
+
+<span class="c">-- delete</span>
+DELETE FROM table_name
+ WHERE condition(s);</pre>
+
+<p>The first <code>INSERT</code> form gives a value for every column, in the
+order the table declares them. The second names the columns, which lets you
+leave some out &mdash; and the ones you leave out get <code>NULL</code>, or
+their declared default.</p>
+
+<div class="box worked"><span class="bt">Example &mdash; two ways to get a null</span>
+<pre class="asm">INSERT INTO Person VALUES (1001, 'Blue', 1970);
+INSERT INTO Person VALUES (1002, 'Red', NULL);
+INSERT INTO Person (id, name) VALUES (1003, 'Pink');
+INSERT INTO Person VALUES (1004, 'Green', 1980);</pre>
+<p>Row 1002 names <code>NULL</code> explicitly, which the first form requires
+since it demands a value for every column. Row 1003 uses the second form and
+simply does not mention <code>yearBorn</code>. Both leave the same row:</p>
+<pre>+------+-------+----------+
+| id   | name  | yearBorn |
++------+-------+----------+
+| 1001 | Blue  |     1970 |
+| 1002 | Red   |     NULL |
+| 1003 | Pink  |     NULL |
+| 1004 | Green |     1980 |
++------+-------+----------+</pre>
+<p>Neither trick works on <code>name</code>, which is <code>NOT NULL</code>,
+and the two refusals read differently:</p>
+<pre>INSERT INTO Person VALUES (1006, NULL, 1990);
+ERROR 1048 (23000): Column 'name' cannot be null
+
+INSERT INTO Person (id, yearBorn) VALUES (1005, 1990);
+ERROR 1364 (HY000): Field 'name' doesn't have a default value</pre>
+<p>The first is the constraint on nulls refusing a null you supplied; the second
+is the server saying it has nothing to put there. Same constraint, two ways of
+hitting it.</p>
+<p><strong>The insert order is forced too</strong>, for the same reason the
+<code>CREATE</code> order was: all four Person rows before any Teacher row, all
+three Department rows before any Discipline row.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; add $1000 to each professor</span>
+<pre class="asm">UPDATE Teacher
+   SET salary = salary + 1000
+ WHERE trank = 'Professor';</pre>
+<pre>before:                          after:
++------+-----------+----------+  +------+-----------+----------+
+| tid  | trank     | salary   |  | tid  | trank     | salary   |
++------+-----------+----------+  +------+-----------+----------+
+| 1001 | Professor | 90000.00 |  | 1001 | Professor | 91000.00 |
+| 1002 | Lecturer  | 50000.00 |  | 1002 | Lecturer  | 50000.00 |
+| 1003 | Professor | 80000.00 |  | 1003 | Professor | 81000.00 |
++------+-----------+----------+  +------+-----------+----------+</pre>
+<p><code>SET salary = salary + 1000</code> reads the old value and writes the
+new one, row by row. The <code>=</code> is assignment here, not comparison
+&mdash; the same symbol doing a different job than it does four words later in
+the <code>WHERE</code> clause.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; delete all data for the person named 'Blue'</span>
+<p>The obvious statement does not work:</p>
+<pre class="asm">DELETE FROM Person WHERE name = 'Blue';</pre>
+<pre>ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key
+constraint fails (`collegeDB`.`Teacher`, CONSTRAINT `Teacher_ibfk_1`
+FOREIGN KEY (`tid`) REFERENCES `Person` (`id`))</pre>
+<p>Blue is referenced from <code>Teacher</code>, and through it from
+<code>Department</code> and <code>Discipline</code>. Referential integrity
+refuses &mdash; which, from Set 4, is the <em>only</em> constraint a
+<code>DELETE</code> can violate. So work inwards from the leaves:</p>
+<pre class="asm">UPDATE Department SET chair = NULL
+ WHERE chair IN (SELECT id FROM Person WHERE name = 'Blue');
+
+DELETE FROM Discipline
+ WHERE tid IN (SELECT id FROM Person WHERE name = 'Blue');
+
+DELETE FROM Teacher
+ WHERE tid IN (SELECT id FROM Person WHERE name = 'Blue');
+
+DELETE FROM Person WHERE name = 'Blue';</pre>
+<pre>Person:                        Department:
++------+-------+----------+    +------+------------------+-------+
+| id   | name  | yearBorn |    | code | name             | chair |
++------+-------+----------+    +------+------------------+-------+
+| 1002 | Red   |     NULL |    | CSCI | Computer Science |  NULL |
+| 1003 | Pink  |     NULL |    | MATH | Mathematic       |  NULL |
+| 1004 | Green |     1980 |    | PHYS | Physices         |  1003 |
++------+-------+----------+    +------+------------------+-------+</pre>
+<p><strong>Why the first statement is an <code>UPDATE</code>.</strong> CSCI and
+MATH still exist; only their chair is leaving. Setting <code>chair</code> to
+null is legal precisely because it is a foreign key that is <em>not</em> part of
+<code>Department</code>'s primary key &mdash; referential integrity permits a
+null foreign key. Had it been <code>NOT NULL</code> there would be no way to do
+this without deleting the departments.</p>
+<p><strong>Why each statement re-reads the subquery.</strong> Every one asks
+<code>Person</code> again for Blue's id, which works because
+<code>Person</code> is deleted last. Reverse any two and the subquery comes back
+empty and the delete silently does nothing.</p></div>
+
+<div class="box warn"><span class="bt">UPDATE and DELETE without WHERE</span>
+<p><code>WHERE</code> is optional and its absence means <em>every row</em>.
+<code>DELETE FROM Teacher;</code> empties the table; <code>UPDATE Teacher SET
+salary = 0;</code> pays nobody. Neither asks whether you meant it. Run the
+matching <code>SELECT</code> first, see which rows come back, then change the
+word.</p></div>
+
+<h2 id="retrieve"><span class="secnum">7.4</span>Retrieving: the algebra, in SQL</h2>
+
+<p>This is Set 6's whole thesis in four lines, and it is where this set starts
+rather than finishes:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>query in relational algebra</th><th>SQL</th></tr></thead>
+<tbody>
+<tr><td><code>&Pi;[A1, ..., An]</code></td><td><code>SELECT A1, ..., An</code></td></tr>
+<tr><td><code>&sigma;[F] ( R1 &times; ... &times; Rk )</code></td><td><code>FROM R1, ..., Rk</code></td></tr>
+<tr><td><code>F &equiv; [ condition(s) ]</code></td><td><code>WHERE condition(s);</code></td></tr>
+</tbody></table></div>
+
+<pre class="asm">SELECT * FROM table_name;                 <span class="c">-- selects the whole table</span>
+SELECT DISTINCT ... FROM ... WHERE ...;   <span class="c">-- selects distinct data</span></pre>
+
+<div class="box worked"><span class="bt">Example &mdash; and the DISTINCT that is easy to forget</span>
+<pre class="asm">SELECT trank FROM Teacher WHERE salary &gt; 5000;</pre>
+<pre>+-----------+          with DISTINCT:   +-----------+
+| trank     |                           | trank     |
++-----------+                           +-----------+
+| Professor |                           | Professor |
+| Lecturer  |                           | Lecturer  |
+| Professor |                           +-----------+
++-----------+</pre>
+<p>Three rows for three teachers, two of them the same word. In the algebra,
+<code>&Pi;[trank] &sigma;[salary &gt; 5000] Teacher</code> gives two &mdash; a
+relation is a set. SQL returns a bag, so the duplicate stays unless you ask.
+Write <code>DISTINCT</code> wherever you are translating a
+<code>&Pi;</code>.</p>
+<p>Note also that every teacher qualifies: 5,000 is below the lowest salary in
+the table, so the <code>WHERE</code> removes nothing.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; teachers who chair more than one department</span>
+<p>The algebra first:</p>
+<pre>&Pi;[name2, salary1] &sigma;[F] ( Teacher1 &times; Person2 &times; Department3 &times; Department4 )
+    where   F  &equiv;  [ tid1 = id2  &and;  tid1 = chair3  &and;  tid1 = chair4  &and;  code3 &ne; code4 ]</pre>
+<pre class="asm">SELECT DISTINCT p.name, t.salary
+  FROM Teacher t, Person p, Department d1, Department d2
+ WHERE t.tid = p.id
+   AND t.tid = d1.chair
+   AND t.tid = d2.chair
+   AND d1.code != d2.code;</pre>
+<pre>+------+----------+        without DISTINCT:  +------+----------+
+| name | salary   |                           | name | salary   |
++------+----------+                           +------+----------+
+| Blue | 90000.00 |                           | Blue | 90000.00 |
++------+----------+                           | Blue | 90000.00 |
+                                              +------+----------+</pre>
+<p>Four relations become four tables after <code>FROM</code>; four conjuncts
+become four lines of <code>WHERE</code>. Two things are not mechanical.</p>
+<p><strong>Two aliases for <code>Department</code>.</strong> Without them
+<code>d1.code != d2.code</code> cannot be written at all &mdash; there would be
+one <code>code</code> and nothing to compare it with.</p>
+<p><strong>The inequality makes &ldquo;more than one&rdquo; mean more than
+one.</strong> Drop it and the two copies may be the same row, so every chair
+qualifies against themselves. And because Blue chairs CSCI and MATH, the pair
+qualifies in both orders &mdash; which is what the <code>DISTINCT</code> is
+cleaning up.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; professors in Computer Science, not knowing the code</span>
+<pre class="asm">SELECT DISTINCT p.name, t.salary
+  FROM Person p, Teacher t, Discipline di, Department de
+ WHERE p.id = t.tid
+   AND t.tid = di.tid
+   AND di.dcode = de.code
+   AND de.name = 'Computer Science'
+   AND t.trank = 'Professor';</pre>
+<pre>+------+----------+
+| name | salary   |
++------+----------+
+| Blue | 90000.00 |
+| Pink | 80000.00 |
++------+----------+</pre>
+<p><strong>The parenthetical is the point.</strong> Knowing the code was
+<code>'CSCI'</code> you could write <code>di.dcode = 'CSCI'</code> and drop
+<code>Department</code> entirely &mdash; three tables instead of four. Not
+knowing it, you go in through the name, which costs one extra table and one
+extra equality. A query is shorter when it can start from a key and longer when
+it has to start from a name.</p>
+<p>Red teaches in CSCI but is a Lecturer, so is excluded. Pink appears via
+<code>Discipline (1003,'CSCI')</code> even though the department Pink chairs is
+PHYS &mdash; teaching in a department and chairing one are separate facts in
+separate tables, and this query asks about the first.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; the highest salary, without MAX</span>
+<p>The losers-and-winners pattern of Set 5, made literal: each step becomes a
+real table.</p>
+<pre class="asm">CREATE TABLE loser
+SELECT t1.tid FROM Teacher t1, Teacher t2 WHERE t1.salary &lt; t2.salary;
+
+CREATE TABLE winner
+SELECT tid FROM Teacher WHERE tid NOT IN (SELECT * FROM loser);
+
+SELECT p.name, t.trank
+  FROM Person p, Teacher t, winner w
+ WHERE p.id = t.tid AND t.tid = w.tid;</pre>
+<pre>loser:              winner:            result:
++------+            +------+           +------+-----------+
+| tid  |            | tid  |           | name | trank     |
++------+            +------+           +------+-----------+
+| 1002 |            | 1001 |           | Blue | Professor |
+| 1003 |            +------+           +------+-----------+
+| 1002 |
++------+</pre>
+<p><strong>Look at <code>loser</code>.</strong> Three rows for two teachers
+&mdash; 1002 appears twice, because Red is out-earned by both Blue and Pink, and
+the <code>SELECT</code> that built the table had no <code>DISTINCT</code>. It
+does not matter here, since <code>NOT IN</code> only asks whether a value is
+present; but a table you built yourself is still a bag, and a
+<code>COUNT</code> over it would have been counting pairs.</p>
+<p>As a single statement, the <code>loser</code> query moves bodily into the
+subquery and <code>winner</code> disappears:</p>
+<pre class="asm">SELECT p.name, t.trank
+  FROM Person p, Teacher t
+ WHERE p.id = t.tid
+   AND t.tid NOT IN ( SELECT t1.tid
+                        FROM Teacher t1, Teacher t2
+                       WHERE t1.salary &lt; t2.salary );</pre>
+<p><strong>The comparison must be strict.</strong> With <code>&lt;=</code>
+every teacher is out-earned by themselves, <code>winner</code> is empty, and the
+query returns nothing. <strong>Ties come out right for free:</strong> two
+teachers sharing the top salary do not out-earn each other, so both
+survive.</p></div>
+
+<h2 id="other"><span class="secnum">7.5</span>Ordering, aggregation, grouping</h2>
+
+<p><strong>Ordering.</strong> The algebra has no order at all &mdash; a relation
+is a set. SQL will sort the answer for you:</p>
+
+<pre class="asm">SELECT column1, column2, ...
+  FROM table_name
+ ORDER BY column1, column2, ... (ASC / DESC);   <span class="c">-- ascending by default</span></pre>
+
+<p><strong>Aggregate functions.</strong> Five of them, and not one has an
+algebraic counterpart:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>function</th><th>returns</th></tr></thead>
+<tbody>
+<tr><td><code>MIN()</code> / <code>MAX()</code></td><td>the smallest / largest value of the selected column</td></tr>
+<tr><td><code>COUNT()</code></td><td>the number of tuples in the selected result</td></tr>
+<tr><td><code>AVG()</code></td><td>the average value of a numeric column</td></tr>
+<tr><td><code>SUM()</code></td><td>the total sum of a numeric column</td></tr>
+</tbody></table></div>
+
+<p><strong>Grouping.</strong> <code>GROUP BY</code> collects the tuples that
+have the same values into summary rows, and is normally used with the aggregate
+functions above. <strong>Conditions on an aggregate</strong> cannot go in
+<code>WHERE</code>, which is applied to each row <em>before</em> the groups
+exist; <code>HAVING</code> is the clause that applies after.</p>
+
+<p>So the clauses run in an order quite different from the one you type them in:
+<code>FROM</code> builds the product, <code>WHERE</code> filters rows,
+<code>GROUP BY</code> forms the groups, <code>HAVING</code> filters groups,
+<code>SELECT</code> picks the columns, <code>ORDER BY</code> sorts what is left.
+That sequence answers most questions about which clause a condition belongs in:
+if it mentions an aggregate it must be <code>HAVING</code>, and otherwise put it
+in <code>WHERE</code>, where it removes rows before any counting is done and so
+costs less.</p>
+
+<div class="box worked"><span class="bt">Example &mdash; teachers who teach more than one department, two ways</span>
+<p>With two copies of one table, the Set 5 technique:</p>
+<pre class="asm">SELECT DISTINCT p.name
+  FROM Person p, Discipline d1, Discipline d2
+ WHERE p.id = d1.tid AND p.id = d2.tid AND d1.dcode != d2.dcode;</pre>
+<p>With grouping, which the algebra cannot express at all:</p>
+<pre class="asm">SELECT p.name
+  FROM Person p, Discipline d
+ WHERE p.id = d.tid
+ GROUP BY p.id
+HAVING COUNT(d.dcode) &gt; 1;</pre>
+<pre>+------+
+| name |
++------+
+| Blue |
++------+</pre>
+<p><strong>The second is better, and not only because it is shorter.</strong>
+&ldquo;More than one&rdquo; generalises: change <code>&gt; 1</code> to
+<code>&gt; 2</code> and you have teachers in three departments. The first would
+need a third copy and three inequalities, and for four departments a fourth copy
+and six. That is the practical reason aggregation was added to SQL.</p>
+<p><strong>No <code>DISTINCT</code> on the second</strong>, because
+<code>GROUP BY p.id</code> produces exactly one row per teacher. The first needs
+it because it produces one row per qualifying <em>pair</em>.</p>
+<p><strong>Group by the key, select the name.</strong> <code>p.name</code> is
+not in the <code>GROUP BY</code> list, which some servers reject. It is legal
+here and in standard SQL, because <code>p.id</code> is the primary key and
+therefore determines <code>name</code>. If your server complains, write
+<code>GROUP BY p.id, p.name</code> &mdash; grouping by both changes nothing,
+since the key alone already fixes the groups.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; min, max and average salary of lecturers</span>
+<pre class="asm">SELECT MIN(salary), MAX(salary), AVG(salary)
+  FROM Teacher
+ WHERE trank = 'Lecturer';</pre>
+<pre>+-------------+-------------+--------------+
+| MIN(salary) | MAX(salary) | AVG(salary)  |
++-------------+-------------+--------------+
+|    50000.00 |    50000.00 | 50000.000000 |
++-------------+-------------+--------------+</pre>
+<p><strong>One row in, one row out.</strong> An aggregate with no
+<code>GROUP BY</code> treats the whole filtered table as a single group, so this
+returns exactly one row however many teachers match. Here only Red does, which
+is why all three answers agree &mdash; degenerate, but correct, and the three
+functions agree precisely when the group has one row.</p>
+<p><strong>Note the widths.</strong> <code>MIN</code> and <code>MAX</code>
+return the column's own type, <code>DEC(8,2)</code>, so two decimal places.
+<code>AVG</code> is a division and the server widens the result, which is why it
+prints six. <code>ROUND(AVG(salary), 2)</code> if you need it formatted.</p>
+<p>The useful version asks it of every rank at once:</p>
+<pre class="asm">SELECT trank, MIN(salary), MAX(salary), AVG(salary), COUNT(*)
+  FROM Teacher GROUP BY trank;</pre>
+<pre>+-----------+-------------+-------------+--------------+----------+
+| trank     | MIN(salary) | MAX(salary) | AVG(salary)  | COUNT(*) |
++-----------+-------------+-------------+--------------+----------+
+| Lecturer  |    50000.00 |    50000.00 | 50000.000000 |        1 |
+| Professor |    80000.00 |    90000.00 | 85000.000000 |        2 |
++-----------+-------------+-------------+--------------+----------+</pre>
+<p>Adding <code>COUNT(*)</code> to a grouped query costs nothing and tells you
+how much each row is based on &mdash; which is how you spot that the Lecturer
+average is one person rather than a hundred.</p>
+<p><strong>A warning about nulls.</strong> Every aggregate except
+<code>COUNT(*)</code> skips nulls rather than treating them as zero. So
+<code>AVG</code> over a column with nulls divides by the number of non-null
+values, and <code>COUNT(salary)</code> and <code>COUNT(*)</code> can
+disagree.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; the highest salary again, now with MAX</span>
+<pre class="asm">SELECT p.name, t.trank
+  FROM Person p, Teacher t
+ WHERE p.id = t.tid
+   AND t.salary = (SELECT MAX(salary) FROM Teacher);</pre>
+<pre>+------+-----------+
+| name | trank     |
++------+-----------+
+| Blue | Professor |
++------+-----------+</pre>
+<p>Four lines instead of the eleven it took without <code>MAX</code>.
+<code>(SELECT MAX(salary) FROM Teacher)</code> is a <strong>scalar
+subquery</strong>: it returns exactly one value, so it can go anywhere a value
+can. If one in that position returned more than one row the server would raise
+an error rather than guess.</p>
+<p><strong>It is still <code>=</code>, not <code>ORDER BY ... LIMIT 1</code>.</strong>
+The tempting one-liner returns one row by construction; if two teachers shared
+the top salary it would pick one, arbitrarily and silently. When a question says
+&ldquo;teacher(s)&rdquo; with the <em>s</em> in brackets, it is telling you the
+answer may have more than one row.</p>
+<p><strong>And the subquery cannot be a <code>WHERE</code> condition on the
+outer query.</strong> <code>WHERE t.salary = MAX(t.salary)</code> is not legal:
+an aggregate cannot appear in <code>WHERE</code>, because <code>WHERE</code> is
+evaluated per row, before any group exists.</p></div>
+
+<div class="box worked"><span class="bt">Example &mdash; every teacher and their number of departments, descending</span>
+<pre class="asm">SELECT p.name, COUNT(d.dcode)
+  FROM Person p, Discipline d
+ WHERE p.id = d.tid
+ GROUP BY p.id
+ ORDER BY COUNT(d.dcode) DESC;</pre>
+<pre>+------+----------------+
+| name | COUNT(d.dcode) |
++------+----------------+
+| Blue |              2 |
+| Red  |              1 |
+| Pink |              1 |
++------+----------------+</pre>
+<p>All five clauses in one query, in the order they are typed and not in the
+order they run.</p>
+<p><strong>&ldquo;Descending&rdquo; needs <code>DESC</code></strong>, and the
+sort is on the <em>count</em>, which is why the expression appears again in the
+<code>ORDER BY</code>. You may repeat it, or name it with <code>AS</code> and
+sort by that. Either way, Red and Pink tie at one and <code>ORDER BY</code> says
+nothing about the order of rows that tie &mdash; add a second sort key if it
+matters.</p>
+<p><strong>The lecture's answer adds <code>HAVING COUNT(d.dcode) &gt;= 1</code></strong>,
+which is harmless and does nothing: a group exists only because it has at least
+one row. Worth noticing rather than copying.</p>
+<p><strong>Green is missing, and that is the interesting part.</strong> Green is
+a person, not a teacher, and has no <code>Discipline</code> row, so the
+<code>WHERE</code> finds no match and Green never reaches a group. &ldquo;Every
+person, including zero&rdquo; cannot be asked on this page at all &mdash; the
+comma product cannot keep a row that matches nothing. That is what an outer join
+is for, and it is the one thing here that genuinely needs the
+<code>JOIN</code> keyword.</p></div>
+
+<h2 id="db"><span class="secnum">7.6</span>The databases</h2>
+
+<pre class="asm"><span class="c">-- load all three, then run anything on this page</span>
+mysql -u root &lt; sql/collegedb.sql       <span class="c"># the examples in 7.2-7.5</span>
+mysql -u root &lt; sql/company.sql         <span class="c"># the exercises in 7.7</span>
+mysql -u root &lt; sql/deptmember.sql      <span class="c"># the exercises in 7.8</span>
+mysql -u root -t &lt; sql/set7.sql         <span class="c"># every answer, in page order</span></pre>
+
+<h3>collegeDB &mdash; the lecture's database, used by the examples above</h3>
+
+<pre>Person     (<u>id</u>, name, yearBorn)
+Teacher    (<u>tid</u>, trank, salary)
+Department (<u>code</u>, name, chair)
+Discipline (<u>tid</u>, <u>dcode</u>)</pre>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>Person</code></th></tr>
+<tr><th style="text-align:center">id</th><th style="text-align:center">name</th><th style="text-align:center">yearBorn</th></tr></thead>
+<tbody>
+<tr><td>1001</td><td>Blue</td><td>1970</td></tr>
+<tr><td>1002</td><td>Red</td><td>NULL</td></tr>
+<tr><td>1003</td><td>Pink</td><td>NULL</td></tr>
+<tr><td>1004</td><td>Green</td><td>1980</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>Teacher</code></th></tr>
+<tr><th style="text-align:center">tid</th><th style="text-align:center">trank</th><th style="text-align:center">salary</th></tr></thead>
+<tbody>
+<tr><td>1001</td><td>Professor</td><td>90000.00</td></tr>
+<tr><td>1002</td><td>Lecturer</td><td>50000.00</td></tr>
+<tr><td>1003</td><td>Professor</td><td>80000.00</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>Department</code></th></tr>
+<tr><th style="text-align:center">code</th><th style="text-align:center">name</th><th style="text-align:center">chair</th></tr></thead>
+<tbody>
+<tr><td>CSCI</td><td>Computer Science</td><td>1001</td></tr>
+<tr><td>MATH</td><td>Mathematic</td><td>1001</td></tr>
+<tr><td>PHYS</td><td>Physices</td><td>1003</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>Discipline</code></th></tr>
+<tr><th style="text-align:center">tid</th><th style="text-align:center">dcode</th></tr></thead>
+<tbody>
+<tr><td>1001</td><td>CSCI</td></tr>
+<tr><td>1001</td><td>MATH</td></tr>
+<tr><td>1002</td><td>CSCI</td></tr>
+<tr><td>1003</td><td>CSCI</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="box note"><span class="bt">One spelling to settle</span>
+<p>The typed page of the handout spells the fourth table
+<code>Dicipline</code>; this page spells it <code>Discipline</code>. Either is
+fine, but pick one and keep it: the foreign keys reference the table by name, so
+a script that creates <code>Dicipline</code> and then queries
+<code>Discipline</code> fails at the first <code>SELECT</code>. The data is the
+handout's verbatim, so typing the handout and typing this page give the same
+rows.</p></div>
+
+<h3>The Company Database &mdash; Appendix B.9, used by &sect;7.7</h3>
+
+<pre>dept (<u>dept_number</u>, dept_name, loc)
+emp  (<u>enumber</u>, ename, job, manager_num, hired_on, salary, dept_number)</pre>
+
+<p><code>manager_num</code> references <code>emp</code> itself &mdash; an
+employee's manager is another employee &mdash; and <code>dept_number</code>
+references <code>dept</code>. Those two foreign keys are every link in the
+database, and between them they carry all eight exercises in &sect;7.7.</p>
+
+<p>Appendix B.9 defines a third table, <code>salary_rank</code>, which
+<code>sql/company.sql</code> creates so that the database matches the book. No
+exercise on this page uses it, and you can ignore it.</p>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="7"><code>emp</code></th></tr>
+<tr><th style="text-align:center">enumber</th><th style="text-align:center">ename</th><th style="text-align:center">job</th><th style="text-align:center">manager_num</th><th style="text-align:center">hired_on</th><th style="text-align:center">salary</th><th style="text-align:center">dept_number</th></tr></thead>
+<tbody>
+<tr><td>7876</td><td>Adams</td><td>clerk</td><td>7788</td><td>12-JAN-83</td><td>1100</td><td>2</td></tr>
+<tr><td>7499</td><td>Allen</td><td>salesman</td><td>7698</td><td>20-FEB-81</td><td>1600</td><td>3</td></tr>
+<tr><td>7698</td><td>Blake</td><td>manager</td><td>7839</td><td>01-MAY-81</td><td>2850</td><td>3</td></tr>
+<tr><td>9999</td><td>Boss</td><td>professor</td><td>7839</td><td>18-NOV-81</td><td>500</td><td>5</td></tr>
+<tr><td>7782</td><td>Clark</td><td>manager</td><td>7839</td><td>09-JUN-81</td><td>2450</td><td>1</td></tr>
+<tr><td>7902</td><td>Ford</td><td>analyst</td><td>7566</td><td>03-DEC-81</td><td>3000</td><td>2</td></tr>
+<tr><td>7900</td><td>James</td><td>clerk</td><td>7698</td><td>03-DEC-81</td><td>950</td><td>3</td></tr>
+<tr><td>7566</td><td>Jones</td><td>manager</td><td>7839</td><td>02-APR-81</td><td>2975</td><td>2</td></tr>
+<tr><td>7839</td><td>King</td><td>president</td><td>NULL</td><td>17-NOV-81</td><td>5000</td><td>1</td></tr>
+<tr><td>7654</td><td>Martin</td><td>salesman</td><td>7698</td><td>28-SEP-81</td><td>1250</td><td>3</td></tr>
+<tr><td>7934</td><td>Miller</td><td>clerk</td><td>7782</td><td>23-JAN-82</td><td>1300</td><td>1</td></tr>
+<tr><td>7788</td><td>Scott</td><td>analyst</td><td>7566</td><td>09-DEC-82</td><td>3000</td><td>2</td></tr>
+<tr><td>7369</td><td>Smith</td><td>clerk</td><td>7902</td><td>17-DEC-80</td><td>800</td><td>2</td></tr>
+<tr><td>7844</td><td>Turner</td><td>salesman</td><td>7698</td><td>08-SEP-81</td><td>1500</td><td>3</td></tr>
+<tr><td>7521</td><td>Ward</td><td>salesman</td><td>7698</td><td>22-FEB-81</td><td>1250</td><td>3</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>dept</code></th></tr>
+<tr><th style="text-align:center">dept_number</th><th style="text-align:center">dept_name</th><th style="text-align:center">loc</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>accounting</td><td>New York</td></tr>
+<tr><td>2</td><td>research</td><td>Dallas</td></tr>
+<tr><td>3</td><td>sales</td><td>Chicago</td></tr>
+<tr><td>4</td><td>operations</td><td>Boston</td></tr>
+<tr><td>5</td><td>education</td><td>Queens</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="box note"><span class="bt">Three things about this database</span>
+<p><strong>The content is the book's, not ours.</strong> Appendix B.9 prints all
+three tables in full. It prints no <code>CREATE TABLE</code> statements, so
+those are written from the column names; dates are stored as real
+<code>DATE</code> values, so the book's <code>12-JAN-83</code> comes back as
+<code>1983-01-12</code>.</p>
+<p><strong><code>rank</code> is a reserved word</strong> in recent MySQL and
+MariaDB, where it is a window function, so the column of that name is written
+<code>`rank`</code> in backticks throughout.</p>
+<p><strong>Department 4 has no employees</strong>, King has no manager, and Boss
+is a professor in the education department reporting to the president. The
+oddities are the book's, and several exercises turn on them.</p></div>
+
+<h3>The Department Membership Database &mdash; Appendix B.19, used by &sect;7.8</h3>
+
+<pre>deprt  (<u>name</u>, room, phone)
+prof   (<u>pnumber</u>, name, rank, salary, main)
+member (<u>pnumber</u>, <u>additional</u>)
+chair  (who, <u>what</u>)</pre>
+
+<p><code>main</code> is the professor's home department and is
+<code>NOT NULL</code>; <code>member</code> holds the <em>additional</em>
+affiliations; <code>chair</code> is keyed on the department, with
+<code>who</code> declared <code>UNIQUE</code> so that nobody chairs two.</p>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5"><code>prof</code></th></tr>
+<tr><th style="text-align:center">pnumber</th><th style="text-align:center">name</th><th style="text-align:center">rank</th><th style="text-align:center">salary</th><th style="text-align:center">main</th></tr></thead>
+<tbody>
+<tr><td>123456789</td><td>Severus Snape</td><td>Professor</td><td>91000</td><td>Potions</td></tr>
+<tr><td>222222222</td><td>Minerva McGonagall</td><td>Professor</td><td>104000</td><td>Transfiguration</td></tr>
+<tr><td>333333333</td><td>Pomona Sprout</td><td>Professor</td><td>88000</td><td>Potions</td></tr>
+<tr><td>444444444</td><td>Filius Flitwick</td><td>Associate Professor</td><td>76000</td><td>Potions</td></tr>
+<tr><td>555555555</td><td>Sybill Trelawney</td><td>Lecturer</td><td>41000</td><td>Divination</td></tr>
+<tr><td>666666666</td><td>Firenze Centaur</td><td>Lecturer</td><td>39000</td><td>Divination</td></tr>
+<tr><td>777777777</td><td>Dolores Umbridge</td><td>unranked</td><td>120000</td><td>Hiding</td></tr>
+<tr><td>888888888</td><td>Argus Filch</td><td>Assistant Professor</td><td>0</td><td>Hiding</td></tr>
+<tr><td>999999999</td><td>Cedric Diggory</td><td>Assistant Professor</td><td>52000</td><td>Transfiguration</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>member</code></th></tr>
+<tr><th style="text-align:center">pnumber</th><th style="text-align:center">additional</th></tr></thead>
+<tbody>
+<tr><td>123456789</td><td>Hiding</td></tr>
+<tr><td>123456789</td><td>Divination</td></tr>
+<tr><td>222222222</td><td>Potions</td></tr>
+<tr><td>333333333</td><td>Divination</td></tr>
+<tr><td>555555555</td><td>Potions</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>chair</code></th></tr>
+<tr><th style="text-align:center">who</th><th style="text-align:center">what</th></tr></thead>
+<tbody>
+<tr><td>123456789</td><td>Potions</td></tr>
+<tr><td>222222222</td><td>Transfiguration</td></tr>
+<tr><td>777777777</td><td>Hiding</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>deprt</code></th></tr>
+<tr><th style="text-align:center">name</th><th style="text-align:center">room</th><th style="text-align:center">phone</th></tr></thead>
+<tbody>
+<tr><td>Potions</td><td>D-5</td><td>3101</td></tr>
+<tr><td>Hiding</td><td>G-7</td><td>3102</td></tr>
+<tr><td>Transfiguration</td><td>T-2</td><td>3103</td></tr>
+<tr><td>Divination</td><td>N-9</td><td>3104</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="box note"><span class="bt">Here the rows are ours</span>
+<p>Appendix B.19 gives the DDL and no data, so the nine professors were chosen
+to make the grouping exercise say something: two ranks with more than one
+professor, one department with a single professor at a given rank, a rank
+spelled <code>unranked</code>, and one professor paid nothing &mdash; which is
+the row Problem 736's <code>HAVING</code> clause exists to remove.</p></div>
+
+<h2 id="company"><span class="secnum">7.7</span>Exercises: the Company Database</h2>
+
+<p>Problems 739&ndash;748 of the problem book, in a different order &mdash;
+single-table first, then the ones that need a product. Same rule throughout: no
+join operators.</p>
+
+<details class="prob"><summary data-label="Exercise 7.1">Print a list of names and salaries of all analysts, sorted by salary, the greatest first.</summary><div class="sol">
+<pre class="asm">SELECT ename, salary FROM emp WHERE job = 'analyst' ORDER BY salary DESC;</pre>
+<pre>+-------+---------+
+| ename | salary  |
++-------+---------+
+| Scott | 3000.00 |
+| Ford  | 3000.00 |
++-------+---------+</pre>
+<p>One table, one condition, one sort. <code>DESC</code> is needed because
+<code>ORDER BY</code> is ascending unless told otherwise, and &ldquo;greatest
+first&rdquo; is the only part of the sentence that is about sorting.</p>
+<p><strong>Scott and Ford both earn 3,000</strong>, so the two rows tie and
+nothing in the query says which comes first. On this server they come back in
+that order; on another, or after an index is added, they may not.
+<code>ORDER BY salary DESC, ename</code> if you want it settled.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.2">Find the total number of salesmen and their average salary.</summary><div class="sol">
+<pre class="asm">SELECT COUNT (enumber), AVG (salary) FROM emp WHERE job = 'salesman';</pre>
+<pre>+----------------+-------------+
+| COUNT(enumber) | AVG(salary) |
++----------------+-------------+
+|              4 | 1400.000000 |
++----------------+-------------+</pre>
+<p>Two aggregates with no <code>GROUP BY</code>, so the whole filtered table is
+one group and the answer is one row. Allen 1600, Martin 1250, Turner 1500 and
+Ward 1250 average 1400 exactly.</p>
+<p><strong><code>COUNT(enumber)</code> rather than
+<code>COUNT(*)</code>.</strong> They agree here, because <code>enumber</code> is
+the primary key and so can never be null. They would differ on a nullable
+column: <code>COUNT(*)</code> counts rows, <code>COUNT(x)</code> counts rows
+where <code>x</code> is not null. Counting a key is a safe habit precisely
+because the two cannot diverge.</p>
+<p><strong>And a question this cannot answer:</strong> the average salary of
+each job, all at once. That needs <code>GROUP BY job</code>, and then you get
+one row per job rather than one row for the single job you filtered to.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.3">Find an alphabetically sorted list of names of all employees whose name begins with letter S.</summary><div class="sol">
+<pre class="asm">SELECT ename FROM emp WHERE ename LIKE 'S%' ORDER BY ename;</pre>
+<pre>+-------+
+| ename |
++-------+
+| Scott |
+| Smith |
++-------+</pre>
+<p><strong><code>LIKE</code> with a pattern</strong>, which is the one string
+operator SQL has that the algebra does not. <code>%</code> matches any run of
+characters including none; <code>_</code> matches exactly one. So
+<code>'S%'</code> is &ldquo;begins with S&rdquo;, <code>'%s'</code> would be
+&ldquo;ends with s&rdquo;, and <code>'_o%'</code> would be &ldquo;second letter
+is o&rdquo;.</p>
+<p><strong>Case.</strong> MariaDB's default collation folds case, so
+<code>'s%'</code> finds the same two rows here. That is a property of the
+collation, not of SQL &mdash; PostgreSQL would return nothing, and
+<code>ILIKE</code> is its case-insensitive form. Never rely on it either
+way.</p>
+<p><strong><code>ORDER BY ename</code> with no <code>DESC</code></strong> is
+ascending, which for a string column means alphabetical &mdash; again, by the
+collation's idea of alphabetical.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.4">Find the highest, lowest, and average salary paid.</summary><div class="sol">
+<pre class="asm">SELECT MAX (salary), MIN (salary), AVG (salary) FROM emp;</pre>
+<pre>+-------------+-------------+-------------+
+| MAX(salary) | MIN(salary) | AVG(salary) |
++-------------+-------------+-------------+
+|     5000.00 |      500.00 | 1968.333333 |
++-------------+-------------+-------------+</pre>
+<p>No <code>WHERE</code> at all: the group is the whole table, all fifteen
+employees. King's 5,000 and Boss's 500 are the two ends.</p>
+<p><strong>What this cannot tell you is <em>who</em>.</strong> Adding
+<code>ename</code> to the select list does not work &mdash; the query returns
+one row and there are fifteen names, so there is no sensible value to put there.
+Standard SQL rejects it outright; MySQL and MariaDB may silently pick a name
+from an arbitrary row, which is worse. Finding the highest-paid employee is a
+different query, and it is the one worked through twice in &sect;7.4 and
+&sect;7.5.</p>
+<p><strong>The average is not a salary anybody earns</strong>, and it is pulled
+upwards by King: nine of the fifteen employees are below it and only six above.
+<code>AVG</code> over a whole table says nothing about how the money is spread,
+which is what <code>GROUP BY</code> is for &mdash; Exercise 7.10 asks the same
+kind of question one group at a time.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.5">Find names and salaries of all employees whose manager is Jones.</summary><div class="sol">
+<pre class="asm">SELECT e1.ename, e1.salary FROM emp e1, emp e2
+ WHERE e1.manager_num = e2.enumber AND e2.ename = 'Jones';</pre>
+<pre>+-------+---------+
+| ename | salary  |
++-------+---------+
+| Scott | 3000.00 |
+| Ford  | 3000.00 |
++-------+---------+</pre>
+<p><strong>Two copies of one table</strong>, because the question is about a
+relationship between two rows of <code>emp</code>: <code>e1</code> is the
+employee being reported, <code>e2</code> is their manager. Without the aliases
+there is no way to say which <code>ename</code> you mean.</p>
+<p><strong>The link runs <code>e1.manager_num = e2.enumber</code></strong>
+&mdash; the child's foreign key to the parent's key &mdash; and getting it
+backwards gives you the subordinates of Jones's own manager, which is a
+different and non-empty answer. Writing the foreign key down in the direction
+the schema declares it is the check.</p>
+<p>Jones is employee 7566 and manages Scott and Ford, the two analysts. You
+could get the same answer with <code>WHERE manager_num = 7566</code> and one
+table &mdash; but only by knowing Jones's number, and the question gives a name.
+That is the same shape as the Computer Science example in &sect;7.4.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.6">Find names and job titles of all employees that are managed by some employee whose job title is not manager.</summary><div class="sol">
+<pre class="asm">SELECT e1.ename, e1.job FROM emp e1, emp e2
+ WHERE e1.manager_num = e2.enumber AND e2.job != 'manager';</pre>
+<pre>+-------+-----------+
+| ename | job       |
++-------+-----------+
+| Smith | clerk     |
+| Jones | manager   |
+| Blake | manager   |
+| Clark | manager   |
+| Adams | clerk     |
+| Boss  | professor |
++-------+-----------+</pre>
+<p>The same two-copy shape as Exercise 7.5, with the condition moved from the
+manager's <em>name</em> to the manager's <em>job</em>.</p>
+<p><strong>Read the answer and the point becomes clear.</strong> Jones, Blake
+and Clark are managers themselves, and they are in the answer because
+<em>their</em> manager is King, whose job is president. Smith's manager is Ford,
+an analyst; Adams's is Scott, also an analyst; Boss reports to King. The
+condition is about the manager's job, not the employee's.</p>
+<p><strong>King is not in the answer</strong>, and the reason is the null.
+King's <code>manager_num</code> is <code>NULL</code>, so
+<code>e1.manager_num = e2.enumber</code> is unknown for every <code>e2</code>,
+and <code>WHERE</code> discards unknown. That is three-valued logic doing
+exactly what you want here &mdash; King has no manager, so no manager of King
+has a job title &mdash; but it is worth noticing that nothing in the query says
+so.</p>
+<p><strong>And <code>!=</code> is the same null trap in waiting.</strong>
+If some employee had a null <code>job</code>, <code>e2.job != 'manager'</code>
+would be unknown for them too and they would silently drop out, even though a
+null job is certainly not 'manager'.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.7">Find names and locations on which they work of all employees managed by the president.</summary><div class="sol">
+<pre class="asm">SELECT e1.ename, loc FROM emp e1, emp e2, dept
+ WHERE e1.dept_number = dept.dept_number
+   AND e1.manager_num = e2.enumber
+   AND e2.job = 'president';</pre>
+<pre>+-------+----------+
+| ename | loc      |
++-------+----------+
+| Clark | New York |
+| Jones | Dallas   |
+| Blake | Chicago  |
+| Boss  | Queens   |
++-------+----------+</pre>
+<p>Three tables, two links. <code>emp</code> twice for the manager relationship,
+as in Exercises 7.5 and 7.6, plus <code>dept</code> to turn the employee's
+department number into a place.</p>
+<p><strong>The two links do different jobs and it is worth saying which.</strong>
+<code>e1.manager_num = e2.enumber</code> together with
+<code>e2.job = 'president'</code> selects the rows &mdash; it is the question.
+<code>e1.dept_number = dept.dept_number</code> selects nothing: it is there only
+to make <code>loc</code> available, because the answer has to name a location
+and <code>emp</code> does not hold one.</p>
+<p>That is the general pattern for &ldquo;find X and some attribute of a related
+thing&rdquo;: one link per relationship you are asserting, plus one link per
+table you need only in order to read a column from it. Count them against the
+tables &mdash; three tables want at least two links &mdash; and a missing one is
+obvious before you run anything.</p>
+<p><strong>The president is King</strong>, and the four people reporting to him
+are the three managers plus Boss, scattered across four of the five locations.
+Boston is missing because department 4 has no employees at all.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.8">Find names and salaries of all employees who have a higher salary than some employee who works in research.</summary><div class="sol">
+<pre class="asm">SELECT ename, salary FROM emp WHERE
+       salary &gt;
+            (SELECT MIN(salary) FROM emp, dept WHERE
+                    dept_name = 'research' AND
+                    emp.dept_number = dept.dept_number);</pre>
+<pre>+--------+---------+     the research salaries:
+| ename  | salary  |     +-------+---------+
++--------+---------+     | ename | salary  |
+| Allen  | 1600.00 |     +-------+---------+
+| Ward   | 1250.00 |     | Smith |  800.00 |
+| Jones  | 2975.00 |     | Jones | 2975.00 |
+| Martin | 1250.00 |     | Scott | 3000.00 |
+| Blake  | 2850.00 |     | Adams | 1100.00 |
+| Clark  | 2450.00 |     | Ford  | 3000.00 |
+| Scott  | 3000.00 |     +-------+---------+
+| King   | 5000.00 |
+| Turner | 1500.00 |
+| Adams  | 1100.00 |
+| James  |  950.00 |
+| Ford   | 3000.00 |
+| Miller | 1300.00 |
++--------+---------+</pre>
+<p><strong>&ldquo;Higher than <em>some</em> employee&rdquo; is higher than the
+lowest-paid one.</strong> That is the whole translation, and it is worth doing
+deliberately rather than by feel: to beat at least one member of a set, you
+need only beat the smallest. The research salaries run from 800 to 3000, so the
+condition amounts to <code>salary &gt; 800</code>, and thirteen of the fifteen
+employees qualify &mdash; everyone except Smith himself at 800 and Boss at
+500.</p>
+<p>The same reading turns the other three quantified questions into things you
+can already write:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>the question</th><th>what to write</th></tr></thead>
+<tbody>
+<tr><td>greater than <em>some</em> member</td><td><code>&gt; (SELECT MIN(...) ...)</code></td></tr>
+<tr><td>greater than <em>every</em> member</td><td><code>&gt; (SELECT MAX(...) ...)</code></td></tr>
+<tr><td>equal to <em>some</em> member</td><td><code>IN (SELECT ...)</code></td></tr>
+<tr><td>different from <em>every</em> member</td><td><code>NOT IN (SELECT ...)</code></td></tr>
+</tbody></table></div>
+<p>The book writes the first two as <code>&gt; ANY</code> and
+<code>&gt; ALL</code>, which SQL does have. The lectures do not use them, and as
+the table shows, nothing is lost: an aggregate and a comparison say the same
+thing, and say it in terms you can already defend.</p>
+<p><strong>Notice that the subquery names the same tables as the outer
+query.</strong> <code>emp</code> appears inside and outside, and they are
+unrelated uses &mdash; the inner one lists research salaries, the outer one is
+the employee being tested. A subquery is evaluated on its own terms unless it
+refers to a column from the outer query, which this one does not.</p>
+<p><strong>The research members themselves are in the answer</strong>, except
+the one who earns least, because a research employee can perfectly well out-earn
+a colleague. Had the question meant &ldquo;than <em>every</em> employee in
+research&rdquo;, the subquery would read <code>MAX</code> instead of
+<code>MIN</code>, and only King at 5,000 would qualify.</p>
+</div></details>
+
+<h2 id="member"><span class="secnum">7.8</span>Exercises: Department Membership</h2>
+
+<p>Problems 735&ndash;738, against the database of &sect;7.6. The book's own
+restriction is the one this set works under: <em>your code must not contain
+union, intersection, except, or any of the join operators.</em></p>
+
+<details class="prob"><summary data-label="Exercise 7.9">Write SQL code that creates the tables for the Department Membership Database. A professor has a social security number, a name, a rank and a salary, and exactly one main department; may additionally be a member of any number of other departments; and a department has at most one chair, who chairs at most one department. Provide for all the stated constraints.</summary><div class="sol">
+<pre class="asm">CREATE TABLE deprt (
+    name VARCHAR (20),
+    room VARCHAR (6),
+    phone DECIMAL (4,0),
+    PRIMARY KEY (name)
+);
+
+CREATE TABLE prof (
+    pnumber CHAR (9),
+    name VARCHAR (20) NOT NULL,
+    rank VARCHAR (20),
+    salary DECIMAL (8,0),
+    main VARCHAR (20) NOT NULL,
+    PRIMARY KEY (pnumber),
+    FOREIGN KEY (main) REFERENCES deprt,
+    CONSTRAINT pnb CHECK (to_number (pnumber) &gt;= 0)
+);
+
+CREATE TABLE member (
+    pnumber CHAR (9),
+    additional VARCHAR (20),
+    PRIMARY KEY (pnumber, additional),
+    FOREIGN KEY (pnumber) REFERENCES prof,
+    FOREIGN KEY (additional) REFERENCES deprt
+);
+
+CREATE TABLE chair (
+    who CHAR (9) UNIQUE,
+    what VARCHAR (20),
+    PRIMARY KEY (what),
+    FOREIGN KEY (who) REFERENCES prof,
+    FOREIGN KEY (what) REFERENCES deprt
+);</pre>
+<p><strong>&ldquo;Exactly one main department&rdquo; is two
+constraints.</strong> The foreign key says it must be a real department; the
+<code>NOT NULL</code> says there must be one. Leave off the
+<code>NOT NULL</code> and a professor may float unattached &mdash; the thing
+this schema most needs to prevent.</p>
+<p><strong>&ldquo;At most one chair per department&rdquo; is the primary key on
+<code>what</code>.</strong> <code>chair</code> is keyed on the department, not
+on the person, which is what stops a department having two chairs.</p>
+<p><strong>&ldquo;Who chairs at most one department&rdquo; is the
+<code>UNIQUE</code> on <code>who</code>.</strong> This is the one easy to miss.
+Without it, <code>chair</code> could hold <code>(Snape, Potions)</code> and
+<code>(Snape, Hiding)</code> &mdash; two different primary keys, so the key
+constraint has no objection. <code>UNIQUE</code> is how you declare a candidate
+key that is not the primary one, and it is the only way to express a
+1&nbsp;:&nbsp;1 relationship in SQL.</p>
+<p><strong>On the <code>CHECK</code> clause.</strong> <code>to_number</code> is
+Oracle's; MariaDB has no such function, so running the book's DDL as printed
+fails there. Written <code>CHECK (pnumber &gt;= 0)</code> it does the same job,
+since MariaDB casts the string for the comparison. This is the standard
+annoyance with <code>CHECK</code>: it is the least portable thing in the DDL,
+and MySQL ignored it entirely until 8.0.16.</p>
+<p><strong><code>FOREIGN KEY (main) REFERENCES deprt</code></strong> with no
+column named is legal shorthand &mdash; the reference is taken to be the primary
+key of <code>deprt</code>. Naming it is clearer.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.10">Write SQL code for the following query, whose purpose is to find how people and earnings are distributed across ranks and departments.
+<p>Find a table with columns <code>DEPARTMENT</code>, <code>RANK</code>, <code>COUNTPROFS</code>, <code>AVGSALARY</code>. For each department say <var>d</var> and each rank say <var>r</var>, find as <code>countProfs</code> the number of professors whose rank is equal to <var>r</var> and whose main department is <var>d</var>, and find as <code>avgSalary</code> the average salary of these professors. Do not take into account or consideration any of those professors whose rank is recorded as <code>unranked</code>, and do not report those pairs of a department <var>d</var> and rank <var>r</var> where the average salary of professors of rank <var>r</var> in the department <var>d</var> is less than one dollar.</p></summary><div class="sol">
+<pre class="asm">SELECT    main AS department, rank, COUNT(*) AS countProfs, AVG(salary) AS avgSalary
+FROM      prof
+WHERE     rank != 'unranked'
+GROUP BY  main, rank
+HAVING    AVG(salary) &gt;= 1;</pre>
+<pre>+-----------------+---------------------+------------+-------------+
+| department      | rank                | countProfs | avgSalary   |
++-----------------+---------------------+------------+-------------+
+| Divination      | Lecturer            |          2 |  40000.0000 |
+| Potions         | Associate Professor |          1 |  76000.0000 |
+| Potions         | Professor           |          2 |  89500.0000 |
+| Transfiguration | Assistant Professor |          1 |  52000.0000 |
+| Transfiguration | Professor           |          1 | 104000.0000 |
++-----------------+---------------------+------------+-------------+</pre>
+<p><strong>One table in the <code>FROM</code>.</strong> Everything the question
+asks about &mdash; department, rank, salary &mdash; is on <code>prof</code>,
+because <code>main</code> holds the department name itself rather than a code.
+No second table, no link.</p>
+<p><strong>Grouping by two columns</strong> makes one group per <em>pair</em>,
+which is exactly what &ldquo;for each department and each rank&rdquo; asks for.
+A department with professors at three ranks produces three rows.</p>
+<p><strong>The two conditions go in different clauses, and the question tells
+you which.</strong> &ldquo;Do not take into account&rdquo; is about individual
+professors, so it is a <code>WHERE</code> &mdash; it removes Umbridge before any
+group is formed, so she affects no count and no average. &ldquo;Do not report
+those pairs&rdquo; is about whole groups and is stated in terms of an average,
+so it must be a <code>HAVING</code>. Swapping them is not possible: an aggregate
+cannot appear in <code>WHERE</code>, and <code>rank != 'unranked'</code> in
+<code>HAVING</code> would let Umbridge into her group's average first.</p>
+<p>Both clauses do visible work on this data. With neither:</p>
+<pre>+-----------------+---------------------+------------+-------------+
+| department      | rank                | countProfs | avgSalary   |
++-----------------+---------------------+------------+-------------+
+| Divination      | Lecturer            |          2 |  40000.0000 |
+| Hiding          | Assistant Professor |          1 |      0.0000 |
+| Hiding          | unranked            |          1 | 120000.0000 |
+| Potions         | Associate Professor |          1 |  76000.0000 |
+| Potions         | Professor           |          2 |  89500.0000 |
+| Transfiguration | Assistant Professor |          1 |  52000.0000 |
+| Transfiguration | Professor           |          1 | 104000.0000 |
++-----------------+---------------------+------------+-------------+</pre>
+<p>Two extra rows: Umbridge's, removed by the <code>WHERE</code>, and Filch's,
+removed by the <code>HAVING</code> because he is paid nothing. That second one
+is the reason the question bothers to mention a dollar.</p>
+<p><strong><code>COUNT(*)</code> rather than
+<code>COUNT(salary)</code>.</strong> They differ when salaries can be null:
+<code>COUNT(*)</code> counts rows, <code>COUNT(salary)</code> counts non-null
+salaries, and <code>AVG</code> ignores nulls as well. A professor with a null
+salary would be counted in <code>countProfs</code> and silently left out of
+<code>avgSalary</code> &mdash; two columns answering slightly different
+questions.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.11">Professor Severus Snape (whose social security number is 123456789) has served as chair in the department named Potions. However, he is now leaving this department and will have no affiliation with it in future. His new main department is Hiding (though he will not be the chair there). Otherwise, he retains all his current additional affiliations. Write the SQL code that makes this change.</summary><div class="sol">
+<p>Three things have to happen, in three tables: he stops chairing Potions, he
+stops being affiliated with Potions, and his main department becomes Hiding.</p>
+<pre class="asm">DELETE FROM chair  WHERE who = '123456789';
+DELETE FROM member WHERE pnumber = '123456789' AND additional = 'Potions';
+DELETE FROM member WHERE pnumber = '123456789' AND additional = 'Hiding';
+UPDATE prof SET main = 'Hiding' WHERE pnumber = '123456789';</pre>
+<pre>chair:                             member, for Snape:
++-----------+-----------------+    +-----------+------------+
+| who       | what            |    | pnumber   | additional |
++-----------+-----------------+    +-----------+------------+
+| 222222222 | Transfiguration |    | 123456789 | Divination |
+| 777777777 | Hiding          |    +-----------+------------+
++-----------+-----------------+
+
+prof, for Snape:
++-----------+---------------+--------+
+| pnumber   | name          | main   |
++-----------+---------------+--------+
+| 123456789 | Severus Snape | Hiding |
++-----------+---------------+--------+</pre>
+<p><strong>The order is forced by the foreign keys again.</strong> The update to
+<code>prof.main</code> comes last so that nothing is pointing at a department he
+is in the middle of leaving.</p>
+<p><strong>The third statement is the one to think about.</strong> Hiding is
+currently an <em>additional</em> affiliation and is about to become his
+<em>main</em> one. Leaving the <code>member</code> row records the same fact
+twice, in two tables, which is the redundancy the split into <code>main</code>
+and <code>additional</code> exists to avoid. The schema does not forbid it, so
+this is a judgement the constraints cannot make for you.</p>
+<div class="box warn"><span class="bt">The book's answer does not run, and then does the wrong thing</span>
+<p>The printed answer is three statements:</p>
+<pre class="asm">DELETE FROM chair WHERE who = '123456789';
+DELETE FROM member WHERE who = '123456789';
+UPDATE prof SET main = 'Hiding' WHERE pnumber = '123456789';</pre>
+<p>The second has no <code>WHERE</code> column to stand on &mdash;
+<code>member</code>'s columns are <code>pnumber</code> and
+<code>additional</code>, and there is no <code>who</code>:</p>
+<pre>ERROR 1054 (42S22): Unknown column 'who' in 'WHERE'</pre>
+<p>Correct that to <code>pnumber</code> and it runs, but now it deletes
+<em>every</em> one of Snape's additional affiliations &mdash; including
+Divination, which the question explicitly says he keeps. Both the chair row and
+the Potions membership should go; Divination should not.</p>
+<p>Worth doing deliberately: run the book's version, look at what is left in
+<code>member</code>, and compare it with the sentence &ldquo;otherwise, he
+retains all his current additional affiliations&rdquo;.</p></div>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 7.12">Implement a database upgrade which will enable the Office to keep track of department secretaries. These are not professors (but rather ordinary wizards and witches). Although identified by social security number and certainly having name, secretaries will never receive any salary, nor bear any special rank. However, secretaries serve in the role known as Keeper of Secrets. Precisely, each department chair may designate one secretary as Keeper of Secrets. Secretaries, in general, may keep secrets for several chairs (or none as yet) and the Office needs to record all the Keeper of Secret assignments.
+<p>Write SQL code to create the new table(s) and/or modify definitions (or content) of the existing ones (including dropping), as needed. No part of the existing database content may be lost.</p></summary><div class="sol">
+<pre class="asm">CREATE TABLE secretary (
+    snumber CHAR (9),
+    name VARCHAR (20) NOT NULL,
+    PRIMARY KEY (snumber)
+);
+
+CREATE TABLE keeperSecrets (
+    pnumber CHAR (9),
+    snumber CHAR (9),
+    PRIMARY KEY (pnumber),
+    FOREIGN KEY (pnumber) REFERENCES prof,
+    FOREIGN KEY (snumber) REFERENCES secretary
+);</pre>
+<p>Two new tables, nothing dropped, nothing altered &mdash; which is the right
+answer to &ldquo;no part of the existing content may be lost&rdquo;.</p>
+<p><strong>Why secretaries do not go in <code>prof</code>.</strong> They would
+fit: social security number, name. But <code>prof</code> also carries
+<code>rank</code>, <code>salary</code> and a <code>NOT NULL</code>
+<code>main</code> department, and the narrative says secretaries have none of
+those. Adding them would mean either relaxing <code>main</code> to nullable
+&mdash; weakening a real constraint on actual professors &mdash; or inventing a
+department for people who have none. A separate table costs one more relation
+and keeps both groups honestly described.</p>
+<p><strong>The cardinality is all in the primary key.</strong> &ldquo;Each chair
+may designate <em>one</em> secretary&rdquo; is
+<code>PRIMARY KEY (pnumber)</code>: at most one row per professor.
+&ldquo;Secretaries may keep secrets for <em>several</em> chairs&rdquo; is the
+absence of any constraint on <code>snumber</code> &mdash; it may repeat freely.
+And &ldquo;or none as yet&rdquo; is satisfied by a secretary simply having no
+row, which is why the relationship is a table of its own rather than a column on
+<code>secretary</code>.</p>
+<p>Checking it after creating:</p>
+<pre>+----------------------+          DESC keeperSecrets;
+| Tables_in_deptmember |          +---------+---------+------+-----+
++----------------------+          | Field   | Type    | Null | Key |
+| chair                |          +---------+---------+------+-----+
+| deprt                |          | pnumber | char(9) | NO   | PRI |
+| keeperSecrets        |          | snumber | char(9) | YES  | MUL |
+| member               |          +---------+---------+------+-----+
+| prof                 |
+| secretary            |
++----------------------+</pre>
+<p><code>PRI</code> on <code>pnumber</code> and <code>MUL</code> on
+<code>snumber</code> is the cardinality, read back out of the catalogue:
+&ldquo;unique&rdquo; and &ldquo;may repeat&rdquo;.</p>
+<p><strong>One thing the schema does not say.</strong> The narrative is about
+department <em>chairs</em> designating secretaries, but <code>pnumber</code>
+references <code>prof</code>, not <code>chair</code>. So the DDL permits a
+professor who chairs nothing to have a Keeper of Secrets. Referencing
+<code>chair(who)</code> instead would enforce it &mdash; <code>who</code> is
+<code>UNIQUE</code>, so it can be referenced &mdash; at the cost that the row
+would have to be deleted whenever someone stopped being a chair, as in Exercise
+7.13. Either is defensible; what matters is noticing that you chose.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>One thing on this page could not be written at all: the last example of
+&sect;7.5 leaves Green out, because the comma product cannot keep a row that
+matches nothing. &ldquo;Every person, with zero where they teach nothing&rdquo;
+needs an outer join, which is the one place the <code>JOIN</code> keyword is not
+avoidable &mdash; <code>LEFT JOIN</code> has no comma equivalent and no
+algebraic counterpart either.</p>
+<p>Beyond that: views, which name a query and let you select from it &mdash; the
+problem book's answer to Problem 750 writes the same query both ways, with and
+without; transactions, which make the four statements of &sect;7.3's deletion
+succeed or fail as one unit; and indexes, which change nothing about what a
+query means and a great deal about how long it takes. And the question this set
+has carefully not asked &mdash; whether the schema stores the same fact twice
+&mdash; is normalization.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-ra-sql.html"><span>Previous</span>Set 6. From algebra to SQL</a>
+      <a class="next" href="ex-sql2.html"><span>Next</span>Set 8. Queries on three databases</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

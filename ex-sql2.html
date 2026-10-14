@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 8 — SQL queries on three databases</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 8 &middot; SQL queries</span>
+  <nav class="topnav">
+    <a href="ex-sql.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="setup-sql.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#load"><span class="t">8.1</span>The three databases</a></li>
+    <li><a href="#hotel"><span class="t">8.2</span>The Hotel Database</a></li>
+    <li><a href="#hotelq"><span class="t">8.3</span>Exercises: Hotel</a></li>
+    <li><a href="#car"><span class="t">8.4</span>The Car Repair Shop Database</a></li>
+    <li><a href="#carq"><span class="t">8.5</span>Exercises: Car Repair Shop</a></li>
+    <li><a href="#cotton"><span class="t">8.6</span>The Cool Cotton Database</a></li>
+    <li><a href="#cottonq"><span class="t">8.7</span>Exercises: Cool Cotton</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 8 &middot; Lectures 11 and 12</span>
+  <span class="chnum">SQL</span>
+  <h1>Queries on three databases</h1>
+  <p class="chsum">Forty-one more exercises at the level of Set 7, on three
+  schemas you have not met: a chain of hotels, a car repair shop, and a shirt
+  company. Nothing new is introduced &mdash; the same <code>SELECT</code>,
+  <code>WHERE</code>, <code>ORDER BY</code>, aggregate functions,
+  <code>GROUP BY</code>, <code>HAVING</code> and subqueries of Lectures 11 and
+  12. What changes is the schema, which is the part that actually takes
+  practice. Still no <code>JOIN</code> keyword.</p>
+</div>
+
+<h2 id="load"><span class="secnum">8.1</span>The three databases</h2>
+
+<p>Each section below gives a schema, the rows it holds, and then the
+exercises written against it. Load all three and you can run anything on this
+page:</p>
+
+<pre class="asm"><span class="c">-- from the sql/ directory</span>
+mysql -u root &lt; sql/hotel.sql           <span class="c"># the exercises in 8.3</span>
+mysql -u root &lt; sql/carshop.sql         <span class="c"># the exercises in 8.5</span>
+mysql -u root &lt; sql/coolcotton.sql      <span class="c"># the exercises in 8.7</span>
+mysql -u root -t &lt; sql/set8.sql         <span class="c"># every answer, in page order</span></pre>
+
+<div class="box note"><span class="bt">The same restriction as Set 7</span>
+<p>All three of these sections of the problem book carry the same sentence at
+the top: <em>your code must not contain union, intersection, except, or any of
+the join operators.</em> So the rule you have been working under is the book's
+rule here, not an extra one of ours. Relations go in the <code>FROM</code>
+clause separated by commas; every link between them is written out in the
+<code>WHERE</code> clause.</p>
+<p>The answers go a little further and stay inside the vocabulary of Lectures 11
+and 12 as well. Where the book reaches for <code>EXISTS</code>,
+<code>NOT EXISTS</code> or <code>&gt;= ALL</code>, the answer here is written
+with <code>IN</code> or <code>NOT IN</code> against a subquery, which is the
+form the lectures use. The shape is always the same: build the set, then ask
+whether a value is in it.</p></div>
+
+<div class="box warn"><span class="bt">Oracle and MariaDB</span>
+<p>The book is written for Oracle, and four of its habits do not survive the
+move to MariaDB. They appear often enough on this page to be worth knowing
+before you start.</p>
+<p><strong><code>sysdate</code> is <code>CURDATE()</code>.</strong> Several
+questions say &ldquo;today, where you do not know what date it is&rdquo; &mdash;
+the point being that the query must ask the server rather than have a date typed
+into it.</p>
+<p><strong><code>trunc(x)</code> disappears.</strong> Oracle's <code>DATE</code>
+carries a time of day, so the book wraps dates in <code>trunc</code> to throw
+the time away before comparing. MariaDB's <code>DATE</code> has no time to throw
+away, so the comparisons are written directly.</p>
+<p><strong><code>to_date('20-MAY-2000')</code> is just
+<code>'2000-05-20'</code>.</strong> MariaDB reads the ISO form natively.</p>
+<p><strong>Reserved words need backticks.</strong> The Hotel schema has a column
+called <code>left</code> and the Car Repair Shop has one called
+<code>rank</code>; both are reserved in recent MySQL and MariaDB. Written
+plainly, <code>left</code> gives you</p>
+<pre class="asm">ERROR 1064 (42000): You have an error in your SQL syntax; check the manual
+that corresponds to your MariaDB server version for the right syntax to use
+near 'FROM booking' at line 1</pre>
+<p>which blames the wrong word. Write <code>`left`</code> and it works. The
+book, on Oracle, needs none of this.</p></div>
+
+<div class="box note"><span class="bt">Where the rows come from</span>
+<p>The Hotel rows are the book's own, printed in Appendix A.8. The Car Repair
+Shop and Cool Cotton rows are ours: the book gives those two schemas but no
+sample content, so rows were written for them &mdash; small, and chosen so that
+every exercise returns something worth looking at. Each file says so in its
+header comment. The <em>questions</em> are the book's throughout.</p></div>
+
+
+<h2 id="hotel"><span class="secnum">8.2</span>The Hotel Database</h2>
+
+<p>Four hotels, their rooms, the guests, and who stayed where. It is the
+smallest schema on this page and the only one whose rows are printed in the
+book &mdash; Appendix A.7 gives the <code>CREATE TABLE</code> statements and
+Appendix A.8 the <code>INSERT</code>s.</p>
+
+<pre>hotel   (<u>hnumber</u>, name, address)
+room    (<u>rnumber</u>, <u>hnumber</u>, type, price_night)
+guest   (<u>gnumber</u>, name, address)
+booking (<u>hnumber</u>, <u>gnumber</u>, <u>rnumber</u>, arrived, left)</pre>
+
+<p>Two things about this schema are worth reading off before any query is
+written. <code>room</code>'s key is the <em>pair</em> &mdash; room 2 exists in
+three different hotels, so a room number alone identifies nothing, and every
+query that reaches a room has to match both columns. And <code>booking</code>'s
+<code>left</code> may be <code>NULL</code>, which here means the guest has not
+checked out: that is what makes &ldquo;occupied today&rdquo; a question about
+two conditions rather than one.</p>
+
+<div class="box warn"><span class="bt">One booking moves with the calendar</span>
+<p>The book's last booking is written <code>sysdate</code>, so that the
+&ldquo;arriving today&rdquo; questions always find something. Ours keeps that:
+Busy Traveler's arrival is <code>CURDATE()</code> and the departure the day
+after. The table below, and every answer on this page that mentions today, was
+printed on <strong>9 October 2026</strong>. Run it yourself and those two dates
+will be your own &mdash; the row counts will not change.</p></div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>hotel</code></th></tr>
+<tr><th style="text-align:center">hnumber</th><th style="text-align:center">name</th><th style="text-align:center">address</th></tr></thead>
+<tbody>
+<tr><td>1111</td><td>Big Hotel</td><td>This Street 1</td></tr>
+<tr><td>2222</td><td>Small Hotel</td><td>Other Street 2</td></tr>
+<tr><td>3333</td><td>Old Hotel</td><td>Big Square</td></tr>
+<tr><td>4444</td><td>New Hotel</td><td>Green Forest</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>guest</code></th></tr>
+<tr><th style="text-align:center">gnumber</th><th style="text-align:center">name</th><th style="text-align:center">address</th></tr></thead>
+<tbody>
+<tr><td>1212</td><td>John Strong</td><td>Chicago, Illinois</td></tr>
+<tr><td>1234</td><td>Nice Guy</td><td>New York someplace</td></tr>
+<tr><td>3232</td><td>Mary Clever</td><td>Baltimore, Maryland</td></tr>
+<tr><td>3456</td><td>Big Boss</td><td>New York other</td></tr>
+<tr><td>4554</td><td>Smart Student</td><td>Queens College</td></tr>
+<tr><td>4567</td><td>Fine Lady</td><td>Boston someplace</td></tr>
+<tr><td>5678</td><td>Any Guy</td><td>New Jersey someplace</td></tr>
+<tr><td>6767</td><td>Former Student</td><td>His Own Company</td></tr>
+<tr><td>7171</td><td>Busy Traveler</td><td>Atlanta, Georgia</td></tr>
+<tr><td>7890</td><td>Poor Student</td><td>Queens, New York</td></tr>
+<tr><td>8901</td><td>Nasty Professor</td><td>Queens, New York</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>room</code></th></tr>
+<tr><th style="text-align:center">rnumber</th><th style="text-align:center">hnumber</th><th style="text-align:center">type</th><th style="text-align:center">price_night</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>1111</td><td>double</td><td>100.00</td></tr>
+<tr><td>2</td><td>1111</td><td>double</td><td>101.00</td></tr>
+<tr><td>3</td><td>1111</td><td>family</td><td>102.00</td></tr>
+<tr><td>4</td><td>1111</td><td>family</td><td>103.00</td></tr>
+<tr><td>1</td><td>2222</td><td>double</td><td>104.00</td></tr>
+<tr><td>2</td><td>2222</td><td>double</td><td>105.00</td></tr>
+<tr><td>3</td><td>2222</td><td>single</td><td>106.00</td></tr>
+<tr><td>4</td><td>2222</td><td>single</td><td>107.00</td></tr>
+<tr><td>2</td><td>3333</td><td>single</td><td>115.00</td></tr>
+<tr><td>10</td><td>3333</td><td>single</td><td>114.00</td></tr>
+<tr><td>32</td><td>3333</td><td>single</td><td>116.00</td></tr>
+<tr><td>43</td><td>3333</td><td>single</td><td>117.00</td></tr>
+<tr><td>4</td><td>4444</td><td>double</td><td>119.00</td></tr>
+<tr><td>5</td><td>4444</td><td>family</td><td>114.00</td></tr>
+<tr><td>6</td><td>4444</td><td>double</td><td>112.00</td></tr>
+<tr><td>7</td><td>4444</td><td>family</td><td>111.00</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5"><code>booking</code></th></tr>
+<tr><th style="text-align:center">hnumber</th><th style="text-align:center">gnumber</th><th style="text-align:center">arrived</th><th style="text-align:center">left</th><th style="text-align:center">rnumber</th></tr></thead>
+<tbody>
+<tr><td>1111</td><td>3232</td><td>1999-12-31</td><td>2000-01-01</td><td>3</td></tr>
+<tr><td>1111</td><td>4567</td><td>2000-05-13</td><td>2000-05-14</td><td>1</td></tr>
+<tr><td>1111</td><td>5678</td><td>2000-04-01</td><td>2000-04-03</td><td>2</td></tr>
+<tr><td>2222</td><td>6767</td><td>2000-05-11</td><td>2000-05-15</td><td>1</td></tr>
+<tr><td>2222</td><td>7890</td><td>2000-04-22</td><td>2000-04-24</td><td>3</td></tr>
+<tr><td>2222</td><td>8901</td><td>2000-04-29</td><td>NULL</td><td>4</td></tr>
+<tr><td>3333</td><td>1234</td><td>2000-05-01</td><td>NULL</td><td>10</td></tr>
+<tr><td>3333</td><td>4554</td><td>2000-04-30</td><td>NULL</td><td>2</td></tr>
+<tr><td>4444</td><td>1212</td><td>1999-12-01</td><td>2000-01-01</td><td>5</td></tr>
+<tr><td>4444</td><td>3456</td><td>1999-12-10</td><td>NULL</td><td>6</td></tr>
+<tr><td>4444</td><td>7171</td><td>2026-10-09</td><td>2026-10-10</td><td>7</td></tr>
+</tbody></table></div>
+</div>
+
+<h2 id="hotelq"><span class="secnum">8.3</span>Exercises: the Hotel Database</h2>
+
+<p>Problems 751&ndash;778 of Section 9.15. They run from a one-table
+<code>SELECT</code> to a <code>NOT IN</code> over two copies of one relation,
+roughly in that order.</p>
+
+<details class="prob"><summary data-label="Exercise 8.1">List numbers and prices
+of all rooms in the hotel number 2222.</summary>
+<div class="sol">
+<pre>SELECT rnumber, price_night FROM room WHERE (hnumber = 2222);</pre>
+<pre>+---------+-------------+
+| rnumber | price_night |
++---------+-------------+
+|       1 |      104.00 |
+|       2 |      105.00 |
+|       3 |      106.00 |
+|       4 |      107.00 |
++---------+-------------+</pre>
+<p>One table, one condition. Note that the question gives you the hotel's
+<em>number</em> and not its name, which is why no second relation is needed
+&mdash; <code>room</code> already carries <code>hnumber</code>.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.2">What is the average
+price of a room?</summary>
+<div class="sol">
+<pre>SELECT AVG (price_night) FROM room;</pre>
+<pre>+------------------+
+| AVG(price_night) |
++------------------+
+|       109.125000 |
++------------------+</pre>
+<p>An aggregate with no <code>GROUP BY</code> collapses the whole table to one
+row. The average is over <em>rooms</em>, not over hotels: the Old Hotel's four
+expensive singles pull it up more than the Big Hotel's four cheap rooms pull it
+down, because each room counts once regardless of which hotel it is in.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.3">List full locations
+(hotel name and room number) of all rooms that cost at least $100 and no more
+than $120.</summary>
+<div class="sol">
+<pre>SELECT room.rnumber, hotel.name
+FROM   room, hotel
+WHERE  (hotel.hnumber = room.hnumber AND price_night BETWEEN 100 AND 120);</pre>
+<pre>+---------+-------------+
+| rnumber | name        |
++---------+-------------+
+|       1 | Big Hotel   |
+|       2 | Big Hotel   |
+|       3 | Big Hotel   |
+|       4 | Big Hotel   |
+|       1 | Small Hotel |
+|       2 | Small Hotel |
+|       3 | Small Hotel |
+|       4 | Small Hotel |
+|       2 | Old Hotel   |
+|      10 | Old Hotel   |
+|      32 | Old Hotel   |
+|      43 | Old Hotel   |
+|       4 | New Hotel   |
+|       5 | New Hotel   |
+|       6 | New Hotel   |
+|       7 | New Hotel   |
++---------+-------------+</pre>
+<p><strong>&ldquo;Full location&rdquo; is why there are two relations.</strong>
+A room number on its own does not locate a room, so the hotel's name has to be
+fetched, and fetching it means putting <code>hotel</code> in the
+<code>FROM</code> clause and writing <code>hotel.hnumber =
+room.hnumber</code>.</p>
+<p><strong>Every room qualifies</strong>, because every price in this database
+happens to fall between 100 and 119. That is worth noticing rather than
+glossing over: a condition that excludes nothing is not a wrong condition, and
+you cannot tell a query is right by looking at the size of its answer. Change
+the bound to 110 and eight rows drop out.</p>
+<p><code>BETWEEN 100 AND 120</code> is inclusive at both ends, and is exactly
+<code>price_night &gt;= 100 AND price_night &lt;= 120</code>.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.4">List full locations and
+prices of all the rooms of type <code>double</code> or <code>family</code> that
+cost more than $105 per night, in ascending order of price.</summary>
+<div class="sol">
+<pre>SELECT rnumber, room.hnumber, name, address, price_night
+FROM   hotel, room
+WHERE  (room.hnumber = hotel.hnumber AND
+        type IN ('family','double') AND
+        price_night &gt; 105)
+ORDER BY price_night ASC;</pre>
+<pre>+---------+---------+-----------+--------------+-------------+
+| rnumber | hnumber | name      | address      | price_night |
++---------+---------+-----------+--------------+-------------+
+|       7 |    4444 | New Hotel | Green Forest |      111.00 |
+|       6 |    4444 | New Hotel | Green Forest |      112.00 |
+|       5 |    4444 | New Hotel | Green Forest |      114.00 |
+|       4 |    4444 | New Hotel | Green Forest |      119.00 |
++---------+---------+-----------+--------------+-------------+</pre>
+<p><code>type IN ('family','double')</code> is shorthand for <code>type =
+'family' OR type = 'double'</code>. The parentheses matter: written without
+them, <code>AND</code> binds tighter than <code>OR</code> and the price
+condition would attach to only one of the two types.</p>
+<p>Only the New Hotel survives &mdash; the rooms above $105 elsewhere are all
+singles. <code>ASC</code> is the default and could be left off; writing it costs
+nothing and says you meant it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.5">List the names and full
+room locations of all guests that have booked a room that costs at least $100
+and no more than $110.</summary>
+<div class="sol">
+<pre>SELECT guest.name, room.rnumber, hotel.name
+FROM   room, hotel, booking, guest
+WHERE  (hotel.hnumber = room.hnumber AND
+        hotel.hnumber = booking.hnumber AND
+        room.rnumber  = booking.rnumber AND
+        guest.gnumber = booking.gnumber AND
+        price_night BETWEEN 100 AND 110);</pre>
+<pre>+-----------------+---------+-------------+
+| name            | rnumber | name        |
++-----------------+---------+-------------+
+| Fine Lady       |       1 | Big Hotel   |
+| Any Guy         |       2 | Big Hotel   |
+| Mary Clever     |       3 | Big Hotel   |
+| Former Student  |       1 | Small Hotel |
+| Poor Student    |       3 | Small Hotel |
+| Nasty Professor |       4 | Small Hotel |
++-----------------+---------+-------------+</pre>
+<p><strong>Four relations, three links.</strong> That is the usual arithmetic:
+<em>n</em> relations in a <code>FROM</code> clause need <em>n</em>&minus;1
+equalities to tie them into one chain, and if you write fewer the missing one
+turns into a silent cross product. Count them before you run anything.</p>
+<p><strong>Two of the links are needed for one relationship.</strong> A booking
+points at a room by both <code>hnumber</code> and <code>rnumber</code>, because
+that is <code>room</code>'s key. Drop <code>room.rnumber =
+booking.rnumber</code> and the query still runs, still looks reasonable, and
+quietly prices each guest against every room in their hotel.</p>
+<p><strong>Both output columns are called <code>name</code>.</strong> SQL allows
+it; the reader has to work out which is which from the order. <code>SELECT
+guest.name AS guest, hotel.name AS hotel</code> is kinder.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.6">What is the average
+price of a room in the New Hotel?</summary>
+<div class="sol">
+<pre>SELECT AVG (price_night)
+FROM   room, hotel
+WHERE  (room.hnumber = hotel.hnumber AND hotel.name = 'New Hotel');</pre>
+<pre>+------------------+
+| AVG(price_night) |
++------------------+
+|       114.000000 |
++------------------+</pre>
+<p>Compare with Exercise 8.2. The aggregate is unchanged; what changed is the
+set of rows reaching it. The <code>WHERE</code> clause runs first and the
+aggregate sees only what survives &mdash; which is the whole mental model you
+need for <code>WHERE</code> against <code>HAVING</code> later.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.7">How many guests have
+booked a room in the Old Hotel?</summary>
+<div class="sol">
+<pre>SELECT COUNT (gnumber)
+FROM   booking, hotel
+WHERE  (booking.hnumber = hotel.hnumber AND hotel.name = 'Old Hotel');</pre>
+<pre>+----------------+
+| COUNT(gnumber) |
++----------------+
+|              2 |
++----------------+</pre>
+<p><strong><code>COUNT(gnumber)</code> counts bookings, not guests.</strong>
+They agree here because no guest has booked the Old Hotel twice. If one had,
+this would say 3 and the honest answer would still be 2 &mdash;
+<code>COUNT(DISTINCT gnumber)</code> is the query that cannot be caught out.
+The book writes it without <code>DISTINCT</code>; both are worth being able to
+defend.</p>
+<p><code>COUNT(gnumber)</code> and <code>COUNT(*)</code> differ only when the
+column can be null, since <code>COUNT</code> of a column skips nulls.
+<code>gnumber</code> is in <code>booking</code>'s primary key, so it never
+is.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.8">What is the price
+difference between the cheapest and the most expensive room in the Big
+Hotel?</summary>
+<div class="sol">
+<pre>SELECT MAX (price_night) - MIN (price_night)
+FROM   room, hotel
+WHERE  (room.hnumber = hotel.hnumber AND hotel.name = 'Big Hotel');</pre>
+<pre>+-------------------------------------+
+| MAX(price_night) - MIN(price_night) |
++-------------------------------------+
+|                                3.00 |
++-------------------------------------+</pre>
+<p>Two aggregates in one expression, over the same filtered rows. Nothing says
+the result of an aggregate cannot be arithmetic on &mdash; and this is much
+easier than it looks if you remember that both <code>MAX</code> and
+<code>MIN</code> see the same four rows.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.9">List names and room
+numbers of all guests who have resided in the Big Hotel but do not live in New
+York.</summary>
+<div class="sol">
+<pre>SELECT guest.name, booking.rnumber
+FROM   guest, booking, hotel
+WHERE  (guest.gnumber = booking.gnumber AND
+        hotel.hnumber = booking.hnumber AND
+        NOT (guest.address LIKE '%New York%') AND
+        hotel.name = 'Big Hotel');</pre>
+<pre>+-------------+---------+
+| name        | rnumber |
++-------------+---------+
+| Mary Clever |       3 |
+| Fine Lady   |       1 |
+| Any Guy     |       2 |
++-------------+---------+</pre>
+<p><strong>The address is free text, so <code>LIKE</code> is the only tool
+available.</strong> <code>%</code> matches any run of characters including
+none, so <code>'%New York%'</code> finds the phrase anywhere in the field.</p>
+<p>It is a crude test and the question deserves a warning: this would also
+exclude a guest living in New York, <em>Nebraska</em>, and it does exclude Big
+Boss, whose address is &ldquo;New York other&rdquo;. A schema that stored city
+and state in their own columns would not need <code>LIKE</code> at all. That is
+a design observation, not a SQL one, and it is the right one to make.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.10">Find names of all
+guests that have stayed in the New Hotel.</summary>
+<div class="sol">
+<pre>SELECT guest.name
+FROM   guest, hotel, booking
+WHERE  booking.hnumber = hotel.hnumber AND
+       booking.gnumber = guest.gnumber AND
+       hotel.name = 'New Hotel';</pre>
+<pre>+---------------+
+| name          |
++---------------+
+| John Strong   |
+| Big Boss      |
+| Busy Traveler |
++---------------+</pre>
+<p>The positive half of the pair. Three relations, two links, one condition
+&mdash; and the whole of it is reachable by asking &ldquo;which tables hold the
+words in the question?&rdquo; The question mentions guests (names), a hotel (by
+name), and staying (which is <code>booking</code>).</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.11">Find names of all
+guests that have <em>never</em> stayed in the New Hotel.</summary>
+<div class="sol">
+<pre>SELECT name
+FROM   guest
+WHERE  gnumber NOT IN
+       (SELECT booking.gnumber
+        FROM   booking, hotel
+        WHERE  booking.hnumber = hotel.hnumber AND
+               hotel.name = 'New Hotel');</pre>
+<pre>+-----------------+
+| name            |
++-----------------+
+| Nice Guy        |
+| Mary Clever     |
+| Smart Student   |
+| Fine Lady       |
+| Any Guy         |
+| Former Student  |
+| Poor Student    |
+| Nasty Professor |
++-----------------+</pre>
+<p><strong>&ldquo;Never&rdquo; cannot be written by negating the condition in
+Exercise 8.10.</strong> <code>hotel.name != 'New Hotel'</code> finds guests with
+<em>some</em> booking elsewhere, which is a different set and includes John
+Strong, who has stayed in both. The question is about a guest having no row at
+all, and no condition on a single row can say that.</p>
+<p><strong>Build the set first, then exclude.</strong> The subquery is the set
+of guest numbers that <em>have</em> stayed there &mdash; it is Exercise 8.10
+with <code>gnumber</code> in place of the name. The outer query then keeps the
+guests not in that set. Eight of the eleven qualify.</p>
+<p>The subquery mentions nothing from the outer query, so it is computed once
+and the whole answer is one pass over <code>guest</code>. That is the shape
+Lecture 11 uses for the highest salary and Lecture 12 for deleting Blue, and it
+is worth reaching for first.</p>
+<p><strong>One warning about <code>NOT IN</code>.</strong> If the inner query
+ever returned a <code>NULL</code>, <code>x NOT IN (...)</code> would be unknown
+for every <code>x</code> and the answer would be empty. It is safe here because
+<code>booking.gnumber</code> is part of a primary key and so is never null
+&mdash; but it is worth checking rather than assuming.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.12">List the room numbers
+of all the rooms in the Small Hotel whose guests left on May 20, 2000, ordered
+by room number.</summary>
+<div class="sol">
+<pre>SELECT booking.rnumber
+FROM   booking, hotel
+WHERE  (booking.hnumber = hotel.hnumber AND
+        hotel.name = 'Small Hotel' AND
+        `left` = '2000-05-20')
+ORDER BY booking.rnumber ASC;</pre>
+<pre>Empty set</pre>
+<p><strong>Nobody left the Small Hotel that day</strong>, so the correct answer
+is no rows. Resist the urge to treat an empty result as a bug &mdash; check it
+against the data instead. The Small Hotel's departures are on 24 April and 15
+May, and one guest has not left at all.</p>
+<p>Ask for the 15th and the query proves itself:</p>
+<pre>+---------+
+| rnumber |
++---------+
+|       1 |
++---------+</pre>
+<div class="box worked"><span class="bt">Two kinds of quote on one line</span>
+<p>The condition <code>`left` = '2000-05-20'</code> has a backtick mark on the
+left and a single-quote mark on the right, and they are not the same thing.</p>
+<p><strong>Backticks mark a name.</strong> <code>`left`</code> says &ldquo;this
+is the <em>column</em> called left&rdquo;, not the reserved word <code>LEFT</code>
+that MariaDB would otherwise try to read as the start of a function. They are
+MariaDB's spelling of what standard SQL writes with double quotes, and they are
+needed only when a name collides with a keyword.</p>
+<p><strong>Single quotes mark a value.</strong> <code>'2000-05-20'</code> is a
+literal &mdash; the thing being compared against, rather than something in the
+database.</p>
+<p>Swap the two and nothing works. <code>'left'</code> is the five-letter word,
+so <code>'left' = '2000-05-20'</code> compares two strings, finds them
+different, and quietly returns no rows at all. And <code>`2000-05-20`</code>
+would be read as a column name, which does not exist.</p></div>
+
+<p><strong>But why is a date in quotes at all?</strong> Because MariaDB has no
+separate syntax for writing one down. You write the date as a string in
+<code>'YYYY-MM-DD'</code> form, and the server converts it to a
+<code>DATE</code> on the spot &mdash; it knows to, because the other side of the
+<code>=</code> is a <code>DATE</code> column. The quotes are about how the value
+is <em>typed</em>, not about what type it ends up being.</p>
+
+<p>Which is why the three conditions in this query are punctuated three
+different ways:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>condition</th><th>the value is</th><th>quoted?</th></tr></thead>
+<tbody>
+<tr><td><code>booking.hnumber = hotel.hnumber</code></td><td>another column</td><td>no &mdash; it is a name, not a value</td></tr>
+<tr><td><code>hotel.name = 'Small Hotel'</code></td><td>a string</td><td>single quotes</td></tr>
+<tr><td><code>`left` = '2000-05-20'</code></td><td>a date</td><td>single quotes, same as a string</td></tr>
+</tbody></table></div>
+
+<p>A number takes no quotes at all: Exercise 8.1 writes <code>hnumber =
+2222</code>. Quoting it would still work, since MariaDB would convert
+<code>'2222'</code> back to a number, but it says the wrong thing about what the
+column holds.</p>
+
+<p><strong>The book, on Oracle, writes <code>left</code> plain</strong>, with no
+backticks &mdash; Oracle does not reserve the word. This is the exercise where
+you first meet the difference.</p>
+<p>The book also wraps the column in <code>trunc</code>, because an Oracle
+<code>DATE</code> carries a time and <code>'2000-05-20'</code> would mean
+midnight exactly. Here the column holds no time, so the comparison is direct
+&mdash; but the habit is a good one to understand, because the moment a column
+becomes a <code>DATETIME</code> an equality test on it starts failing for
+reasons that are invisible in the output.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.13">List full locations
+(room number and hotel name) of all the rooms to which guests are arriving
+today, where you do not know what date it is.</summary>
+<div class="sol">
+<pre>SELECT rnumber, hotel.name
+FROM   hotel, booking
+WHERE  (hotel.hnumber = booking.hnumber AND CURDATE() = arrived);</pre>
+<pre>+---------+-----------+
+| rnumber | name      |
++---------+-----------+
+|       7 | New Hotel |
++---------+-----------+</pre>
+<p><strong>&ldquo;Where you do not know what date it is&rdquo; is the whole
+instruction.</strong> It forbids typing a date into the query and requires
+asking the server &mdash; <code>CURDATE()</code> in MariaDB, <code>sysdate</code>
+in the book's Oracle. A query with a literal date in it is wrong tomorrow;
+this one is right every day.</p>
+<p>The row you get is Busy Traveler's, which is stored as <code>CURDATE()</code>
+precisely so that this question has an answer whenever the file is loaded.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.14">List the names of all
+guests that are leaving the day after tomorrow, where you do not know which date
+is today.</summary>
+<div class="sol">
+<pre>SELECT guest.name
+FROM   guest, booking
+WHERE  (guest.gnumber = booking.gnumber AND `left` = CURDATE() + INTERVAL 2 DAY);</pre>
+<pre>Empty set</pre>
+<p>Empty, correctly: the only booking anchored to today ends tomorrow, not the
+day after. Ask for tomorrow and it appears:</p>
+<pre>SELECT guest.name
+FROM   guest, booking
+WHERE  (guest.gnumber = booking.gnumber AND `left` = CURDATE() + INTERVAL 1 DAY);</pre>
+<pre>+---------------+
+| name          |
++---------------+
+| Busy Traveler |
++---------------+</pre>
+<p><strong>Date arithmetic is not addition.</strong> The book writes
+<code>sysdate+2</code>, which works in Oracle because a <code>DATE</code> there
+is a number of days. MariaDB wants the unit named: <code>CURDATE() + INTERVAL 2
+DAY</code>. Writing <code>CURDATE() + 2</code> does something else entirely
+&mdash; it converts the date to the number 20261009 and adds two.</p>
+<p>Guests who have not checked out have <code>left</code> set to
+<code>NULL</code>, and <code>NULL = anything</code> is unknown, never true. They
+are excluded here, which is what the question wants.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.15">List the name of the
+guest who was the first to arrive in the year 2000.</summary>
+<div class="sol">
+<pre>SELECT name
+FROM   guest, booking
+WHERE  guest.gnumber = booking.gnumber AND
+       arrived &gt;= '2000-01-01' AND
+       arrived NOT IN
+         (SELECT b1.arrived
+          FROM   booking b1, booking b2
+          WHERE  b1.arrived &gt;= '2000-01-01' AND
+                 b2.arrived &gt;= '2000-01-01' AND
+                 b1.arrived &gt; b2.arrived);</pre>
+<pre>+---------+
+| name    |
++---------+
+| Any Guy |
++---------+</pre>
+<p><strong>&ldquo;First&rdquo; written without <code>MIN</code>.</strong> This
+is the <code>notMax</code> pattern of Lecture 11, upside down. The subquery
+pairs every in-range arrival with every other and keeps the later one of each
+pair &mdash; so it is the set of arrivals that <em>something beats</em>. The
+earliest is the one date not in that set.</p>
+<p><strong>Two copies of <code>booking</code>, and the comparison between
+them.</strong> Exactly as in Lecture 11's <code>notMax</code>: a superlative
+needs the relation compared against itself, which means naming it twice.</p>
+<p><strong>The year condition appears three times on purpose.</strong> It is in
+the outer query and on <em>both</em> copies inside. Leave it off
+<code>b2</code> and the four 1999 arrivals start beating things, so every
+year-2000 arrival lands in the excluded set and the answer is empty.</p>
+<p>With <code>MIN</code> it is shorter:</p>
+<pre>SELECT name
+FROM   guest, booking
+WHERE  guest.gnumber = booking.gnumber
+  AND  arrived = (SELECT MIN(arrived) FROM booking WHERE arrived &gt;= '2000-01-01');</pre>
+<p>Both return one row here. If two guests had arrived the same morning, both
+would return two &mdash; &ldquo;the guest who&rdquo; in a question is not a
+promise that the answer is unique.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.16">What is the total
+income from bookings for double rooms at the Big Hotel today?</summary>
+<div class="sol">
+<pre>SELECT SUM (price_night)
+FROM   room, hotel
+WHERE  room.hnumber = hotel.hnumber AND
+       hotel.name = 'Big Hotel' AND
+       room.type  = 'double' AND
+       room.rnumber IN
+         (SELECT booking.rnumber
+          FROM   booking, hotel h2
+          WHERE  booking.hnumber = h2.hnumber AND
+                 h2.name = 'Big Hotel' AND
+                 booking.arrived &lt;= CURDATE() AND
+                 (booking.`left` &gt;= CURDATE() OR booking.`left` IS NULL));</pre>
+<pre>+------------------+
+| SUM(price_night) |
++------------------+
+|             NULL |
++------------------+</pre>
+<p><strong><code>SUM</code> of nothing is <code>NULL</code>, not zero.</strong>
+No double room at the Big Hotel is occupied today, so no row reaches the
+aggregate, and SQL answers with a null rather than a 0. If the figure is going
+into a report, that difference matters &mdash; a null is not a zero and most
+things that read the answer will not treat it as one.</p>
+<p>Standing today's date in for a day when the hotel had guests shows the query
+working:</p>
+<pre>  <span class="c">-- with '2000-05-13' in place of CURDATE()</span>
++------------------+
+| SUM(price_night) |
++------------------+
+|           100.00 |
++------------------+</pre>
+<p><strong>&ldquo;Occupied today&rdquo; is two conditions, and the second has a
+null case.</strong> Arrived on or before today, <em>and</em> either left on or
+after today or not left at all. Drop the <code>IS NULL</code> half and every
+guest still in residence silently stops counting &mdash; which is the single
+most common way to get this kind of query wrong.</p>
+<p><strong>Why the subquery can match on <code>rnumber</code> alone.</strong> A
+room is identified by the pair, so matching half a key is usually the error of
+Exercise 8.5. It is safe here only because both the outer query and the
+subquery have already been pinned to the Big Hotel &mdash; which is why
+<code>hotel</code> appears twice, once outside and once as <code>h2</code>
+inside. Drop <code>h2</code> and the set becomes every room number booked
+anywhere, and the Big Hotel's room 1 starts counting because somebody is in
+room 1 of the Small Hotel.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.17">List the room numbers,
+along with hotel numbers, of all the rooms of type double at the Big Hotel that
+are today unoccupied, where you do not know what date it is today.</summary>
+<div class="sol">
+<pre>SELECT room.hnumber, room.rnumber
+FROM   room, hotel
+WHERE  hotel.hnumber = room.hnumber AND
+       hotel.name = 'Big Hotel' AND
+       room.type = 'double' AND
+       room.rnumber NOT IN
+         (SELECT booking.rnumber
+          FROM   booking, hotel h2
+          WHERE  booking.hnumber = h2.hnumber AND
+                 h2.name = 'Big Hotel' AND
+                 booking.arrived &lt;= CURDATE() AND
+                 booking.`left` &gt;= CURDATE());</pre>
+<pre>+---------+---------+
+| hnumber | rnumber |
++---------+---------+
+|    1111 |       1 |
+|    1111 |       2 |
++---------+---------+</pre>
+<p>Exercise 8.16 with <code>NOT IN</code> in place of <code>IN</code>, and the
+same &ldquo;build the set, then exclude&rdquo; shape as Exercise 8.11. Both of
+the Big Hotel's doubles are free, because the only bookings in that hotel are
+from the year 2000.</p>
+<p><strong>The book's version here omits the <code>IS NULL</code> case</strong>
+that its own Problem 772 includes one page earlier. On this data it makes no
+difference, since the Big Hotel has no open stay. On data where somebody had
+checked in and not out, this query would call their room unoccupied. Worth
+writing both and deciding which you believe.</p>
+<p>Note that omitting it is also what keeps the <code>NOT IN</code> safe. Had
+the subquery selected <code>booking.`left`</code> rather than the room number,
+a single open stay would have put a <code>NULL</code> in the set and emptied
+the whole answer.</p>
+</div></details>
+
+
+<details class="prob"><summary data-label="Exercise 8.18">Add a dollar to the
+price of every room.</summary>
+<div class="sol">
+<pre>UPDATE room SET price_night = price_night + 1;</pre>
+<p>No <code>WHERE</code> clause, so every row. Before and after, the first four
+rooms:</p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">before</th></tr>
+<tr><th style="text-align:center">rnumber</th><th style="text-align:center">hnumber</th><th style="text-align:center">type</th><th style="text-align:center">price_night</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>1111</td><td>double</td><td>100.00</td></tr>
+<tr><td>2</td><td>1111</td><td>double</td><td>101.00</td></tr>
+<tr><td>3</td><td>1111</td><td>family</td><td>102.00</td></tr>
+<tr><td>4</td><td>1111</td><td>family</td><td>103.00</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">after</th></tr>
+<tr><th style="text-align:center">rnumber</th><th style="text-align:center">hnumber</th><th style="text-align:center">type</th><th style="text-align:center">price_night</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>1111</td><td>double</td><td>101.00</td></tr>
+<tr><td>2</td><td>1111</td><td>double</td><td>102.00</td></tr>
+<tr><td>3</td><td>1111</td><td>family</td><td>103.00</td></tr>
+<tr><td>4</td><td>1111</td><td>family</td><td>104.00</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>The missing <code>WHERE</code> is the exercise.</strong> An
+<code>UPDATE</code> without one is legal, silent, and affects every row &mdash;
+there is no confirmation and no undo outside a transaction. The habit worth
+building is to write the statement as a <code>SELECT</code> first, look at what
+comes back, and only then change the verb.</p>
+<p>Reload <code>hotel.sql</code> before the next exercise; the prices on this
+page are the original ones.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.19">Increase the price of
+every room by 10% plus an additional dollar.</summary>
+<div class="sol">
+<pre>UPDATE room SET price_night = price_night * 1.1 + 1;</pre>
+<pre>+---------+---------+--------+-------------+
+| rnumber | hnumber | type   | price_night |
++---------+---------+--------+-------------+
+|       1 |    1111 | double |      111.00 |
+|       2 |    1111 | double |      112.10 |
+|       3 |    1111 | family |      113.20 |
+|       4 |    1111 | family |      114.30 |
+|       1 |    2222 | double |      115.40 |
+|       2 |    2222 | double |      116.50 |
+...
+|       7 |    4444 | family |      123.10 |
++---------+---------+--------+-------------+</pre>
+<p><strong>Order of operations decides the answer.</strong>
+<code>price_night * 1.1 + 1</code> is ten percent and then a dollar;
+<code>(price_night + 1) * 1.1</code> is a dollar and then ten percent, and gives
+a different number. The English &ldquo;10% plus an additional dollar&rdquo;
+settles it, barely &mdash; this is the sort of sentence worth reading twice
+before you write arithmetic from it.</p>
+<p>The right-hand side reads the <em>old</em> value of the column for every row,
+so there is no danger of an update compounding on itself as it goes.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.20">Add ten dollars to
+the price of all rooms in the New Hotel that are cheaper than sixty dollars per
+night.</summary>
+<div class="sol">
+<pre>UPDATE room
+SET    price_night = price_night + 10
+WHERE  price_night &lt; 60 AND
+       hnumber IN (SELECT hnumber FROM hotel WHERE name = 'New Hotel');</pre>
+<pre>Query OK, 0 rows affected</pre>
+<p><strong>Nothing changes</strong>, because the New Hotel's cheapest room is
+$111. Run the same statement with 115 in place of 60 and three of its four rooms
+move:</p>
+<pre>+---------+---------+--------+-------------+
+| rnumber | hnumber | type   | price_night |
++---------+---------+--------+-------------+
+|       4 |    4444 | double |      119.00 |
+|       5 |    4444 | family |      124.00 |
+|       6 |    4444 | double |      122.00 |
+|       7 |    4444 | family |      121.00 |
++---------+---------+--------+-------------+</pre>
+<p><strong>Why a subquery at all?</strong> <code>UPDATE</code> names one
+relation and has no <code>FROM</code> clause, so there is nowhere to put
+<code>hotel</code> &mdash; and the hotel's <em>name</em> is what the question
+gives you. The subquery turns that name into the set of matching hotel numbers,
+and <code>IN</code> tests the row being updated against it. This is the shape
+Lecture 12 uses four times over to delete Blue.</p>
+<p><strong>The price condition stays outside.</strong> It is about the row being
+changed, so it belongs in the <code>UPDATE</code>'s own <code>WHERE</code>
+clause; only the part that needs another relation goes into the subquery. The
+split is worth making deliberately &mdash; put the price test inside and you
+are asking a different question.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.21">Increase by ten
+dollars the price of all those rooms for which guests are booked to arrive not
+earlier than the next month, where you do not know what the current month
+is.</summary>
+<div class="sol">
+<pre>UPDATE room SET price_night = price_night + 10
+WHERE  hnumber IN (SELECT booking.hnumber
+                   FROM   booking
+                   WHERE  booking.rnumber = room.rnumber AND
+                          booking.arrived &gt; LAST_DAY(CURDATE()));</pre>
+<pre>Query OK, 0 rows affected</pre>
+<p><strong><code>LAST_DAY</code> is the whole trick.</strong> &ldquo;Not earlier
+than next month&rdquo; means &ldquo;after the last day of this month&rdquo;, and
+<code>LAST_DAY(CURDATE())</code> gives that date without your needing to know
+whether this month has 28, 30 or 31 days. The book writes
+<code>last_day(sysdate)</code>; the name happens to be the same.</p>
+<p>No row changes, because every booking in the data is either from the year
+2000 or is today's. Standing 30 April 2000 in for the end of the month shows the
+shape &mdash; four rooms have a guest arriving after that date, and all four go
+up by ten:</p>
+<pre>+---------+---------+--------+-------------+
+| hnumber | rnumber | type   | price_night |
++---------+---------+--------+-------------+
+|    1111 |       1 | double |      110.00 |
+|    2222 |       1 | double |      114.00 |
+|    3333 |      10 | single |      124.00 |
+|    4444 |       7 | family |      121.00 |
++---------+---------+--------+-------------+</pre>
+<p>They are in four different hotels: the condition is about the booking's
+date, not about where the room is. Room 2 of the Old Hotel is <em>not</em> in
+the list, because its guest arrives on 30 April exactly and the comparison is
+strictly greater.</p>
+<p><strong>This subquery does mention the row being updated</strong>, and here
+there is no way round it. A room is a pair, so the set has to be built for
+<em>this</em> room number and then the room's own hotel tested against it.
+Compare Exercise 8.20, where one <code>IN</code> against a fixed set was
+enough because the question named a single hotel.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.22">Delete all the rooms
+located in the Horrible Hotel.</summary>
+<div class="sol">
+<pre>DELETE FROM room
+WHERE  hnumber IN (SELECT hnumber FROM hotel WHERE name = 'Horrible Hotel');</pre>
+<pre>Query OK, 0 rows affected</pre>
+<p><strong>There is no Horrible Hotel</strong>, so the subquery returns nothing,
+<code>hnumber IN ()</code> is false for every row, and nothing is deleted. No
+error: asking SQL to delete rows that do not exist is a perfectly ordinary thing
+to do, and it reports zero rather than complaining.</p>
+<p><strong>Had the hotel existed, this would have failed</strong> the moment one
+of its rooms was booked &mdash; <code>booking</code> has a foreign key into
+<code>room</code>, and deleting a parent whose children remain is refused.
+Compare Exercise 8.30, where the shop's supplier has to be dismantled from the
+bottom up.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.23">Delete all the
+bookings of those guests who are booked to arrive on January 1, 2000.</summary>
+<div class="sol">
+<pre>DELETE FROM booking WHERE arrived = '2000-01-01';</pre>
+<pre>Query OK, 0 rows affected</pre>
+<p><strong>Nobody arrives on that date</strong>, though two guests
+<em>leave</em> then. Reading <code>arrived</code> where the data says
+<code>left</code> is the mistake this question is built to catch, and the only
+defence is to look at the table.</p>
+<p><strong>The book's own answer has the wrong year.</strong> It prints</p>
+<pre>DELETE FROM booking
+WHERE trunc(arrived) = '01-JAN-1999';</pre>
+<p>for a question that says January 1, 2000. Deleting nothing either way here,
+so the slip is invisible unless you check &mdash; which is the argument for
+running an answer key rather than reading it.</p>
+<p>The date that does remove something is 31 December 1999, Mary Clever's
+arrival:</p>
+<pre>Query OK, 1 row affected</pre>
+<p><strong>Deleting from <code>booking</code> is always safe here.</strong>
+Nothing references it, so it is the leaf of this schema and has no children to
+orphan.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.24">Assume the database
+is empty. Write a complete piece of SQL that stores the following. <em>Our New
+Hotel, numbered 4445, is located at Green Forest. Mr Magnus Famous-Rich is
+booking room 331 (of type single) in this hotel, at two hundred dollars per
+night, starting today (whenever that is). Mr Famous-Rich is our guest number 1.
+He lives at One Big Castle Drive.</em></summary>
+<div class="sol">
+<pre>INSERT INTO hotel VALUES (4445, 'New Hotel', 'Green Forest');
+
+INSERT INTO room VALUES (331, 4445, 'single', 200);
+
+INSERT INTO guest VALUES (1, 'Magnus Famous-Rich', 'One Big Castle Drive');
+
+INSERT INTO booking (hnumber, rnumber, gnumber, arrived)
+VALUES (4445, 331, 1, CURDATE());</pre>
+<pre>+---------+---------+------------+------+---------+
+| hnumber | gnumber | arrived    | left | rnumber |
++---------+---------+------------+------+---------+
+|    4445 |       1 | 2026-10-09 | NULL |     331 |
++---------+---------+------------+------+---------+</pre>
+<p><strong>The order is forced, and it is the referential order.</strong> A row
+carrying a foreign key can only go in after the row it points at.
+<code>booking</code> points at <code>guest</code> and at <code>room</code>, and
+<code>room</code> points at <code>hotel</code>, so the booking is necessarily
+last. Put it first and the server says:</p>
+<pre class="asm">ERROR 1452 (23000): Cannot add or update a child row: a foreign key
+constraint fails (`hotel`.`booking`, CONSTRAINT `booking_ibfk_1`
+FOREIGN KEY (`gnumber`) REFERENCES `guest` (`gnumber`))</pre>
+<p><strong>The last insert names its columns; the others do not.</strong> That
+is not decoration &mdash; <code>left</code> is unknown, and the only way to
+leave a column out of an <code>INSERT</code> is to list the ones you are
+supplying. It comes out <code>NULL</code>, which is the correct reading of
+&ldquo;has not checked out&rdquo;.</p>
+<p><strong>Today is <code>CURDATE()</code> again</strong>, for the same reason
+as Exercise 8.13: the question says &ldquo;whenever that is&rdquo;.</p>
+<p>Note that the number 4445 is ours: the narrative says 4444, but the Hotel
+database already has a New Hotel at 4444, and inserting a second row with that
+key is refused by the primary key. On a genuinely empty database, use 4444 as
+the question says.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.25">Read the following
+query. (a) Describe in one sentence, for a non-specialist, what it does. (b)
+Write the equivalent relational algebra, using only &sigma;, &Pi;, &times;,
+&cup; and &minus;.
+<pre>SELECT name, rnumber, price_night
+FROM   hotel, room
+WHERE  (room.hnumber = hotel.hnumber AND price_night &lt;= 110);</pre></summary>
+<div class="sol">
+<p><strong>(a)</strong> It lists every room costing no more than $110 a night,
+giving the room's number, its price, and the name of the hotel it is in.</p>
+<pre>+-------------+---------+-------------+
+| name        | rnumber | price_night |
++-------------+---------+-------------+
+| Big Hotel   |       1 |      100.00 |
+| Big Hotel   |       2 |      101.00 |
+| Big Hotel   |       3 |      102.00 |
+| Big Hotel   |       4 |      103.00 |
+| Small Hotel |       1 |      104.00 |
+| Small Hotel |       2 |      105.00 |
+| Small Hotel |       3 |      106.00 |
+| Small Hotel |       4 |      107.00 |
++-------------+---------+-------------+</pre>
+<p><strong>(b)</strong> The product, then the condition, then the columns
+&mdash; which is the order Lecture 10 reads a <code>SELECT</code> in:</p>
+<pre>R = &Pi;[name, rnumber, price_night] &sigma;[F] (hotel&#8321; &times; room&#8322;)
+
+F &equiv; [ hnumber&#8321; = hnumber&#8322; &and; price_night &le; 110 ]</pre>
+<p><strong>The subscripts are not optional.</strong> Both relations have a
+column called <code>hnumber</code>, so the product has two of them and the
+condition has to say which is which. In SQL the same job is done by
+<code>room.hnumber</code> and <code>hotel.hnumber</code> &mdash; the dot is
+renaming, written differently.</p>
+<p>Going the other way is the habit this exercise is for. Reading a query you
+did not write, in a schema you half remember, is most of what the job turns out
+to be.</p>
+</div></details>
+
+
+<h2 id="car"><span class="secnum">8.4</span>The Car Repair Shop Database</h2>
+
+<p>Eleven relations, from Appendix B.1. The shop repairs cars; it buys parts
+from suppliers and installs them; its mechanics are certified for particular
+makes. It is the biggest schema on this page, and the exercises are mostly
+about picking the right three or four relations out of the eleven.</p>
+
+<pre>manufacturer       (<u>name</u>, address)
+car                (<u>manufacturerId</u>, <u>model</u>, price)
+part               (<u>manufacturerId</u>, <u>partNumber</u>, description)
+fit                (<u>carManufacturerId</u>, <u>carModel</u>, <u>partManufacturerId</u>, <u>partNumber</u>, quantity)
+mechanic           (<u>socSecNum</u>, name)
+mechanicCredential (<u>mechanicID</u>, <u>certificate</u>)
+repair             (<u>mechanicID</u>, <u>manufacturerId</u>, <u>model</u>)
+supplier           (<u>name</u>, rank)
+supplierLine       (<u>supplierName</u>, <u>partManufacturerId</u>, <u>partNumber</u>, price)
+carInstance        (<u>VIN</u>, manufacturerId, modelCode, dateMade)
+repairJob          (<u>workOrderID</u>, carID, officer, dateBrought)</pre>
+
+<div class="box note"><span class="bt">Two words that look alike</span>
+<p><code>car</code> is a <em>type</em> of car &mdash; a make and a model, with a
+list price. <code>carInstance</code> is a particular vehicle with a VIN, built
+on a particular date. <code>repair</code> says which car <em>types</em> a
+mechanic is certified for; <code>repairJob</code> says which
+<em>vehicle</em> came in on which day and who was in charge. Almost every
+mistake on this section is one of these two pairs swapped.</p>
+<p>Likewise <code>fit</code> and <code>supplierLine</code>: the first says a
+part <em>goes into</em> a car type, the second says a supplier <em>sells</em>
+that part at a price. A question about what fits uses one; a question about who
+sells it uses the other; a question about both uses both, which is Exercise
+8.30.</p></div>
+
+<p>The rows below are ours, not the book's &mdash; Appendix B.1 gives the
+schema and no sample content. They are small on purpose, so that every answer
+can be checked by eye against the tables.</p>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>manufacturer</code></th></tr>
+<tr><th style="text-align:center">name</th><th style="text-align:center">address</th></tr></thead>
+<tbody>
+<tr><td>GreatConjurer</td><td>9 Spell Street</td></tr>
+<tr><td>HappyForgerWorks</td><td>1 Anvil Road</td></tr>
+<tr><td>SolidWheel</td><td>22 Rim Avenue</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>car</code></th></tr>
+<tr><th style="text-align:center">manufacturerId</th><th style="text-align:center">model</th><th style="text-align:center">price</th></tr></thead>
+<tbody>
+<tr><td>GreatConjurer</td><td>Charm</td><td>25000</td></tr>
+<tr><td>GreatConjurer</td><td>Wand</td><td>32000</td></tr>
+<tr><td>HappyForgerWorks</td><td>Hammer</td><td>21000</td></tr>
+<tr><td>HappyForgerWorks</td><td>Tongs</td><td>18000</td></tr>
+<tr><td>SolidWheel</td><td>Roller</td><td>15000</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>part</code></th></tr>
+<tr><th style="text-align:center">manufacturerId</th><th style="text-align:center">partNumber</th><th style="text-align:center">description</th></tr></thead>
+<tbody>
+<tr><td>GreatConjurer</td><td>C-010</td><td>spark plug</td></tr>
+<tr><td>GreatConjurer</td><td>C-020</td><td>air filter</td></tr>
+<tr><td>HappyForgerWorks</td><td>P-100</td><td>front brake pad</td></tr>
+<tr><td>HappyForgerWorks</td><td>P-200</td><td>rear brake pad</td></tr>
+<tr><td>HappyForgerWorks</td><td>P-300</td><td>oil filter</td></tr>
+<tr><td>SolidWheel</td><td>W-001</td><td>alloy wheel</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>mechanic</code></th></tr>
+<tr><th style="text-align:center">socSecNum</th><th style="text-align:center">name</th></tr></thead>
+<tbody>
+<tr><td>111111111</td><td>Constructor Break Fixer</td></tr>
+<tr><td>222222222</td><td>Careful Wheel Turner</td></tr>
+<tr><td>333333333</td><td>Lazy Bolt Dropper</td></tr>
+<tr><td>444444444</td><td>Quick Spark Changer</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>mechanicCredential</code></th></tr>
+<tr><th style="text-align:center">mechanicID</th><th style="text-align:center">certificate</th></tr></thead>
+<tbody>
+<tr><td>111111111</td><td>brakes</td></tr>
+<tr><td>111111111</td><td>engine</td></tr>
+<tr><td>222222222</td><td>wheels</td></tr>
+<tr><td>444444444</td><td>engine</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>repair</code></th></tr>
+<tr><th style="text-align:center">mechanicID</th><th style="text-align:center">manufacturerId</th><th style="text-align:center">model</th></tr></thead>
+<tbody>
+<tr><td>111111111</td><td>GreatConjurer</td><td>Wand</td></tr>
+<tr><td>111111111</td><td>HappyForgerWorks</td><td>Hammer</td></tr>
+<tr><td>111111111</td><td>HappyForgerWorks</td><td>Tongs</td></tr>
+<tr><td>222222222</td><td>HappyForgerWorks</td><td>Tongs</td></tr>
+<tr><td>333333333</td><td>SolidWheel</td><td>Roller</td></tr>
+<tr><td>444444444</td><td>GreatConjurer</td><td>Charm</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5"><code>fit</code></th></tr>
+<tr><th style="text-align:center">carManufacturerId</th><th style="text-align:center">carModel</th><th style="text-align:center">partManufacturerId</th><th style="text-align:center">partNumber</th><th style="text-align:center">quantity</th></tr></thead>
+<tbody>
+<tr><td>GreatConjurer</td><td>Charm</td><td>HappyForgerWorks</td><td>P-300</td><td>1</td></tr>
+<tr><td>GreatConjurer</td><td>Wand</td><td>GreatConjurer</td><td>C-010</td><td>8</td></tr>
+<tr><td>GreatConjurer</td><td>Wand</td><td>SolidWheel</td><td>W-001</td><td>4</td></tr>
+<tr><td>HappyForgerWorks</td><td>Hammer</td><td>GreatConjurer</td><td>C-010</td><td>6</td></tr>
+<tr><td>HappyForgerWorks</td><td>Hammer</td><td>HappyForgerWorks</td><td>P-100</td><td>4</td></tr>
+<tr><td>HappyForgerWorks</td><td>Tongs</td><td>HappyForgerWorks</td><td>P-200</td><td>4</td></tr>
+<tr><td>SolidWheel</td><td>Roller</td><td>SolidWheel</td><td>W-001</td><td>4</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>supplier</code></th></tr>
+<tr><th style="text-align:center">name</th><th style="text-align:center">rank</th></tr></thead>
+<tbody>
+<tr><td>CheapAndFast</td><td>3</td></tr>
+<tr><td>HighMargin</td><td>12</td></tr>
+<tr><td>MiddleProfit</td><td>5</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>supplierLine</code></th></tr>
+<tr><th style="text-align:center">supplierName</th><th style="text-align:center">partManufacturerId</th><th style="text-align:center">partNumber</th><th style="text-align:center">price</th></tr></thead>
+<tbody>
+<tr><td>CheapAndFast</td><td>HappyForgerWorks</td><td>P-100</td><td>22</td></tr>
+<tr><td>CheapAndFast</td><td>HappyForgerWorks</td><td>P-200</td><td>12</td></tr>
+<tr><td>HighMargin</td><td>SolidWheel</td><td>W-001</td><td>90</td></tr>
+<tr><td>MiddleProfit</td><td>GreatConjurer</td><td>C-010</td><td>30</td></tr>
+<tr><td>MiddleProfit</td><td>GreatConjurer</td><td>C-020</td><td>15</td></tr>
+<tr><td>MiddleProfit</td><td>HappyForgerWorks</td><td>P-100</td><td>20</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>carInstance</code></th></tr>
+<tr><th style="text-align:center">VIN</th><th style="text-align:center">manufacturerId</th><th style="text-align:center">modelCode</th><th style="text-align:center">dateMade</th></tr></thead>
+<tbody>
+<tr><td>VIN0001</td><td>HappyForgerWorks</td><td>Hammer</td><td>1999-03-01</td></tr>
+<tr><td>VIN0002</td><td>HappyForgerWorks</td><td>Hammer</td><td>2021-06-15</td></tr>
+<tr><td>VIN0003</td><td>HappyForgerWorks</td><td>Tongs</td><td>2022-01-20</td></tr>
+<tr><td>VIN0004</td><td>GreatConjurer</td><td>Wand</td><td>2020-09-09</td></tr>
+<tr><td>VIN0005</td><td>GreatConjurer</td><td>Charm</td><td>1998-11-11</td></tr>
+<tr><td>VIN0006</td><td>SolidWheel</td><td>Roller</td><td>2023-02-02</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>repairJob</code></th></tr>
+<tr><th style="text-align:center">workOrderID</th><th style="text-align:center">carID</th><th style="text-align:center">officer</th><th style="text-align:center">dateBrought</th></tr></thead>
+<tbody>
+<tr><td>W-001</td><td>VIN0001</td><td>111111111</td><td>2024-03-10</td></tr>
+<tr><td>W-002</td><td>VIN0002</td><td>111111111</td><td>2024-04-02</td></tr>
+<tr><td>W-003</td><td>VIN0003</td><td>222222222</td><td>2024-05-18</td></tr>
+<tr><td>W-004</td><td>VIN0004</td><td>222222222</td><td>2024-06-21</td></tr>
+<tr><td>W-005</td><td>VIN0006</td><td>444444444</td><td>2024-07-04</td></tr>
+<tr><td>W-006</td><td>VIN0005</td><td>111111111</td><td>2024-08-30</td></tr>
+</tbody></table></div>
+</div>
+
+<h2 id="carq"><span class="secnum">8.5</span>Exercises: the Car Repair Shop</h2>
+
+<p>Problems 534&ndash;540 of Section 9.1.</p>
+
+<details class="prob"><summary data-label="Exercise 8.26">Find part number and
+description of those parts whose manufacturer is named
+<code>HappyForgerWorks</code>.</summary>
+<div class="sol">
+<pre>SELECT partNumber, description
+FROM   part
+WHERE  manufacturerId = 'HappyForgerWorks';</pre>
+<pre>+------------+-----------------+
+| partNumber | description     |
++------------+-----------------+
+| P-100      | front brake pad |
+| P-200      | rear brake pad  |
+| P-300      | oil filter      |
++------------+-----------------+</pre>
+<p>The warm-up. <code>part</code> stores the manufacturer's name directly, so
+there is no need to go through <code>manufacturer</code> at all &mdash; the
+foreign key <em>is</em> the name. Had the schema used a numeric manufacturer id,
+this would be a two-relation query.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.27">Find
+<code>workOrderID</code> and <code>carID</code> of those repair jobs where the
+name of the officer in charge is <code>Constructor Break Fixer</code>.</summary>
+<div class="sol">
+<pre>SELECT r.workOrderID, r.carID
+FROM   repairJob r, mechanic m
+WHERE  r.officer = m.socSecNum AND m.name = 'Constructor Break Fixer';</pre>
+<pre>+-------------+---------+
+| workOrderID | carID   |
++-------------+---------+
+| W-001       | VIN0001 |
+| W-002       | VIN0002 |
+| W-006       | VIN0005 |
++-------------+---------+</pre>
+<p><strong><code>officer</code> is a foreign key into <code>mechanic</code>,
+under a different name.</strong> Nothing in the column's name says so; you have
+to read the schema. This is the ordinary case, not the exception &mdash; a
+foreign key is named for the <em>role</em> it plays, and &ldquo;officer in
+charge&rdquo; is a role a mechanic plays.</p>
+<p>The book gives this one in relational algebra and Datalog as well:</p>
+<pre>R = &Pi;[workOrderID&#8321;, carID&#8321;] &sigma;[F] (repairJob&#8321; &times; mechanic&#8322;)
+
+F &equiv; [ officer&#8321; = socSecNum&#8322; &and; name&#8322; = 'Constructor Break Fixer' ]</pre>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.28">Find social security
+number and name of those mechanics who are qualified to repair cars whose
+manufacturer is named <code>HappyForgerWorks</code>.</summary>
+<div class="sol">
+<pre>SELECT m.socSecNum, m.name
+FROM   mechanic m, repair r
+WHERE  m.socSecNum = r.mechanicID AND r.manufacturerId = 'HappyForgerWorks';</pre>
+<pre>+-----------+-------------------------+
+| socSecNum | name                    |
++-----------+-------------------------+
+| 111111111 | Constructor Break Fixer |
+| 111111111 | Constructor Break Fixer |
+| 222222222 | Careful Wheel Turner    |
++-----------+-------------------------+</pre>
+<p><strong>Constructor Break Fixer comes out twice</strong>, because he is
+certified on two HappyForgerWorks models &mdash; the Hammer and the Tongs
+&mdash; and <code>repair</code> therefore has two rows for him. The query asks
+for mechanics and returns certifications.</p>
+<pre>SELECT DISTINCT m.socSecNum, m.name
+FROM   mechanic m, repair r
+WHERE  m.socSecNum = r.mechanicID AND r.manufacturerId = 'HappyForgerWorks';</pre>
+<pre>+-----------+-------------------------+
+| socSecNum | name                    |
++-----------+-------------------------+
+| 111111111 | Constructor Break Fixer |
+| 222222222 | Careful Wheel Turner    |
++-----------+-------------------------+</pre>
+<p>The book's answer has no <code>DISTINCT</code>. On its own unseen data the
+duplicate may not arise; here it does. The rule from Set 7 holds: a projection
+in the algebra returns a set, a <code>SELECT</code> returns a bag, and
+<code>DISTINCT</code> is the word that closes the gap. Ask yourself what the
+question is counting &mdash; mechanics, or reasons a mechanic qualifies.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.29">Find social security
+number and name of those mechanics that have never been officers in charge of a
+car repair job.</summary>
+<div class="sol">
+<pre>SELECT socSecNum, name
+FROM   mechanic
+WHERE  socSecNum NOT IN (SELECT officer FROM repairJob);</pre>
+<pre>+-----------+-------------------+
+| socSecNum | name              |
++-----------+-------------------+
+| 333333333 | Lazy Bolt Dropper |
++-----------+-------------------+</pre>
+<p>The &ldquo;never&rdquo; shape of Exercise 8.11 again, and the shortest
+version of it on this page: the subquery is one column of one table, with no
+condition at all. Every officer who has ever run a job is in that set, and the
+mechanics left over are the answer.</p>
+<p><strong>One warning about <code>NOT IN</code>.</strong> If the inner query
+ever returned a <code>NULL</code>, <code>x NOT IN (...)</code> would be unknown
+for every <code>x</code> and the whole query would return nothing &mdash; not
+an error, just an empty answer. It is safe here because
+<code>repairJob.officer</code> is a foreign key that is never null. Check that
+before trusting the shape; it is the one way <code>NOT IN</code> can lie to
+you.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.30">Find name and rank of
+those suppliers whose parts fit cars made by at least two different
+manufacturers. (It is not required that one part fit multiple cars &mdash; it is
+required that at least two different car manufacturers find some parts that fit
+their cars among the parts supplied by the supplier.)</summary>
+<div class="sol">
+<pre>SELECT DISTINCT s.name, s.`rank`
+FROM   supplier s, supplierLine L1, supplierLine L2, fit F1, fit F2
+WHERE
+    s.name = L1.supplierName AND s.name = L2.supplierName AND
+    L1.partManufacturerId = F1.partManufacturerId AND L1.partNumber = F1.partNumber AND
+    L2.partManufacturerId = F2.partManufacturerId AND L2.partNumber = F2.partNumber AND
+    F1.carManufacturerId != F2.carManufacturerId;</pre>
+<pre>+--------------+------+
+| name         | rank |
++--------------+------+
+| HighMargin   |   12 |
+| MiddleProfit |    5 |
++--------------+------+</pre>
+<p><strong>Five relations, and two of them are copies.</strong> &ldquo;At least
+two different manufacturers&rdquo; means two things exist at once, so the query
+needs two of everything that leads from the supplier to a car maker: two
+<code>supplierLine</code> rows and two <code>fit</code> rows. The last line is
+the only thing forcing them to be different &mdash; without it, every row pairs
+with itself and every supplier qualifies.</p>
+<p><strong>The parenthetical in the question is the hard part.</strong> It
+rules out the reading &ldquo;one part that fits two makes&rdquo;. The two paths
+may start from <em>different</em> parts, which is why <code>L1</code> and
+<code>L2</code> are unconstrained relative to each other. MiddleProfit qualifies
+exactly that way: its P-100 fits a HappyForgerWorks car, its C-010 fits a
+GreatConjurer one.</p>
+<p><strong><code>rank</code> needs backticks</strong> in recent MySQL and
+MariaDB, where it is the name of a window function. The book, on Oracle, writes
+it plain.</p>
+<p><strong>And again <code>DISTINCT</code> earns its place.</strong> Without it
+MiddleProfit appears four times and HighMargin twice, once for each ordered pair
+of paths that happens to work:</p>
+<pre>+--------------+------+
+| name         | rank |
++--------------+------+
+| HighMargin   |   12 |
+| HighMargin   |   12 |
+| MiddleProfit |    5 |
+| MiddleProfit |    5 |
+| MiddleProfit |    5 |
+| MiddleProfit |    5 |
++--------------+------+</pre>
+<p>CheapAndFast is correctly left out: both parts it sells fit HappyForgerWorks
+cars and nothing else, so there is no pair with
+<code>F1.carManufacturerId != F2.carManufacturerId</code>.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.31">Double the price of
+every part supplied by the supplier named <code>MiddleProfit</code> but
+manufactured by the manufacturer named <code>GreatConjurer</code>.</summary>
+<div class="sol">
+<pre>UPDATE supplierLine
+SET    price = price * 2
+WHERE  supplierName = 'MiddleProfit' AND partManufacturerId = 'GreatConjurer';</pre>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">before</th></tr>
+<tr><th style="text-align:center">supplierName</th><th style="text-align:center">partManufacturerId</th><th style="text-align:center">partNumber</th><th style="text-align:center">price</th></tr></thead>
+<tbody>
+<tr><td>CheapAndFast</td><td>HappyForgerWorks</td><td>P-100</td><td>22</td></tr>
+<tr><td>CheapAndFast</td><td>HappyForgerWorks</td><td>P-200</td><td>12</td></tr>
+<tr><td>HighMargin</td><td>SolidWheel</td><td>W-001</td><td>90</td></tr>
+<tr><td>MiddleProfit</td><td>GreatConjurer</td><td>C-010</td><td>30</td></tr>
+<tr><td>MiddleProfit</td><td>GreatConjurer</td><td>C-020</td><td>15</td></tr>
+<tr><td>MiddleProfit</td><td>HappyForgerWorks</td><td>P-100</td><td>20</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">after</th></tr>
+<tr><th style="text-align:center">supplierName</th><th style="text-align:center">partManufacturerId</th><th style="text-align:center">partNumber</th><th style="text-align:center">price</th></tr></thead>
+<tbody>
+<tr><td>CheapAndFast</td><td>HappyForgerWorks</td><td>P-100</td><td>22</td></tr>
+<tr><td>CheapAndFast</td><td>HappyForgerWorks</td><td>P-200</td><td>12</td></tr>
+<tr><td>HighMargin</td><td>SolidWheel</td><td>W-001</td><td>90</td></tr>
+<tr><td>MiddleProfit</td><td>GreatConjurer</td><td>C-010</td><td>60</td></tr>
+<tr><td>MiddleProfit</td><td>GreatConjurer</td><td>C-020</td><td>30</td></tr>
+<tr><td>MiddleProfit</td><td>HappyForgerWorks</td><td>P-100</td><td>20</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>Both conditions are on the row being changed</strong>, so no
+subquery is needed and no second relation enters the statement. Compare
+Exercise 8.20, where the condition lived in another table and had to be reached
+for. Recognising which case you are in is most of the work.</p>
+<p>The row MiddleProfit sells from HappyForgerWorks is untouched, and so are
+CheapAndFast's: the two conditions are joined by <code>AND</code>, and a part
+has to fail neither.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.32">Delete <em>all</em>
+data about the supplier named <code>MiddleProfit</code>.</summary>
+<div class="sol">
+<pre>DELETE FROM supplierLine WHERE supplierName = 'MiddleProfit';
+DELETE FROM supplier     WHERE name = 'MiddleProfit';</pre>
+<pre>+--------------+------+
+| name         | rank |
++--------------+------+
+| CheapAndFast |    3 |
+| HighMargin   |   12 |
++--------------+------+
+
++--------------+--------------------+------------+-------+
+| supplierName | partManufacturerId | partNumber | price |
++--------------+--------------------+------------+-------+
+| CheapAndFast | HappyForgerWorks   | P-100      |    22 |
+| CheapAndFast | HappyForgerWorks   | P-200      |    12 |
+| HighMargin   | SolidWheel         | W-001      |    90 |
++--------------+--------------------+------------+-------+</pre>
+<p><strong>&ldquo;All data&rdquo; means more than one table, and the order is
+the reverse of an insert.</strong> Children first, parent last. Do it the other
+way and the server refuses:</p>
+<pre class="asm">ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key
+constraint fails (`carshop`.`supplierLine`, CONSTRAINT `supplierLine_ibfk_1`
+FOREIGN KEY (`supplierName`) REFERENCES `supplier` (`name`))</pre>
+<p>which is referential integrity doing its job &mdash; the alternative would be
+three rows in <code>supplierLine</code> naming a supplier that no longer
+exists.</p>
+<p><strong>What is <em>not</em> deleted is as important.</strong> The parts
+themselves stay: <code>part</code> belongs to a manufacturer, not to a supplier,
+and C-010 and C-020 are still made by GreatConjurer whether or not anyone sells
+them. Deleting them would be the real mistake here.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.33">For each manufacturer,
+find the manufacturer's name and address, the count of individual cars made by
+this manufacturer that the shop has repaired, the count of different models to
+which these cars belong, the count of mechanics that served as officers in
+charge of these repairs, the total count of repair jobs performed on these cars,
+and the date of the earliest and latest individual repair. Ignore cars made
+before the year 2000, and do not report manufacturers that had fewer than 10
+cars repaired in the shop.</summary>
+<div class="sol">
+<pre>SELECT  m.name, m.address,
+        COUNT (DISTINCT c.VIN),
+        COUNT (DISTINCT c.modelCode),
+        COUNT (DISTINCT r.officer),
+        COUNT (*),
+        MIN (r.dateBrought), MAX (r.dateBrought)
+FROM    manufacturer m, carInstance c, repairJob r
+WHERE   m.name = c.manufacturerId AND
+        c.VIN  = r.carID AND
+        YEAR (c.dateMade) &gt;= 2000
+GROUP BY m.name, m.address
+HAVING   COUNT (DISTINCT c.VIN) &gt;= 10;</pre>
+<pre>Empty set</pre>
+<p><strong>Nothing qualifies</strong>, because no manufacturer in this little
+database has ten repaired cars &mdash; the largest has two. That is deliberate:
+you can watch the <code>HAVING</code> clause do its work by lowering the
+threshold to 2, with the six aggregate headings shortened here to fit the
+page:</p>
+<pre>+------------------+--------------+------+-------+---------+----------+------------+------------+
+| name             | address      | cars | modls | offcrs  | COUNT(*) | earliest   | latest     |
++------------------+--------------+------+-------+---------+----------+------------+------------+
+| HappyForgerWorks | 1 Anvil Road |    2 |     2 |       2 |        2 | 2024-04-02 | 2024-05-18 |
++------------------+--------------+------+-------+---------+----------+------------+------------+</pre>
+<p>The server's own headings are the expressions themselves &mdash;
+<code>COUNT(DISTINCT c.VIN)</code>, <code>MIN(r.dateBrought)</code> and so on
+&mdash; which is why an aggregate column is usually given a name with
+<code>AS</code> before anybody has to read the result.</p>
+<p>and again with the year condition and the <code>HAVING</code> both removed:</p>
+<pre>+------------------+-----------------------+----------+
+| name             | COUNT(DISTINCT c.VIN) | COUNT(*) |
++------------------+-----------------------+----------+
+| GreatConjurer    |                     2 |        2 |
+| HappyForgerWorks |                     3 |        3 |
+| SolidWheel       |                     1 |        1 |
++------------------+-----------------------+----------+</pre>
+<p><strong>Six aggregates over one grouping.</strong> Everything in the
+<code>SELECT</code> list is either grouped on or aggregated &mdash; that is the
+rule, and it is why <code>m.address</code> has to appear in the
+<code>GROUP BY</code> even though it adds nothing (the name is already a
+key).</p>
+<p><strong><code>COUNT(DISTINCT c.VIN)</code> and <code>COUNT(*)</code> are
+different questions.</strong> The first is how many vehicles; the second is how
+many repair jobs. A car brought in three times contributes 1 and 3. The
+question asks for both, which is the point of the exercise: once rows have been
+multiplied by a product, a plain count stops meaning what you assumed.</p>
+<p><strong>Where the conditions go.</strong> &ldquo;Made before 2000&rdquo;
+tests a single row, so it belongs in <code>WHERE</code> and happens before
+grouping. &ldquo;Fewer than 10 cars repaired&rdquo; tests a whole group, so it
+belongs in <code>HAVING</code> and happens after. They are not interchangeable
+and the server will tell you so if you try.</p>
+<p>The book writes the year test as <code>to_number(to_char(c.dateMade,
+'YYYY')) &gt;= 2000</code>, which is Oracle's way of pulling the year out of a
+date. MariaDB has <code>YEAR()</code>.</p>
+</div></details>
+
+
+<h2 id="cotton"><span class="secnum">8.6</span>The Cool Cotton Database</h2>
+
+<p>A shirt company, from Appendix B.16. Part (I) holds the styles, their colors
+and sizes, who designed them, and what the factories charge. Part (II) adds the
+mail-order catalog &mdash; which shirt appeared on which page of which
+issue.</p>
+
+<pre>  Part (I)
+shirt          (<u>styleCode</u>, salesPrice)
+shirtColor     (<u>style</u>, <u>colorCode</u>)
+shirtSize      (<u>basicStyle</u>, <u>sizeOption</u>)
+designer       (<u>designerId</u>, designerName)
+originalDesign (<u>theStyle</u>, theDesigner, adoptedWhen, designPlan)
+factory        (<u>factoryId</u>, factoryName)
+purchaseDeal   (<u>item</u>, <u>producedBy</u>, <u>productName</u>, purchasePrice, quantity, orderDue)
+
+  Part (II)
+catalog        (<u>year</u>, <u>month</u>)
+appear         (<u>issueYear</u>, <u>issueMonth</u>, <u>onPage</u>, <u>itemCode</u>)</pre>
+
+<div class="box note"><span class="bt">Three things to read off the schema</span>
+<p><strong><code>originalDesign</code>'s key is the style alone</strong>, not
+the pair. One style has one original designer. <code>purchaseDeal</code>'s key
+is three columns, so one factory can make one style under several product names
+&mdash; which is exactly what Exercise 8.37 goes looking for.</p>
+<p><strong><code>designerName</code> is not a key.</strong> Two designers here
+share the name Smart Dresser, so &ldquo;designed by Smart Dresser&rdquo; is a
+question about two people. Queries that filter on a name rather than an id are
+asking something slightly different from what they look like they are
+asking.</p>
+<p><strong><code>salesPrice</code> may be <code>NULL</code></strong>, and one
+style's is. The <code>CHECK (salesPrice &gt; 0)</code> does not prevent it: a
+check constraint rejects a row only when it evaluates to <em>false</em>, and
+<code>NULL &gt; 0</code> is unknown. That one null is what the whole of
+Exercise 8.39 turns on.</p></div>
+
+<p>These rows are ours too, chosen so each exercise has something to find.</p>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>shirt</code></th></tr>
+<tr><th style="text-align:center">styleCode</th><th style="text-align:center">salesPrice</th></tr></thead>
+<tbody>
+<tr><td>S-1001</td><td>6.50</td></tr>
+<tr><td>S-1002</td><td>12.00</td></tr>
+<tr><td>S-1003</td><td>24.99</td></tr>
+<tr><td>S-1004</td><td>9.75</td></tr>
+<tr><td>S-1005</td><td>NULL</td></tr>
+<tr><td>S-1006</td><td>24.99</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>shirtColor</code></th></tr>
+<tr><th style="text-align:center">style</th><th style="text-align:center">colorCode</th></tr></thead>
+<tbody>
+<tr><td>S-1001</td><td>BL</td></tr>
+<tr><td>S-1001</td><td>RD</td></tr>
+<tr><td>S-1002</td><td>BK</td></tr>
+<tr><td>S-1003</td><td>GR</td></tr>
+<tr><td>S-1003</td><td>WH</td></tr>
+<tr><td>S-1004</td><td>BL</td></tr>
+<tr><td>S-1006</td><td>RD</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>shirtSize</code></th></tr>
+<tr><th style="text-align:center">basicStyle</th><th style="text-align:center">sizeOption</th></tr></thead>
+<tbody>
+<tr><td>S-1001</td><td>16</td></tr>
+<tr><td>S-1001</td><td>18</td></tr>
+<tr><td>S-1002</td><td>20</td></tr>
+<tr><td>S-1002</td><td>22</td></tr>
+<tr><td>S-1003</td><td>22</td></tr>
+<tr><td>S-1003</td><td>24</td></tr>
+<tr><td>S-1004</td><td>18</td></tr>
+<tr><td>S-1005</td><td>20</td></tr>
+<tr><td>S-1006</td><td>16</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>designer</code></th></tr>
+<tr><th style="text-align:center">designerId</th><th style="text-align:center">designerName</th></tr></thead>
+<tbody>
+<tr><td>D-01</td><td>Smart Dresser</td></tr>
+<tr><td>D-02</td><td>Plain Tailor</td></tr>
+<tr><td>D-03</td><td>Smart Dresser</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>factory</code></th></tr>
+<tr><th style="text-align:center">factoryId</th><th style="text-align:center">factoryName</th></tr></thead>
+<tbody>
+<tr><td>F-01</td><td>Superb Seamstress Star</td></tr>
+<tr><td>F-02</td><td>Tiny Thread</td></tr>
+<tr><td>F-03</td><td>Rapid Stitch</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>originalDesign</code></th></tr>
+<tr><th style="text-align:center">theStyle</th><th style="text-align:center">theDesigner</th><th style="text-align:center">adoptedWhen</th></tr></thead>
+<tbody>
+<tr><td>S-1001</td><td>D-02</td><td>2019-02-01</td></tr>
+<tr><td>S-1002</td><td>D-01</td><td>2020-03-15</td></tr>
+<tr><td>S-1003</td><td>D-01</td><td>2021-07-01</td></tr>
+<tr><td>S-1004</td><td>D-03</td><td>2022-05-20</td></tr>
+<tr><td>S-1006</td><td>D-02</td><td>2023-01-09</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="6"><code>purchaseDeal</code></th></tr>
+<tr><th style="text-align:center">item</th><th style="text-align:center">producedBy</th><th style="text-align:center">productName</th><th style="text-align:center">purchasePrice</th><th style="text-align:center">quantity</th><th style="text-align:center">orderDue</th></tr></thead>
+<tbody>
+<tr><td>S-1001</td><td>F-01</td><td>Classic</td><td>3.00</td><td>500</td><td>2024-09-01</td></tr>
+<tr><td>S-1002</td><td>F-01</td><td>Deluxe</td><td>6.00</td><td>300</td><td>2027-12-01</td></tr>
+<tr><td>S-1002</td><td>F-02</td><td>Budget</td><td>4.50</td><td>800</td><td>NULL</td></tr>
+<tr><td>S-1003</td><td>F-02</td><td>Elite</td><td>15.50</td><td>100</td><td>2027-10-20</td></tr>
+<tr><td>S-1003</td><td>F-02</td><td>Premium</td><td>14.00</td><td>120</td><td>2027-11-15</td></tr>
+<tr><td>S-1004</td><td>F-03</td><td>Casual</td><td>5.25</td><td>400</td><td>2024-08-01</td></tr>
+<tr><td>S-1006</td><td>F-01</td><td>Classic</td><td>9.00</td><td>200</td><td>2024-10-09</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>catalog</code></th></tr>
+<tr><th style="text-align:center">year</th><th style="text-align:center">month</th></tr></thead>
+<tbody>
+<tr><td>2024</td><td>3</td></tr>
+<tr><td>2024</td><td>9</td></tr>
+<tr><td>2025</td><td>4</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>appear</code></th></tr>
+<tr><th style="text-align:center">issueYear</th><th style="text-align:center">issueMonth</th><th style="text-align:center">onPage</th><th style="text-align:center">itemCode</th></tr></thead>
+<tbody>
+<tr><td>2024</td><td>3</td><td>12</td><td>S-1001</td></tr>
+<tr><td>2024</td><td>3</td><td>12</td><td>S-1002</td></tr>
+<tr><td>2024</td><td>9</td><td>5</td><td>S-1003</td></tr>
+<tr><td>2024</td><td>9</td><td>40</td><td>S-1001</td></tr>
+<tr><td>2025</td><td>4</td><td>7</td><td>S-1004</td></tr>
+<tr><td>2025</td><td>4</td><td>7</td><td>S-1006</td></tr>
+</tbody></table></div>
+</div>
+
+<h2 id="cottonq"><span class="secnum">8.7</span>Exercises: Cool Cotton</h2>
+
+<p>Problems 714&ndash;721 of Section 9.10.</p>
+
+<details class="prob"><summary data-label="Exercise 8.34">Find year, month, and
+page number of every catalog page that contains a picture of some shirt with
+sales price less than 7 dollars.</summary>
+<div class="sol">
+<pre>SELECT issueYear, issueMonth, onPage
+FROM   appear, shirt
+WHERE  (styleCode = itemCode AND salesPrice &lt; 7);</pre>
+<pre>+-----------+------------+--------+
+| issueYear | issueMonth | onPage |
++-----------+------------+--------+
+| 2024      |          3 |     12 |
+| 2024      |          9 |     40 |
++-----------+------------+--------+</pre>
+<p><strong><code>catalog</code> is not needed.</strong> The year and month are
+already on <code>appear</code> &mdash; they are its foreign key into
+<code>catalog</code>, and a foreign key is a copy of the value, so there is
+nothing to go and fetch. Adding <code>catalog</code> to the
+<code>FROM</code> clause would change nothing but would cost a relation.</p>
+<p><strong>S-1005 is excluded</strong>, as it should be. Its price is
+<code>NULL</code>, <code>NULL &lt; 7</code> is unknown, and
+<code>WHERE</code> keeps only what is true. &ldquo;We do not know the
+price&rdquo; is not &ldquo;the price is under seven&rdquo;.</p>
+<p>Page 12 of the March 2024 issue shows two shirts; only the one under $7
+brings the page into the answer. If a page had shown two cheap shirts it would
+have appeared twice, and <code>DISTINCT</code> would be wanted.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.35">Find styles and names
+of original designers of all shirts produced by <code>Superb Seamstress
+Star</code> factory.</summary>
+<div class="sol">
+<pre>SELECT theStyle, designerName
+FROM   designer, originalDesign, factory, purchaseDeal
+WHERE  (designerId = theDesigner AND
+        factoryId  = producedBy AND
+        theStyle   = item AND
+        factoryName = 'Superb Seamstress Star');</pre>
+<pre>+----------+---------------+
+| theStyle | designerName  |
++----------+---------------+
+| S-1002   | Smart Dresser |
+| S-1001   | Plain Tailor  |
+| S-1006   | Plain Tailor  |
++----------+---------------+</pre>
+<p><strong>Four relations in a chain, three equalities.</strong> Follow the
+sentence: a factory (named) produces shirts (<code>purchaseDeal</code>), each
+shirt has an original design (<code>originalDesign</code>), each design has a
+designer (<code>designer</code>). Each hop is one equality, and the chain runs
+out exactly when the sentence does.</p>
+<p><strong><code>shirt</code> itself never appears.</strong> Both
+<code>purchaseDeal.item</code> and <code>originalDesign.theStyle</code> are
+foreign keys into it, so they can be compared to each other directly. Routing
+through <code>shirt</code> would be a third equality doing the work of one.</p>
+<p>Plain Tailor appears twice, for two different styles &mdash; and here the
+duplicate is correct, since the question asks for style-and-designer pairs
+rather than for designers.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.36">Find all colors that
+have ever been used in those shirt styles, designed by <code>Smart
+Dresser</code> designers, that exist in sizes greater than 20.</summary>
+<div class="sol">
+<pre>SELECT DISTINCT colorCode
+FROM   shirtColor, shirtSize, designer, originalDesign
+WHERE  shirtColor.style = shirtSize.basicStyle AND
+       shirtColor.style = originalDesign.theStyle AND
+       shirtSize.sizeOption &gt; 20 AND
+       originalDesign.theDesigner = designer.designerId AND
+       designer.designerName = 'Smart Dresser';</pre>
+<pre>+-----------+
+| colorCode |
++-----------+
+| BK        |
+| GR        |
+| WH        |
++-----------+</pre>
+<p><strong>Two conditions on the same style, reached by two different
+routes.</strong> <code>shirtColor.style</code> is matched against
+<code>shirtSize.basicStyle</code> and against
+<code>originalDesign.theStyle</code>; all three name the same style, under
+three different column names. Writing them out is what the no-join rule
+costs, and what it buys is that nothing is matched by accident.</p>
+<p><strong><code>DISTINCT</code> is in the book's own answer here</strong>, and
+it is needed: S-1003 exists in sizes 22 and 24, so without it every color of
+that style would be listed twice.</p>
+<p><strong>The query says &ldquo;Smart Dresser designers&rdquo;, plural, and
+means it.</strong> D-01 and D-03 both carry that name, so both are matched.
+D-03's style S-1004 then drops out anyway, for a different reason &mdash; its
+only size is 18.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.37">Find the name of each
+factory that has, at any point in time, produced the same shirt style under
+different product names.</summary>
+<div class="sol">
+<pre>SELECT DISTINCT factoryName
+FROM   factory, purchaseDeal p1, purchaseDeal p2
+WHERE  p1.item = p2.item AND
+       p1.producedBy = p2.producedBy AND
+       p1.productName != p2.productName AND
+       factoryId = p1.producedBy;</pre>
+<pre>+-------------+
+| factoryName |
++-------------+
+| Tiny Thread |
++-------------+</pre>
+<p><strong>Two copies of one relation, and the third line is the whole
+query.</strong> Same style, same factory, <em>different</em> product name. Drop
+<code>p1.productName != p2.productName</code> and every deal pairs with
+itself, so every factory qualifies &mdash; the inequality is not a refinement,
+it is the question.</p>
+<p>Tiny Thread makes S-1003 as both Premium and Elite. Superb Seamstress Star
+uses the product name Classic for two different styles, which is a different
+thing and correctly not matched.</p>
+<p><strong>Each qualifying pair is found twice</strong>, once as
+(Premium, Elite) and once as (Elite, Premium), so <code>DISTINCT</code> is
+doing real work even though only one factory qualifies. The usual way to avoid
+that is <code>p1.productName &lt; p2.productName</code>, which picks one
+ordering of each pair.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.38">Find styles and sales
+prices of those shirts that have outstanding purchase orders &mdash; orders not
+yet due as of today, not knowing what date it is today.</summary>
+<div class="sol">
+<pre>SELECT styleCode, salesPrice
+FROM   shirt, purchaseDeal
+WHERE  (styleCode = item AND
+        (orderDue &gt;= CURDATE() + INTERVAL 1 DAY OR orderDue IS NULL));</pre>
+<pre>+-----------+------------+
+| styleCode | salesPrice |
++-----------+------------+
+| S-1002    |      12.00 |
+| S-1002    |      12.00 |
+| S-1003    |      24.99 |
+| S-1003    |      24.99 |
++-----------+------------+</pre>
+<p><strong>&ldquo;Not yet due&rdquo; is tomorrow or later</strong>, not today
+or later &mdash; an order due today is due. Hence the <code>+ INTERVAL 1
+DAY</code>, which the book writes <code>trunc(sysdate + 1)</code>.</p>
+<p><strong>And a null due date counts as outstanding.</strong> That is a
+judgement about what the data means: no due date recorded, so the order has not
+come due. The alternative reading &mdash; that the null means something else
+entirely &mdash; is equally defensible, and the lesson is that nothing in SQL
+decides it for you. What SQL <em>does</em> decide is that
+<code>orderDue &gt;= anything</code> is unknown for a null, so the
+<code>IS NULL</code> test has to be written separately or the row vanishes
+silently.</p>
+<p>Both styles come out twice, because each has two outstanding deals.
+<code>DISTINCT</code> would fix it; whether it should depends on whether
+&ldquo;shirts&rdquo; or &ldquo;orders&rdquo; is what is being asked for.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.39">Find style and sales
+price of the most expensive shirt(s). Then write the same query without using
+<code>MAX</code>, and account for the difference.</summary>
+<div class="sol">
+<p><strong>With <code>MAX</code>:</strong></p>
+<pre>SELECT styleCode, salesPrice
+FROM   shirt s
+WHERE  s.salesPrice = (SELECT MAX (salesPrice) FROM shirt);</pre>
+<pre>+-----------+------------+
+| styleCode | salesPrice |
++-----------+------------+
+| S-1003    |      24.99 |
+| S-1006    |      24.99 |
++-----------+------------+</pre>
+<p>Two rows, because two shirts tie. The <code>(s)</code> in the question is a
+warning that a superlative need not be unique.</p>
+<p><strong>Without <code>MAX</code>:</strong> this is the <code>notMax</code>
+pattern of Lecture 11. Pair every shirt with every other, keep the cheaper one
+of each pair, and the answer is whatever is left out of that set.</p>
+<pre>SELECT styleCode, salesPrice
+FROM   shirt
+WHERE  styleCode NOT IN (SELECT s1.styleCode
+                         FROM   shirt s1, shirt s2
+                         WHERE  s1.salesPrice &lt; s2.salesPrice);</pre>
+<pre>+-----------+------------+
+| styleCode | salesPrice |
++-----------+------------+
+| S-1003    |      24.99 |
+| S-1005    |       NULL |
+| S-1006    |      24.99 |
++-----------+------------+</pre>
+<p><strong>Three rows, and one of them has no price at all.</strong> The
+subquery is the set of shirts that something beats, and S-1005 never lands in
+it: <code>NULL &lt; 24.99</code> is unknown, not true, so the pair that should
+have knocked it out never matched. Nothing beat it, so it comes back as one of
+the dearest shirts in the catalog.</p>
+<p><strong>The fix is to say so explicitly:</strong></p>
+<pre>SELECT styleCode, salesPrice
+FROM   shirt
+WHERE  salesPrice IS NOT NULL
+  AND  styleCode NOT IN (SELECT s1.styleCode
+                         FROM   shirt s1, shirt s2
+                         WHERE  s1.salesPrice &lt; s2.salesPrice);</pre>
+<pre>+-----------+------------+
+| styleCode | salesPrice |
++-----------+------------+
+| S-1003    |      24.99 |
+| S-1006    |      24.99 |
++-----------+------------+</pre>
+<p><strong>This is the whole argument for the aggregate functions.</strong>
+<code>MAX</code> ignores nulls by definition, so the one-line version was right
+the first time and stayed right without your having to think about it.
+Hand-rolling the same idea out of comparisons means noticing the null yourself
+&mdash; and the failure is silent, because a shirt with no price looks exactly
+like a shirt nothing beats.</p>
+<p>Worth running both against the data with S-1005 removed. They agree
+perfectly, which is the point: the pattern is not wrong, it is only incomplete,
+and incomplete in a way no amount of staring at the output of a smaller example
+would reveal.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.40">Find the sales
+price(s) of the shirt style(s) with the largest purchased price that has ever
+been ordered.</summary>
+<div class="sol">
+<pre>SELECT salesPrice
+FROM   shirt, purchaseDeal
+WHERE  (styleCode = item AND
+        purchasePrice = (SELECT MAX (purchasePrice) FROM purchaseDeal));</pre>
+<pre>+------------+
+| salesPrice |
++------------+
+|      24.99 |
++------------+</pre>
+<p><strong>Two prices, and the query must not confuse them.</strong>
+<code>purchasePrice</code> is what the factory charges Cool Cotton;
+<code>salesPrice</code> is what the customer pays. The <code>MAX</code> is taken
+over the first and the answer reported from the second.</p>
+<p>The dearest deal is Tiny Thread's Elite at 15.50, which is style S-1003,
+selling at 24.99. Note that the query says nothing about <em>which</em> style
+it is &mdash; add <code>styleCode</code> to the <code>SELECT</code> list if the
+answer should be readable.</p>
+<p><strong>A subquery on the right of <code>=</code> has to return exactly one
+value</strong>, and <code>MAX</code> guarantees that it does. This is the form
+Lecture 12 uses for the highest salary. Had the subquery returned two rows the
+server would have refused it, and <code>IN</code> would be the operator to reach
+for instead &mdash; which is the difference between the two: <code>=</code>
+compares against a value, <code>IN</code> against a set.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 8.41">Shirt factory
+<code>Tiny Thread</code> has changed its name into <code>Reliable Rope</code>.
+Record the change in the database.</summary>
+<div class="sol">
+<pre>UPDATE factory
+SET    factoryName = 'Reliable Rope'
+WHERE  factoryName = 'Tiny Thread';</pre>
+<pre>+-----------+------------------------+
+| factoryId | factoryName            |
++-----------+------------------------+
+| F-01      | Superb Seamstress Star |
+| F-02      | Reliable Rope          |
+| F-03      | Rapid Stitch           |
++-----------+------------------------+</pre>
+<p><strong>One row, one table, nothing else to do</strong> &mdash; and that is
+the exercise. <code>purchaseDeal</code> refers to the factory by
+<code>factoryId</code>, not by name, so the five deals Tiny Thread had are
+untouched and still correct. The name was stored in exactly one place.</p>
+<p><strong>Compare the Car Repair Shop</strong>, where <code>supplierLine</code>
+references a supplier by <em>name</em>. Renaming a supplier there means changing
+the parent and every child, and the foreign key will refuse to let you do the
+first without the second. Same operation, different schema, wholly different
+amount of work &mdash; which is the practical argument for keys that never have
+to change.</p>
+</div></details>
+
+<div class="box extra"><span class="bt">Going further</span>
+<p>Three themes recur across all three databases on this page, and they are
+worth collecting.</p>
+<p><strong>A duplicate in the output is usually a question about what you were
+counting.</strong> Exercises 8.28, 8.30, 8.35, 8.37 and 8.38 all produce
+repeated rows, and in only one of them is the repetition what the question
+wanted. <code>DISTINCT</code> is the fix; knowing whether you need it is the
+skill.</p>
+<p><strong>A null is not a value and does not behave like one.</strong> It
+removed a shirt from Exercise 8.34, smuggled a priceless one into the answer in
+8.39, had to be tested for separately in 8.16 and 8.38, and is the correct way
+to record &ldquo;has not checked out&rdquo; in Exercise 8.24. Three-valued logic
+is the one part of SQL that cannot be learned by analogy with anything
+else.</p>
+<p><strong>Every answer here is written in the vocabulary of Lectures 11 and
+12</strong> &mdash; nothing beyond <code>SELECT</code>, <code>FROM</code>,
+<code>WHERE</code>, <code>DISTINCT</code>, the comma product, the five aggregate
+functions, <code>GROUP BY</code>, <code>HAVING</code>, <code>ORDER BY</code>,
+and <code>IN</code> and <code>NOT IN</code> against a subquery. SQL has more
+than this: <code>EXISTS</code> and <code>NOT EXISTS</code> for asking whether a
+subquery found anything at all, <code>ALL</code> and <code>ANY</code> for
+comparing against every or some member of a set, and the outer join for keeping
+rows that match nothing. Each would shorten two or three of these answers. None
+is needed for any of them, which is worth knowing before you reach for one.</p>
+<p><strong>The key you have to match is the key the schema declares.</strong>
+A room is a pair, a purchase deal is a triple, a part is a pair. Matching on
+half a key is the error that runs cleanly and answers wrongly, and no amount of
+reading the output will reveal it &mdash; only reading the schema will.</p>
+<p>What this set still has not asked: whether any of these three schemas stores
+the same fact in two places. That is normalization, and the problem book has a
+long section on exactly these databases when you get there.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-sql.html"><span>Previous</span>Set 7. SQL: creating, changing, querying</a>
+      <a class="next" href="setup-sql.html"><span>Next</span>Appendix A. Setting up SQL</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
