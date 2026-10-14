@@ -946,39 +946,39 @@ refuses to record.</p>
 <figcaption>Figure 63: Items and Purchases. Every purchase is made <em>by</em> exactly one customer; a purchase may be <em>of</em> many items and an item may appear on many purchases.</figcaption></figure>
 
 <details class="prob"><summary data-label="Exercise 4.13">Write SQL code that creates the database represented by the ER diagram in Figure 63. Be sure to implement all the constraints expressed in the diagram.</summary><div class="sol">
-<pre class="asm">create table item (
-    itemnum char (10),
-    price decimal (12,2),
-    quantity decimal (10,0),
-    primary key (itemnum));
+<pre class="asm">CREATE TABLE item (
+    itemnum CHAR (10),
+    price DECIMAL (12,2),
+    quantity DECIMAL (10,0),
+    PRIMARY KEY (itemnum));
 
-create table customer (
-    catalognum char (12),
-    name varchar (36),
-    address varchar (54),
-    primary key (catalognum));
+CREATE TABLE customer (
+    catalognum CHAR (12),
+    name VARCHAR (36),
+    address VARCHAR (54),
+    PRIMARY KEY (catalognum));
 
-create table phonebook (
-    person char (12),
-    phonenum varchar (16),
-    primary key (person, phonenum),
-    foreign key (person) references customer);
+CREATE TABLE phonebook (
+    person CHAR (12),
+    phonenum VARCHAR (16),
+    PRIMARY KEY (person, phonenum),
+    FOREIGN KEY (person) REFERENCES customer);
 
-create table purchase (
-    invoicenum char (14),
-    orderdate date,
-    shipdate date,
-    cardnumber char (16),
-    buyer char (12) not null,          <span class="c">-- the double line, in SQL</span>
-    primary key (invoicenum),
-    foreign key (buyer) references customer);
+CREATE TABLE purchase (
+    invoicenum CHAR (14),
+    orderdate DATE,
+    shipdate DATE,
+    cardnumber CHAR (16),
+    buyer CHAR (12) NOT NULL,          <span class="c">-- the double line, in SQL</span>
+    PRIMARY KEY (invoicenum),
+    FOREIGN KEY (buyer) REFERENCES customer);
 
-create table orderfor (
-    itemnum char (10),
-    invoicenum char (14),
-    primary key (itemnum, invoicenum),
-    foreign key (itemnum) references item,
-    foreign key (invoicenum) references purchase);</pre>
+CREATE TABLE orderfor (
+    itemnum CHAR (10),
+    invoicenum CHAR (14),
+    PRIMARY KEY (itemnum, invoicenum),
+    FOREIGN KEY (itemnum) REFERENCES item,
+    FOREIGN KEY (invoicenum) REFERENCES purchase);</pre>
 <p><strong>Five relations for three entity sets and two relationship
 sets.</strong> <code>phonebook</code> exists because <code>phone&nbsp;#</code>
 is multivalued; <code>orderfor</code> exists because <code>of</code> is
@@ -986,7 +986,7 @@ M&nbsp;:&nbsp;M. The <code>by</code> relationship gets no relation at all
 &mdash; it is 1&nbsp;:&nbsp;M, so it collapses into the <code>buyer</code>
 column of <code>purchase</code>.</p>
 <p><strong>The one line that is easy to leave out</strong> is
-<code>not null</code> on <code>buyer</code> &mdash; an N.C., not a consequence
+<code>NOT NULL</code> on <code>buyer</code> &mdash; an N.C., not a consequence
 of the foreign key. The diagram puts <code>M</code> on the purchase side of
 <code>by</code> and <code>1</code> on the customer side, and a purchase with no
 buyer is not a thing the enterprise has; the foreign key alone would permit it,
@@ -1005,12 +1005,12 @@ exercise.</p>
 <p><strong>On the other columns.</strong> <code>orderdate</code>,
 <code>shipdate</code> and <code>cardnumber</code> are left nullable on purpose:
 an order placed today has no ship date yet, and the diagram does not say every
-purchase carries a card. Declaring them <code>not null</code> would be adding a
+purchase carries a card. Declaring them <code>NOT NULL</code> would be adding a
 constraint the diagram never made &mdash; as much an error as omitting one it
 did.</p>
 <p>Column types are a judgement call the diagram cannot make for you; they are
 your domain constraints, and any reasonable width passes. What is marked is the
-keys, the foreign keys and the <code>not null</code>.</p>
+keys, the foreign keys and the <code>NOT NULL</code>.</p>
 </div></details>
 
 <details class="prob"><summary data-label="Exercise 4.14">Name a constraint expressed by Figure 63 that your answer to Exercise 4.13 does <em>not</em> enforce. Which of the three categories of &sect;4.1 does it fall into, and why can no column carry it?</summary><div class="sol">
@@ -1052,7 +1052,7 @@ relationship becomes an N.C. and is enforced; total participation on the
 <p>A second answer would also have earned the marks: nothing in the DDL says the
 <code>quantity</code> of an item cannot be negative, or that
 <code>shipdate</code> cannot precede <code>orderdate</code>. Those are domain
-constraints that a <code>check</code> clause <em>can</em> express &mdash; so
+constraints that a <code>CHECK</code> clause <em>can</em> express &mdash; so
 they are schema-based constraints you omitted, not application-based ones. The
 difference between &ldquo;undeclarable&rdquo; and &ldquo;declarable but not
 declared&rdquo; is exactly what &sect;4.1 is asking you to notice.</p>
