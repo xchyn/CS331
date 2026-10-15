@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Midterm review</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Midterm review</span>
+  <nav class="topnav">
+    <a href="ex-sql2.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="setup-sql.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#shape"><span class="t">M.1</span>What the exam looks like</a></li>
+    <li><a href="#p1"><span class="t">M.2</span>Problem 1 &mdash; the diagram</a></li>
+    <li><a href="#p2"><span class="t">M.3</span>Problem 2 &mdash; diagram to schemas</a></li>
+    <li><a href="#p3"><span class="t">M.4</span>Problem 3 &mdash; keys and legal operations</a></li>
+    <li><a href="#db"><span class="t">M.5</span>The practice database</a></li>
+    <li><a href="#p4"><span class="t">M.6</span>Problem 4 &mdash; which constraint breaks</a></li>
+    <li><a href="#p56"><span class="t">M.7</span>Problems 5 and 6 &mdash; algebra queries</a></li>
+    <li><a href="#p678"><span class="t">M.8</span>Problems 6b, 7, 8 &mdash; SQL queries</a></li>
+    <li><a href="#last"><span class="t">M.9</span>The last hour, and the 75 minutes</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Review &middot; Lectures 1&ndash;12</span>
+  <span class="chnum">Midterm</span>
+  <h1>What to revise, and how</h1>
+  <p class="chsum">Eight problems, 100 points, 75 minutes, closed book. This
+  page says what each problem asks for, how to go about it, and what loses
+  marks &mdash; then gives you fresh practice for every question type that can
+  be practised on paper. Nothing here is taken from the exam, and nothing here
+  is taken from the problem sets, so working through it tells you something
+  the sets cannot.</p>
+</div>
+
+<h2 id="shape"><span class="secnum">M.1</span>What the exam looks like</h2>
+
+<p>Closed book. No notes, no computer, no phone, no calculator. Eight problems
+on 100 points, 75 minutes &mdash; which is <strong>45 seconds a point</strong>,
+and worth knowing before you spend twenty minutes perfecting a diagram worth
+thirteen.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Points</th><th>What it asks for</th><th>Revise with</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="nb">13</td><td>Draw an ER/EER diagram from a written description, marking cardinality and participation</td><td>Sets 1 and 2</td></tr>
+<tr><td>2</td><td class="nb">12</td><td>Turn a given EER diagram into relational schemas; identify every primary and foreign key</td><td>Set 3</td></tr>
+<tr><td>3</td><td class="nb">20</td><td>Four small relations. Reason about superkeys and candidate keys, then build six algebra expressions &mdash; or say why one cannot be built</td><td>Sets 3 and 5, and &sect;M.4 below</td></tr>
+<tr><td>4</td><td class="nb">10</td><td>Given insert sequences on a schema: does each succeed, and if not, which constraint stops it</td><td>Set 4, and &sect;M.6</td></tr>
+<tr><td>5</td><td class="nb">9</td><td>One query in relational algebra</td><td>Set 5, and &sect;M.7</td></tr>
+<tr><td>6</td><td class="nb">15</td><td>One query, written twice: (a) relational algebra, (b) SQL</td><td>Sets 5 and 6, and &sect;M.7</td></tr>
+<tr><td>7</td><td class="nb">9</td><td>One query in SQL, counting</td><td>Sets 7 and 8, and &sect;M.8</td></tr>
+<tr><td>8</td><td class="nb">12</td><td>One query in SQL, grouped</td><td>Sets 7 and 8, and &sect;M.8</td></tr>
+</tbody></table></div>
+
+<p>Problems 1, 2 and 3 stand on their own. Problems 4 to 8 all run against
+<strong>one database</strong>, printed on the last page of the exam &mdash;
+five or six tables with their primary keys underlined and their foreign keys
+listed underneath. You may tear that page off, and you should: you will be
+looking at it for roughly half the exam.</p>
+
+<div class="box note"><span class="bt">Where the points are</span>
+<p><strong>45 of the 100 points are queries</strong> (Problems 5 to 8), and
+another 20 are the algebra of Problem 3. Two thirds of the exam is relational
+algebra and SQL. The two drawing questions are 25 between them.</p>
+<p>So if revision time is short, it goes on queries. If you can write the eight
+expressions of Problem 3 and the four queries of Problems 5 to 8, you have 65
+points before you draw anything.</p></div>
+
+<div class="box warn"><span class="bt">Three conventions that are marked</span>
+<p><strong>The join.</strong> Sets 5 to 8 avoid the join operator and write
+every match out with a product and a condition. Keep doing that &mdash; it is
+what the lecture notes do and it is never wrong. But note that Problem 3 may
+ask you whether <code>R &#8904; S</code> <em>can be constructed</em>, which is a
+question about the operator's definition, so you still have to know it.</p>
+<p><strong>SQL vocabulary.</strong> Everything on the exam can be written with
+what Lectures 11 and 12 give you: <code>SELECT</code>, <code>FROM</code>,
+<code>WHERE</code> with the comma product, <code>DISTINCT</code>,
+<code>IN</code> and <code>NOT IN</code> against a subquery, the five aggregate
+functions, <code>GROUP BY</code>, <code>HAVING</code> and <code>ORDER BY</code>.
+You will not need <code>EXISTS</code>, <code>ALL</code>, <code>ANY</code> or
+<code>EXCEPT</code>, and using them is not a safe bet under time pressure.</p>
+<p><strong>Show your work.</strong> The paper says so. On an algebra question
+that means naming your intermediate relations and writing the condition
+<code>F</code> out on its own line, the way Lecture 9 does. A wrong final
+expression with a readable derivation is worth more than a wrong one-liner.</p></div>
+
+
+<h2 id="p1"><span class="secnum">M.2</span>Problem 1 &mdash; the diagram <span class="nb">[13 pts]</span></h2>
+
+<p>You are given four or five sentences describing an organisation and asked
+for the ER/EER diagram, with cardinality and participation marked. The
+description is written so that each sentence carries one or two modelling
+decisions; read it with that in mind and the diagram almost writes itself.</p>
+
+<div class="box worked"><span class="bt">The method, in order</span>
+<p><strong>1. Underline every noun that has its own identifier.</strong> A
+sentence like &ldquo;each X is identified by its Y&rdquo; is telling you two
+things: X is an entity set, and Y is its key. Draw those boxes first.</p>
+<p><strong>2. Watch for an entity identified by <em>two</em> things.</strong>
+&ldquo;Identified by the name and the type&rdquo; means a composite key &mdash;
+both attributes underlined, not one. This appears nearly every time.</p>
+<p><strong>3. Watch for an entity identified by another entity.</strong> If a
+thing is identified by &ldquo;the course, the instructor and the date&rdquo;,
+it has no key of its own: it is either a weak entity set with a partial key, or
+a relationship among three entity sets. Decide which and say why.</p>
+<p><strong>4. Attributes that describe a <em>pair</em> go on the
+relationship.</strong> A score that depends on both the student and the
+session belongs on the diamond, not in either box. This is the single most
+common place to lose a point.</p>
+<p><strong>5. Subclasses last.</strong> &ldquo;There are also X who ...&rdquo;
+followed by an attribute only those X have is a specialization. Draw the
+circle, mark <strong>d</strong> or <strong>o</strong>, and mark whether it is
+total (double line) or partial (single).</p>
+<p><strong>6. Then walk every edge and write both ends.</strong> Not just the
+side you were thinking about.</p></div>
+
+<div class="box warn"><span class="bt">What costs marks</span>
+<p><strong>A cardinality written at one end only.</strong> Every edge has two
+ends; both get a number or a letter.</p>
+<p><strong>Participation left off.</strong> Total participation is a double
+line. If the text says &ldquo;every lesson must have an instructor&rdquo;, that
+is a double line, and leaving it single is a different diagram.</p>
+<p><strong>A relationship attribute parked on an entity.</strong> Ask: if I
+deleted one of the two participants, would this value still mean anything? If
+not, it belongs on the relationship.</p>
+<p><strong>A subclass drawn as a separate unrelated box.</strong> It needs the
+circle and the subset arcs, or it is not a specialization.</p>
+<p><strong>Inventing an identifier.</strong> If the description does not give
+an entity a key, that is deliberate &mdash; it is a weak entity set, and
+adding a made-up ID throws away the point the question was testing.</p></div>
+
+<p><strong>Where to practise.</strong> Set 1 has sixteen full diagrams to draw
+and Set 2 has eight more with specialization in them. Exercises 1.14 to 1.19
+and 2.6 to 2.9 are the closest in size to a 13-point exam question; the longer
+ones in Set 1 are larger than anything you will be asked for in 75 minutes.
+Work them with the solution closed, then compare edge by edge rather than
+overall &mdash; it is the ends of the edges that differ.</p>
+
+<h2 id="p2"><span class="secnum">M.3</span>Problem 2 &mdash; diagram to schemas <span class="nb">[12 pts]</span></h2>
+
+<p>An EER diagram is given; you write the relational schemas and identify every
+primary key and every foreign key. This is the most mechanical question on the
+paper, which cuts both ways: there is a procedure that always works, and there
+is no partial credit for arriving somewhere sensible by another route.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>In the diagram</th><th>In the schemas</th></tr></thead>
+<tbody>
+<tr><td>Strong entity set</td><td>Its own relation; its key underlined</td></tr>
+<tr><td>Weak entity set</td><td>Its own relation; key is the owner's key <em>plus</em> the partial key; the owner's key is also a foreign key</td></tr>
+<tr><td>Composite attribute</td><td>One column per leaf; the composite itself disappears</td></tr>
+<tr><td>Multivalued attribute</td><td>A relation of its own: the owner's key plus the value, both in the primary key</td></tr>
+<tr><td>Derived attribute</td><td>Nothing &mdash; it is computed, not stored</td></tr>
+<tr><td>1 : M relationship</td><td>The key of the <em>one</em> side becomes a foreign key on the <em>many</em> side. No new relation</td></tr>
+<tr><td>1 : M with an attribute</td><td>Same, and the attribute rides along on the many side</td></tr>
+<tr><td>M : N relationship</td><td>A new relation: both keys, both foreign, both in the primary key; any relationship attribute joins them</td></tr>
+<tr><td>1 : 1 relationship</td><td>A foreign key on either side &mdash; put it on the side with total participation</td></tr>
+<tr><td>Specialization</td><td>One relation per subclass, keyed by the superclass key, which is also a foreign key</td></tr>
+</tbody></table></div>
+
+<div class="box warn"><span class="bt">What costs marks</span>
+<p><strong>Forgetting that the weak entity's foreign key is also part of its
+primary key.</strong> It is both. Write it twice.</p>
+<p><strong>Putting the foreign key on the wrong side of a 1 : M.</strong> It
+goes on the many side, always. Putting it on the one side would need a
+multivalued column, which the relational model does not have.</p>
+<p><strong>Listing primary keys and forgetting foreign keys.</strong> The
+question asks for both and the marks are split. Go through your schemas a
+second time looking only for foreign keys.</p>
+<p><strong>Creating a relation for a 1 : M relationship.</strong> It is not
+wrong as a design, but it is not what the mapping algorithm produces, and the
+question is about the algorithm.</p></div>
+
+<p><strong>Where to practise.</strong> Set 3 is exactly this question, twelve
+times. Exercises 3.1 to 3.4 are the mapping drills; 3.10 to 3.12 map the
+diagrams you drew in Sets 1 and 2, which is the closest thing on the site to
+sitting the exam question cold.</p>
+
+
+<h2 id="p3"><span class="secnum">M.4</span>Problem 3 &mdash; keys and legal operations <span class="nb">[20 pts]</span></h2>
+
+<p>The biggest single question on the paper, and the most mechanical once you
+know the rules. Four small relations are printed with their contents. Two parts
+ask about keys; six ask you to construct an expression <em>or explain why it is
+impossible</em>. That last clause is the whole question: some of the six cannot
+be built, and saying clearly why earns the same marks as computing one that
+can.</p>
+
+<div class="box worked"><span class="bt">When is an operation impossible?</span>
+<p>There is only one rule, and it governs three operators.</p>
+<p><strong>&cup;, &cap; and &minus; need union-compatible operands.</strong>
+Two relations are union-compatible when they have the <em>same number</em> of
+attributes and corresponding attributes are drawn from the <em>same
+domains</em>. The exam tells you how to read domains: <em>two domains are
+identical if and only if they have identical name</em>. So compare the
+attribute names. Different arity, or the same arity with a name that does not
+line up, and the operation is impossible &mdash; say which pair fails and
+stop.</p>
+<p><strong>&sigma;, &Pi; and &times; are almost never impossible.</strong>
+Selection needs its condition to mention only attributes the relation actually
+has, and to compare things of the same domain. Projection needs the attributes
+to exist. The product needs the two relations to have no attribute name in
+common, or the result would have two columns with one name.</p>
+<p><strong>The natural join is never impossible</strong>, but it is sometimes
+not what you expect. With common attributes it matches on all of them; with
+<em>no</em> common attributes it degenerates into the product. Say which case
+you are in.</p></div>
+
+<div class="box warn"><span class="bt">Keys: what an instance can and cannot tell you</span>
+<p>An instance can <strong>disprove</strong> a key and can never
+<strong>prove</strong> one. Find two rows that agree on the attributes in
+question and you have settled it: not a superkey, and the two rows are your
+proof. Find none and all you may say is that nothing in this instance forbids
+it &mdash; a key is a constraint the designer declares about every possible
+state, not a pattern you read off five rows.</p>
+<p>Write both halves. &ldquo;No, because of these two tuples&rdquo; is a
+complete answer; &ldquo;yes&rdquo; on its own is not.</p>
+<p>And remember the difference between the two words. A <em>superkey</em>
+identifies a row. A <em>candidate key</em> is a superkey with nothing to
+spare: remove any attribute and it stops identifying. So showing a set is a
+superkey is only half of showing it is a candidate key.</p></div>
+
+<details class="prob"><summary data-label="Practice A">Relations <code>K</code>,
+<code>L</code>, <code>M</code> and <code>N</code> are given below. Assume that
+two domains are identical if and only if they have identical name.
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>K</code></th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>5</td></tr>
+<tr><td>1</td><td>3</td><td>7</td></tr>
+<tr><td>2</td><td>2</td><td>9</td></tr>
+<tr><td>2</td><td>2</td><td>5</td></tr>
+<tr><td>3</td><td>4</td><td>5</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>L</code></th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>4</td></tr>
+<tr><td>2</td><td>2</td><td>8</td></tr>
+<tr><td>3</td><td>4</td><td>4</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>M</code></th></tr>
+<tr><th style="text-align:center">E</th><th style="text-align:center">F</th></tr></thead>
+<tbody>
+<tr><td>6</td><td>1</td></tr>
+<tr><td>7</td><td>2</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>N</code></th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>5</td></tr>
+<tr><td>1</td><td>7</td></tr>
+<tr><td>4</td><td>4</td></tr>
+</tbody></table></div>
+</div>
+<p>(a) Can <code>AB</code> be a superkey of <code>K</code>? Explain your answer.<br>
+(b) Find a candidate key for <code>L</code> and explain why it is a candidate key.<br>
+(c) Construct <code>K &minus; N</code> or explain why it is impossible.<br>
+(d) Construct <code>&sigma;[C &gt; A + B] K</code> or explain why it is impossible.<br>
+(e) Construct <code>K &#8904; L</code> or explain why it is impossible.<br>
+(f) Construct <code>&Pi;[A, C] &sigma;[B &ne; 2] K</code> or explain why it is impossible.<br>
+(g) Construct <code>(&Pi;[A, C] K) &minus; N</code> or explain why it is impossible.<br>
+(h) Construct <code>&sigma;[F = 1] M &times; &sigma;[A = 1] L</code> or explain why it is impossible.</p>
+</summary>
+<div class="sol">
+<p><strong>(a) No.</strong> The second and third rows of the table &mdash;
+<code>(2, 2, 9)</code> and <code>(2, 2, 5)</code> &mdash; agree on both
+<code>A</code> and <code>B</code> and are still different tuples. A superkey
+must determine the whole row, so two rows sharing its value settle the
+question.</p>
+<p><strong>(b) <code>A</code>.</strong> Its three values are 1, 2 and 3, all
+distinct, so no two tuples of <code>L</code> agree on <code>A</code> and it is a
+superkey. It is a candidate key because it is a single attribute: the only
+proper subset is the empty set, which cannot distinguish three tuples. (Strictly
+this shows only that the instance does not refuse <code>A</code> as a key;
+no instance can establish one.)</p>
+<p><em>Not</em> <code>B</code> &mdash; it has 2 twice &mdash; and not
+<code>D</code>, which has 4 twice.</p>
+
+<p><strong>(c) Impossible.</strong> <code>K</code> has three attributes and
+<code>N</code> has two, so they are not union-compatible and the difference is
+undefined. Arity is the first thing to check, before you look at any name.</p>
+
+<p><strong>(d) Possible.</strong> Keep the rows where <code>C</code> exceeds
+<code>A + B</code>:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">&sigma;[C &gt; A + B] K</th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>5</td></tr>
+<tr><td>1</td><td>3</td><td>7</td></tr>
+<tr><td>2</td><td>2</td><td>9</td></tr>
+<tr><td>2</td><td>2</td><td>5</td></tr>
+</tbody></table></div></div>
+<p>Only <code>(3, 4, 5)</code> fails, since 5 is not greater than 7. A
+selection condition may do arithmetic on attributes; it does not have to
+compare an attribute with a constant.</p>
+
+<p><strong>(e) Possible.</strong> <code>K</code> and <code>L</code> share
+<code>A</code> and <code>B</code>, so the natural join matches on both and the
+result has <code>A, B, C, D</code> &mdash; the shared columns appear once.</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4">K &#8904; L</th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>5</td><td>4</td></tr>
+<tr><td>2</td><td>2</td><td>9</td><td>8</td></tr>
+<tr><td>2</td><td>2</td><td>5</td><td>8</td></tr>
+<tr><td>3</td><td>4</td><td>5</td><td>4</td></tr>
+</tbody></table></div></div>
+<p><code>(1, 3, 7)</code> of <code>K</code> matches nothing, because
+<code>L</code> has no row with <code>A</code> = 1 and <code>B</code> = 3, and a
+join keeps only what matches. Written without the join operator, this is
+<code>&Pi;[A&#8321;, B&#8321;, C&#8321;, D&#8322;] &sigma;[A&#8321; = A&#8322;
+&and; B&#8321; = B&#8322;] (K&#8321; &times; L&#8322;)</code> &mdash; the form
+Sets 5 to 8 use throughout.</p>
+
+<p><strong>(f) Possible.</strong> Select first, then project:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">&Pi;[A, C] &sigma;[B &ne; 2] K</th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>7</td></tr>
+<tr><td>3</td><td>5</td></tr>
+</tbody></table></div></div>
+<p>Two of the five rows survive the selection, and projecting them onto
+<code>A</code> and <code>C</code> happens to produce no duplicates here. Had it
+produced any, the projection would have removed them &mdash; the algebra
+returns a set.</p>
+
+<p><strong>(g) Possible.</strong> <code>&Pi;[A, C] K</code> has attributes
+<code>A, C</code>, and so does <code>N</code>, so this time the difference is
+defined. <code>&Pi;[A, C] K</code> is
+<code>{(1,5), (1,7), (2,9), (2,5), (3,5)}</code>; removing the tuples that are
+also in <code>N</code> leaves:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">(&Pi;[A, C] K) &minus; N</th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>9</td></tr>
+<tr><td>2</td><td>5</td></tr>
+<tr><td>3</td><td>5</td></tr>
+</tbody></table></div></div>
+<p>Note that <code>(4, 4)</code> of <code>N</code> plays no part. A difference
+removes; it never adds, so nothing in the right operand can appear in the
+answer. Compare with (c): the same operator, and the only thing that changed is
+that a projection made the operands compatible first. That is usually the point
+of a projection in these questions.</p>
+
+<p><strong>(h) Possible.</strong> <code>M</code> has <code>E, F</code> and
+<code>L</code> has <code>A, B, D</code> &mdash; no name in common, so the
+product is defined. Select on each side first, then multiply:
+<code>&sigma;[F = 1] M</code> is <code>{(6, 1)}</code> and
+<code>&sigma;[A = 1] L</code> is <code>{(1, 2, 4)}</code>, so the product is one
+row of five columns.</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5">&sigma;[F = 1] M &times; &sigma;[A = 1] L</th></tr>
+<tr><th style="text-align:center">E</th><th style="text-align:center">F</th><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">D</th></tr></thead>
+<tbody>
+<tr><td>6</td><td>1</td><td>1</td><td>2</td><td>4</td></tr>
+</tbody></table></div></div>
+<p>The product of an <em>m</em>-row and an <em>n</em>-row relation has
+<em>mn</em> rows, so 1 &times; 1 = 1. Had you forgotten the selections, it would
+have been 2 &times; 3 = 6.</p>
+
+<div class="box note"><span class="bt">The marking, part by part</span>
+<p>Six constructions and two key questions on 20 points is roughly 2&frac12;
+points each. An impossible one takes fifteen seconds once you have checked the
+arity; a product takes as long as it takes to write the rows out. Do them in
+the order they are cheapest, not in the order they are printed.</p></div>
+</div></details>
+
+
+<h2 id="db"><span class="secnum">M.5</span>The practice database</h2>
+
+<p>Problems 4 to 8 of the exam all run against one database printed on the last
+page. The practice below does the same, against a database you have not seen:
+a small chain of veterinary clinics. It is ours, written for this page.</p>
+
+<pre>clinic    (<u>clid</u>, name, borough, phone)
+vet       (<u>vid</u>, clid, name, specialty, yearsExp)
+owner     (<u>oid</u>, name, phone, zip)
+pet       (<u>pid</u>, oid, name, species, birthYear)
+visit     (<u>visid</u>, pid, vid, visitDate, fee)
+treatment (<u>visid</u>, <u>tname</u>, cost, category)</pre>
+
+<div class="tablewrap"><table>
+<thead><tr><th>field</th><th>in schema</th><th>references schema</th></tr></thead>
+<tbody>
+<tr><td><code>clid</code></td><td><code>vet</code></td><td><code>clinic</code></td></tr>
+<tr><td><code>oid</code></td><td><code>pet</code></td><td><code>owner</code></td></tr>
+<tr><td><code>pid</code></td><td><code>visit</code></td><td><code>pet</code></td></tr>
+<tr><td><code>vid</code></td><td><code>visit</code></td><td><code>vet</code></td></tr>
+<tr><td><code>visid</code></td><td><code>treatment</code></td><td><code>visit</code></td></tr>
+</tbody></table></div>
+
+<p>Read the shape before reading the rows, because the exam's database will
+have the same shape and you will have about a minute to take it in. There is a
+chain &mdash; a clinic has vets, an owner has pets &mdash; meeting in
+<code>visit</code>, which is the only relation that touches both sides. A
+question that mentions a clinic and an owner in the same breath has to go
+through <code>visit</code>, and that is four relations in the
+<code>FROM</code> clause before you have written a condition.</p>
+
+<p>One table has a <strong>composite primary key</strong>:
+<code>treatment</code> is keyed by the visit and the treatment's name together,
+so one visit may have several treatments but not two with the same name. The
+exam database will have a table like this, and it is what the &ldquo;can these
+two rows coexist&rdquo; part of Problem 4 is usually about.</p>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>clinic</code></th></tr>
+<tr><th style="text-align:center">clid</th><th style="text-align:center">name</th><th style="text-align:center">borough</th><th style="text-align:center">phone</th></tr></thead>
+<tbody>
+<tr><td>CL01</td><td>Riverside Animal Care</td><td>Queens</td><td>718-555-0101</td></tr>
+<tr><td>CL02</td><td>Harbor Vet Hospital</td><td>Brooklyn</td><td>718-555-0102</td></tr>
+<tr><td>CL03</td><td>Parkview Pet Clinic</td><td>Queens</td><td>718-555-0103</td></tr>
+<tr><td>CL04</td><td>Bayside Animal Centre</td><td>Queens</td><td>718-555-0104</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>owner</code></th></tr>
+<tr><th style="text-align:center">oid</th><th style="text-align:center">name</th><th style="text-align:center">phone</th><th style="text-align:center">zip</th></tr></thead>
+<tbody>
+<tr><td>OW01</td><td>Grace Abbott</td><td>917-555-0201</td><td>11367</td></tr>
+<tr><td>OW02</td><td>Hector Ruiz</td><td>917-555-0202</td><td>11375</td></tr>
+<tr><td>OW03</td><td>Mei Ling Tan</td><td>917-555-0203</td><td>11367</td></tr>
+<tr><td>OW04</td><td>Tomas Reyes</td><td>917-555-0204</td><td>11201</td></tr>
+<tr><td>OW05</td><td>Fiona Walsh</td><td>917-555-0205</td><td>11367</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5"><code>vet</code></th></tr>
+<tr><th style="text-align:center">vid</th><th style="text-align:center">clid</th><th style="text-align:center">name</th><th style="text-align:center">specialty</th><th style="text-align:center">yearsExp</th></tr></thead>
+<tbody>
+<tr><td>VT01</td><td>CL01</td><td>Dana Osei</td><td>surgery</td><td>12</td></tr>
+<tr><td>VT02</td><td>CL01</td><td>Marco Bianchi</td><td>dentistry</td><td>4</td></tr>
+<tr><td>VT03</td><td>CL02</td><td>Hana Kim</td><td>surgery</td><td>9</td></tr>
+<tr><td>VT04</td><td>CL02</td><td>Priya Raman</td><td>dermatology</td><td>2</td></tr>
+<tr><td>VT05</td><td>CL03</td><td>Luis Ferrer</td><td>general</td><td>15</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5"><code>pet</code></th></tr>
+<tr><th style="text-align:center">pid</th><th style="text-align:center">oid</th><th style="text-align:center">name</th><th style="text-align:center">species</th><th style="text-align:center">birthYear</th></tr></thead>
+<tbody>
+<tr><td>PT01</td><td>OW01</td><td>Biscuit</td><td>dog</td><td>2019</td></tr>
+<tr><td>PT02</td><td>OW01</td><td>Sable</td><td>cat</td><td>2022</td></tr>
+<tr><td>PT03</td><td>OW02</td><td>Pepper</td><td>dog</td><td>2015</td></tr>
+<tr><td>PT04</td><td>OW03</td><td>Mango</td><td>parrot</td><td>2020</td></tr>
+<tr><td>PT05</td><td>OW03</td><td>Olive</td><td>cat</td><td>2023</td></tr>
+<tr><td>PT06</td><td>OW05</td><td>Rufus</td><td>dog</td><td>2018</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="5"><code>visit</code></th></tr>
+<tr><th style="text-align:center">visid</th><th style="text-align:center">pid</th><th style="text-align:center">vid</th><th style="text-align:center">visitDate</th><th style="text-align:center">fee</th></tr></thead>
+<tbody>
+<tr><td>V001</td><td>PT01</td><td>VT01</td><td>2026-01-12</td><td>180.00</td></tr>
+<tr><td>V002</td><td>PT01</td><td>VT02</td><td>2026-03-04</td><td>95.00</td></tr>
+<tr><td>V003</td><td>PT02</td><td>VT01</td><td>2026-02-20</td><td>50.00</td></tr>
+<tr><td>V004</td><td>PT03</td><td>VT03</td><td>2026-01-30</td><td>240.00</td></tr>
+<tr><td>V005</td><td>PT03</td><td>VT03</td><td>2026-05-18</td><td>120.00</td></tr>
+<tr><td>V006</td><td>PT03</td><td>VT05</td><td>2026-07-02</td><td>75.00</td></tr>
+<tr><td>V007</td><td>PT04</td><td>VT05</td><td>2026-02-11</td><td>60.00</td></tr>
+<tr><td>V008</td><td>PT05</td><td>VT05</td><td>2026-04-09</td><td>45.00</td></tr>
+<tr><td>V009</td><td>PT05</td><td>VT05</td><td>2026-09-22</td><td>310.00</td></tr>
+<tr><td>V010</td><td>PT06</td><td>VT01</td><td>2026-03-15</td><td>220.00</td></tr>
+<tr><td>V011</td><td>PT06</td><td>VT02</td><td>2026-06-01</td><td>85.00</td></tr>
+<tr><td>V012</td><td>PT01</td><td>VT03</td><td>2025-11-08</td><td>150.00</td></tr>
+<tr><td>V013</td><td>PT04</td><td>VT05</td><td>2025-12-19</td><td>55.00</td></tr>
+<tr><td>V014</td><td>PT02</td><td>VT02</td><td>2026-08-30</td><td>40.00</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>treatment</code></th></tr>
+<tr><th style="text-align:center">visid</th><th style="text-align:center">tname</th><th style="text-align:center">cost</th><th style="text-align:center">category</th></tr></thead>
+<tbody>
+<tr><td>V001</td><td>pain relief</td><td>45.00</td><td>medication</td></tr>
+<tr><td>V001</td><td>spay</td><td>320.00</td><td>surgical</td></tr>
+<tr><td>V002</td><td>scale and polish</td><td>90.00</td><td>dental</td></tr>
+<tr><td>V003</td><td>vaccination</td><td>35.00</td><td>preventive</td></tr>
+<tr><td>V004</td><td>fracture repair</td><td>500.00</td><td>surgical</td></tr>
+<tr><td>V004</td><td>x-ray</td><td>140.00</td><td>imaging</td></tr>
+<tr><td>V005</td><td>suture removal</td><td>30.00</td><td>surgical</td></tr>
+<tr><td>V006</td><td>vaccination</td><td>35.00</td><td>preventive</td></tr>
+<tr><td>V007</td><td>wing trim</td><td>25.00</td><td>grooming</td></tr>
+<tr><td>V008</td><td>vaccination</td><td>35.00</td><td>preventive</td></tr>
+<tr><td>V009</td><td>dental surgery</td><td>420.00</td><td>surgical</td></tr>
+<tr><td>V009</td><td>x-ray</td><td>140.00</td><td>imaging</td></tr>
+<tr><td>V010</td><td>skin biopsy</td><td>160.00</td><td>surgical</td></tr>
+<tr><td>V011</td><td>extraction</td><td>130.00</td><td>dental</td></tr>
+<tr><td>V012</td><td>x-ray</td><td>140.00</td><td>imaging</td></tr>
+<tr><td>V013</td><td>vaccination</td><td>35.00</td><td>preventive</td></tr>
+</tbody></table></div>
+</div>
+
+
+<div class="box note"><span class="bt">Five things these rows are built to catch</span>
+<p>Bayside Animal Centre has <strong>no vets</strong>. Priya Raman has seen
+<strong>no patients</strong>. Tomas Reyes owns <strong>no pets</strong>. Visit
+V014 has <strong>no treatment</strong> recorded. And one visit fee is
+<strong>exactly 50.00</strong>.</p>
+<p>Each of those is a row that a careless query silently loses or silently
+keeps. On the exam the sample database will have been built the same way, so
+when your answer comes back suspiciously round, go looking for the row that
+should have been awkward.</p></div>
+
+<h2 id="p4"><span class="secnum">M.6</span>Problem 4 &mdash; which constraint breaks <span class="nb">[10 pts]</span></h2>
+
+<p>Four short parts. Each gives you a sequence of inserts against an empty
+database and asks whether it succeeds &mdash; and if not, which constraint
+stops it. The answer is always one of five, and naming the right one is where
+the marks are.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>Constraint</th><th>Says</th><th>Breaks when</th></tr></thead>
+<tbody>
+<tr><td><strong>D.C.</strong> domain</td><td>each value comes from its column's domain</td><td>a number where a date belongs, a string too long, a value outside a declared range</td></tr>
+<tr><td><strong>K.C.</strong> key</td><td>no two tuples agree on the primary key</td><td>a second row arrives with a key that is already there</td></tr>
+<tr><td><strong>N.C.</strong> nulls</td><td>a column declared <code>NOT NULL</code> has a value</td><td>a null is offered for such a column</td></tr>
+<tr><td><strong>E.I.C.</strong> entity integrity</td><td>no part of a primary key is null</td><td>a null appears in any key column &mdash; which needs no declaration, it is automatic</td></tr>
+<tr><td><strong>R.I.C.</strong> referential integrity</td><td>a foreign key value exists in the referenced relation, or is null</td><td>a child points at a parent that is not there yet</td></tr>
+</tbody></table></div>
+
+<div class="box worked"><span class="bt">The method, and the trap</span>
+<p><strong>Take the inserts strictly in order.</strong> &ldquo;Assume the
+database is empty&rdquo; is doing work: a row that would be fine later may fail
+now because the row it references has not been inserted yet. Most parts of this
+question turn on exactly that.</p>
+<p><strong>For each row, check in this order:</strong> are the values of the
+right type (D.C.); is any key column null (E.I.C.); is any <code>NOT NULL</code>
+column null (N.C.); is the key already present (K.C.); does every non-null
+foreign key find its parent (R.I.C.)?</p>
+<p><strong>A null foreign key is legal</strong> unless the column is part of
+the primary key or separately declared <code>NOT NULL</code>. &ldquo;We do not
+know which vet&rdquo; is a thing the relational model can say. This is the trap
+the question sets most often: students see a null in a foreign key column and
+call R.I.C., and R.I.C. is not violated &mdash; referential integrity is
+satisfied by a null.</p>
+<p><strong>Answer in two parts.</strong> Which statement fails, and which
+constraint. &ldquo;The second insert fails, K.C.&rdquo; is a complete answer;
+&ldquo;fails&rdquo; is not.</p></div>
+
+<details class="prob"><summary data-label="Practice B">In each part the database
+is empty to begin with. Say whether the operation succeeds; if it does not, say
+which statement fails and which constraint it violates.
+<p>(a) Insert into <code>clinic</code>:</p>
+<pre>'CL09', 'Elmhurst Pet Care',       'Queens', '718-555-0109'
+'CL09', 'Astoria Animal Hospital', 'Queens', '718-555-0110'</pre>
+<p>(b) Is it possible for <code>treatment</code> to hold these two rows at the
+same time?</p>
+<pre>'V014', 'x-ray', 140.00, 'imaging'
+'V014', 'x-ray', 155.00, 'diagnostic'</pre>
+<p>(c) Insert into <code>vet</code>:</p>
+<pre>'VT09', 'CL99', 'Ruth Levine', 'general', 6</pre>
+<p>(d) Insert into <code>clinic</code>, then <code>vet</code>, then
+<code>visit</code>:</p>
+<pre>'CL05', 'Corona Animal Clinic', 'Queens', '718-555-0105'
+'VT09', 'CL05', 'Ruth Levine', 'general', 6
+'V900', 'PT07', 'VT09', '2026-09-01', 70.00</pre>
+</summary>
+<div class="sol">
+<p><strong>(a) Fails on the second row &mdash; K.C.</strong>
+<code>clid</code> is the primary key of <code>clinic</code> and
+<code>'CL09'</code> is already there. The first insert succeeds; only the second
+is refused, which is why the question says <em>which</em> statement fails.</p>
+<pre class="asm">ERROR 1062 (23000): Duplicate entry 'CL09' for key 'PRIMARY'</pre>
+<p>Notice that the two rows disagree on everything except the key. That is not
+a defence: the key constraint is about the key alone.</p>
+
+<p><strong>(b) No &mdash; K.C.</strong> <code>treatment</code> is keyed by the
+pair <code>(visid, tname)</code>, and both rows offer
+<code>('V014', 'x-ray')</code>. The differing cost and category are irrelevant
+for the same reason as in (a).</p>
+<pre class="asm">ERROR 1062 (23000): Duplicate entry 'V014-x-ray' for key 'PRIMARY'</pre>
+<p><strong>Change one of them and it is fine.</strong>
+<code>('V014', 'x-ray', ...)</code> and <code>('V009', 'x-ray', ...)</code>
+coexist happily &mdash; and in fact the database already holds an
+<code>x-ray</code> on three different visits. A composite key constrains the
+combination, not either column.</p>
+
+<p><strong>(c) Fails &mdash; R.I.C.</strong> <code>clid</code> in
+<code>vet</code> is a foreign key into <code>clinic</code>, and there is no
+clinic <code>'CL99'</code> &mdash; the database is empty.</p>
+<pre class="asm">ERROR 1452 (23000): Cannot add or update a child row: a foreign key
+constraint fails (`vetclinic`.`vet`, CONSTRAINT `vet_ibfk_1`
+FOREIGN KEY (`clid`) REFERENCES `clinic` (`clid`))</pre>
+<p><strong>Had the row been <code>'VT09', NULL, 'Ruth Levine', ...</code> it
+would have succeeded.</strong> A null foreign key violates nothing:
+<code>clid</code> is not part of <code>vet</code>'s primary key, so entity
+integrity does not apply, and referential integrity explicitly permits a null.
+It would mean &ldquo;this vet is not attached to a clinic&rdquo;, which the
+schema allows.</p>
+
+<p><strong>(d) Fails on the third statement &mdash; R.I.C.</strong> The clinic
+goes in; the vet goes in, because <code>'CL05'</code> now exists; the visit is
+refused because <code>pid</code> is a foreign key into <code>pet</code> and
+there is no pet <code>'PT07'</code>.</p>
+<p>This is the shape the exam uses most: a chain of inserts where the first two
+are fine and the third points at something nobody created. Work down the
+sequence and check each foreign key against what exists <em>at that
+moment</em>, not against the full database you can see printed on the last
+page.</p>
+<p>The fix is not to reorder these three &mdash; no order helps, because the
+pet is simply absent. Insert an owner and then a pet first, and the visit goes
+in.</p>
+</div></details>
+
+
+<h2 id="p56"><span class="secnum">M.7</span>Problems 5 and 6 &mdash; algebra queries <span class="nb">[9 + 15 pts]</span></h2>
+
+<p>Problem 5 is one query in relational algebra. Problem 6 is one query written
+twice, in algebra and then in SQL. Between them they are 24 points, and they
+are drawn from two patterns that come up again and again.</p>
+
+<div class="box worked"><span class="bt">Pattern 1 &mdash; the second copy</span>
+<p>Any question of the form &ldquo;others who also ...&rdquo; or &ldquo;two
+different Xs that share a Y&rdquo; needs the <em>same relation twice</em>. In
+the algebra that is numbered copies; in SQL it is two aliases. The giveaway in
+the English is the word <strong>other</strong> or <strong>also</strong>, and
+the condition that makes the two copies different is never optional:</p>
+<pre>&sigma;[ ... &and; name&#8324; &ne; 'Grace Abbott' ]</pre>
+<p>Leave it off and the answer includes the person you were comparing against,
+which the question explicitly excluded.</p></div>
+
+<div class="box worked"><span class="bt">Pattern 2 &mdash; losers and winners</span>
+<p>Any question containing <strong>never</strong>, <strong>no</strong> or
+<strong>not any</strong> needs a difference. A condition on one row can only
+say &ldquo;this row is not X&rdquo;; it can never say &ldquo;this thing has no
+row that is X&rdquo;. Those are different claims and the second is what is
+being asked.</p>
+<p>So build the set of things that <em>do</em> offend, and subtract:</p>
+<pre>Losers  &larr;  &Pi;[key] &sigma;[the offending condition] ( ... )
+Winners &larr;  &Pi;[key] (everything)  &minus;  Losers</pre>
+<p>Both operands must be projected onto the <em>same</em> attributes or the
+difference is undefined &mdash; which is the same rule as Problem 3, in use.</p>
+<p>In SQL the difference becomes <code>NOT IN</code> against a subquery. In the
+algebra it is <code>&minus;</code>. They are the same idea.</p>
+<p>Most Problem 6 questions are this pattern <em>and</em> a positive condition:
+&ldquo;never done A, and has at least one B&rdquo;. Build the two sets
+separately and intersect, or build the B set and subtract the A set from it.</p></div>
+
+<details class="prob"><summary data-label="Practice C">Find the names of all
+owners, other than <code>'Grace Abbott'</code> herself, who have a pet that was
+seen by a vet who has also seen a pet of <code>'Grace Abbott'</code>. Write the
+expression in relational algebra.</summary>
+<div class="sol">
+<pre>HerVets &larr;  &Pi;[vid&#8323;] &sigma;[F&#8321;] ( owner&#8321; &times; pet&#8322; &times; visit&#8323; )
+
+   F&#8321; &equiv; [ name&#8321; = 'Grace Abbott' &and; oid&#8321; = oid&#8322; &and; pid&#8322; = pid&#8323; ]
+
+Result  &larr;  &Pi;[name&#8324;] &sigma;[F&#8322;] ( HerVets&#8321; &times; visit&#8322; &times; pet&#8323; &times; owner&#8324; )
+
+   F&#8322; &equiv; [ vid&#8321; = vid&#8322; &and; pid&#8322; = pid&#8323; &and; oid&#8323; = oid&#8324;
+            &and; name&#8324; &ne; 'Grace Abbott' ]</pre>
+<p>Running the SQL that corresponds to it:</p>
+<pre>+-------------+
+| name        |
++-------------+
+| Fiona Walsh |
+| Hector Ruiz |
++-------------+</pre>
+<p><strong>Name the intermediate relation.</strong> Written as one expression
+this needs six copies and a condition nobody can read. Two steps with a name in
+between is the same answer and a far better one to mark &mdash; and the exam
+paper tells you to show your work.</p>
+<p><strong>The vets who saw one of her pets are VT01, VT02 and VT03.</strong>
+Hector Ruiz's dog Pepper was seen by VT03; Fiona Walsh's dog Rufus was seen by
+VT01 and VT02. Mei Ling Tan's pets have only ever seen VT05, so she is
+correctly absent.</p>
+<p><strong>The last conjunct is the word &ldquo;other&rdquo;.</strong> Without
+it Grace Abbott appears in her own answer, since her pets were certainly seen
+by vets who saw her pets.</p>
+<p><strong>Comparing on the name, not the id.</strong> That is what the
+question gives you, and it is what the exam does. It is also a small lie: two
+owners could share a name. If you want to be exact,
+<code>oid&#8324; &ne; oid&#8321;</code> is the honest condition &mdash; and
+saying so in a margin note costs nothing and shows you noticed.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Practice D">Find the ids and names
+of all owners who have never had a pet seen at a clinic in
+<code>'Brooklyn'</code>, and who have at least one visit with a fee above
+$200. (a) Write the expression in relational algebra. (b) Write the expression
+in SQL.</summary>
+<div class="sol">
+<p><strong>(a)</strong> Two sets, then a difference:</p>
+<pre>Brooklyn &larr;  &Pi;[oid&#8321;] &sigma;[F&#8321;] ( owner&#8321; &times; pet&#8322; &times; visit&#8323; &times; vet&#8324; &times; clinic&#8325; )
+
+   F&#8321; &equiv; [ oid&#8321; = oid&#8322; &and; pid&#8322; = pid&#8323; &and; vid&#8323; = vid&#8324;
+            &and; clid&#8324; = clid&#8325; &and; borough&#8325; = 'Brooklyn' ]
+
+Spenders &larr;  &Pi;[oid&#8321;] &sigma;[F&#8322;] ( owner&#8321; &times; pet&#8322; &times; visit&#8323; )
+
+   F&#8322; &equiv; [ oid&#8321; = oid&#8322; &and; pid&#8322; = pid&#8323; &and; fee&#8323; &gt; 200 ]
+
+Winners  &larr;  Spenders &minus; Brooklyn
+
+Result   &larr;  &Pi;[oid&#8322;, name&#8322;] &sigma;[oid&#8321; = oid&#8322;] ( Winners&#8321; &times; owner&#8322; )</pre>
+<p><strong>The difference comes last but the projection comes first.</strong>
+Both operands are <code>&Pi;[oid]</code>, which is what makes the difference
+legal. Then one more product to turn the surviving ids back into names, because
+the question asked for both.</p>
+
+<p><strong>(b)</strong> In SQL the difference becomes <code>NOT IN</code>:</p>
+<pre>SELECT DISTINCT o.oid, o.name
+  FROM owner o, pet p, visit v
+ WHERE o.oid = p.oid AND p.pid = v.pid AND v.fee &gt; 200
+   AND o.oid NOT IN (SELECT o2.oid
+                       FROM owner o2, pet p2, visit v2, vet vt2, clinic c2
+                      WHERE o2.oid = p2.oid AND p2.pid = v2.pid
+                        AND v2.vid = vt2.vid AND vt2.clid = c2.clid
+                        AND c2.borough = 'Brooklyn');</pre>
+<pre>+------+--------------+
+| oid  | name         |
++------+--------------+
+| OW03 | Mei Ling Tan |
+| OW05 | Fiona Walsh  |
++------+--------------+</pre>
+<p><strong>The subquery is the <code>Brooklyn</code> relation</strong>, written
+inline instead of named. The outer query is <code>Spenders</code>, and
+<code>NOT IN</code> is the minus sign. Line the two answers up against each
+other and every piece of the algebra is visible in the SQL.</p>
+<p><strong>Who it separates.</strong> Three owners have a visit over $200:
+Hector Ruiz (240), Mei Ling Tan (310) and Fiona Walsh (220). Hector's dog was
+seen at Harbor Vet Hospital, which is in Brooklyn, so he drops out. The other
+two stay.</p>
+<p><strong><code>DISTINCT</code> is needed.</strong> An owner with two
+expensive visits would otherwise appear twice &mdash; the outer query is over
+visits, and the question is about owners.</p>
+<p><strong>The negative cannot be written as a condition.</strong>
+<code>c.borough != 'Brooklyn'</code> finds owners with <em>some</em> visit
+outside Brooklyn, which is a different set and includes Hector Ruiz, whose dog
+has also been seen in Queens. If you take one thing from this page, take
+that.</p>
+</div></details>
+
+
+<h2 id="p678"><span class="secnum">M.8</span>Problems 6b, 7 and 8 &mdash; SQL queries <span class="nb">[36 pts between them]</span></h2>
+
+<p>Three SQL answers, and they are three different questions. Problem 6(b) is
+the translation you have just seen. Problem 7 counts. Problem 8 groups. Knowing
+which of the three you are looking at is most of the work, because each has a
+shape that is almost always right.</p>
+
+<div class="box worked"><span class="bt">Reading the question into a query</span>
+<p><strong>&ldquo;How many distinct ...&rdquo;</strong> &rarr; one row out, so
+no <code>GROUP BY</code>. <code>SELECT COUNT(DISTINCT x)</code>, and the
+<code>DISTINCT</code> is not decoration: once you put four relations in a
+<code>FROM</code> clause, one vet with three visits is three rows.</p>
+<p><strong>&ldquo;For each ...&rdquo;</strong> &rarr; one row per something, so
+<code>GROUP BY</code> that something. Everything in the <code>SELECT</code>
+list must then be either grouped on or wrapped in an aggregate &mdash; that is
+the rule, and it is how you check your own answer.</p>
+<p><strong>&ldquo;Ignore those with fewer than <em>n</em> ...&rdquo;</strong>
+&rarr; <code>HAVING</code>, because it is a test on a whole group.
+<strong>&ldquo;Ignore those whose rating is below ...&rdquo;</strong> &rarr;
+<code>WHERE</code>, because it is a test on one row. Both say
+&ldquo;ignore&rdquo;; they go in different clauses, and Problem 8 nearly always
+asks for one of each.</p>
+<p><strong>&ldquo;during 2026&rdquo;, &ldquo;in the fall of ...&rdquo;</strong>
+&rarr; a range on a date column. <code>BETWEEN '2026-01-01' AND
+'2026-12-31'</code> is readable and inclusive at both ends. Do not reach for a
+function you are not sure of under exam pressure &mdash; two comparisons always
+work.</p>
+<p><strong>&ldquo;from high to low&rdquo;</strong> &rarr; <code>ORDER BY ...
+DESC</code>, and if you are ordering by an aggregate, write the aggregate again
+in the <code>ORDER BY</code>.</p></div>
+
+<details class="prob"><summary data-label="Practice E">Find the number of
+distinct vets who saw a pet belonging to an owner in the zip code
+<code>'11367'</code> during 2026. Write the expression in SQL.</summary>
+<div class="sol">
+<pre>SELECT COUNT(DISTINCT v.vid)
+  FROM owner o, pet p, visit v
+ WHERE o.oid = p.oid AND p.pid = v.pid
+   AND o.zip = '11367'
+   AND v.visitDate BETWEEN '2026-01-01' AND '2026-12-31';</pre>
+<pre>+-----------------------+
+| COUNT(DISTINCT v.vid) |
++-----------------------+
+|                     3 |
++-----------------------+</pre>
+<p><strong>Three relations, two links, two conditions.</strong> The chain is
+forced by the question: it names owners (by zip) and vets, and nothing joins
+those two except a visit, which reaches owners only through a pet.</p>
+<p><strong>Why <code>DISTINCT</code> is the whole question.</strong> Nine rows
+survive the <code>WHERE</code> clause &mdash; three owners live in 11367 and
+their pets made nine visits in 2026 between them. But those nine visits were
+handled by only three different vets, VT01, VT02 and VT05. Without
+<code>DISTINCT</code> the answer is 9, and 9 is not the number of vets.</p>
+<p><strong>No <code>GROUP BY</code>.</strong> The question asks for one number,
+not a number per anything. An aggregate with no <code>GROUP BY</code> collapses
+the whole result to a single row, which is exactly what is wanted.</p>
+<p><strong>The date range.</strong> Pepper's visit of 8 November 2025 and
+Mango's of 19 December 2025 are both excluded, correctly. Had the question said
+&ldquo;the autumn of 2026&rdquo;, only the two ends of the
+<code>BETWEEN</code> would change.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Practice F">For each clinic in
+<code>'Queens'</code>, print the clinic ID, name, and the average fee of its
+visits. Count only visits handled by a vet with at least 5 years of
+experience, and ignore clinics with fewer than 4 such visits. Order the result
+by average fee, highest first. Write the expression in SQL.</summary>
+<div class="sol">
+<pre>SELECT c.clid, c.name, AVG(v.fee)
+  FROM clinic c, vet vt, visit v
+ WHERE c.clid = vt.clid AND vt.vid = v.vid
+   AND c.borough = 'Queens' AND vt.yearsExp &gt;= 5
+ GROUP BY c.clid, c.name
+HAVING COUNT(v.visid) &gt;= 4
+ ORDER BY AVG(v.fee) DESC;</pre>
+<pre>+------+---------------------+------------+
+| clid | name                | AVG(v.fee) |
++------+---------------------+------------+
+| CL03 | Parkview Pet Clinic | 109.000000 |
++------+---------------------+------------+</pre>
+<p><strong>Two &ldquo;ignores&rdquo;, two different clauses.</strong>
+&ldquo;Only visits by a vet with 5+ years&rdquo; tests a single row, so it is in
+the <code>WHERE</code> and happens before grouping. &ldquo;Clinics with fewer
+than 4 such visits&rdquo; tests a whole group, so it is in the
+<code>HAVING</code> and happens after. Swap them and the query is either
+rejected or quietly wrong.</p>
+<p>Taking the filters off one at a time shows each one working. Without the
+<code>HAVING</code>:</p>
+<pre>+------+-----------------------+--------+------------+
+| clid | name                  | visits | avgfee     |
++------+-----------------------+--------+------------+
+| CL01 | Riverside Animal Care |      3 | 150.000000 |
+| CL03 | Parkview Pet Clinic   |      5 | 109.000000 |
++------+-----------------------+--------+------------+</pre>
+<p>and without the experience condition as well:</p>
+<pre>+------+-----------------------+--------+------------+
+| clid | name                  | visits | avgfee     |
++------+-----------------------+--------+------------+
+| CL01 | Riverside Animal Care |      6 | 111.666667 |
+| CL03 | Parkview Pet Clinic   |      5 | 109.000000 |
++------+-----------------------+--------+------------+</pre>
+<p>Riverside's average moves from 111.67 to 150.00 when the junior vet's three
+cheap visits come out, and then the clinic disappears entirely because three is
+fewer than four. Both filters change the answer, which is how you know you put
+them in the right places.</p>
+<p><strong>Bayside Animal Centre never appears at all</strong>, in any of the
+three. It is in Queens, but it has no vets, so no row of the product mentions
+it and no group is formed for it. <code>GROUP BY</code> groups the rows it is
+given; it cannot invent a group with nothing in it. If the question had wanted
+Bayside listed with a zero, that would need an outer join &mdash; which is the
+one thing this course's SQL deliberately cannot do, and worth saying in a
+margin note if you think a grader might wonder.</p>
+<p><strong><code>c.name</code> is in the <code>GROUP BY</code></strong> even
+though <code>c.clid</code> already determines it. Standard SQL insists, and
+this is the kind of thing a marker checks.</p>
+<p><strong>The <code>ORDER BY</code> repeats the aggregate.</strong> You may
+instead write <code>AVG(v.fee) AS avgfee</code> in the <code>SELECT</code> list
+and order by <code>avgfee</code>, which is shorter and reads better.</p>
+</div></details>
+
+<h2 id="last"><span class="secnum">M.9</span>The last hour, and the 75 minutes</h2>
+
+<div class="box note"><span class="bt">If you have one evening</span>
+<p>Work &sect;M.4's Practice A with the answers closed. Then Practice D, which
+is the single most representative question on this page &mdash; a negative, a
+positive, algebra and SQL in one. Then re-draw two diagrams from Set 1 and map
+one of them with Set 3. That is about two hours and it touches 70 of the 100
+points.</p></div>
+
+<div class="box worked"><span class="bt">In the room</span>
+<p><strong>Tear off the last page first.</strong> Then read the schema once
+before reading any question: where the keys are and which way the foreign keys
+point is the information you will use five times.</p>
+<p><strong>Do Problem 3 early.</strong> Twenty points, no narrative to
+interpret, and the impossible parts are nearly free once you have checked the
+arity.</p>
+<p><strong>45 seconds a point.</strong> That is about six minutes on Problem 1
+and nine on Problem 3. If a diagram is eating fifteen minutes, leave it, take
+the query marks, and come back.</p>
+<p><strong>Write the condition out.</strong> On every algebra answer, name the
+intermediate relations and put <code>F &equiv; [ ... ]</code> on its own line.
+It is faster to write than a nested one-liner, far easier to correct, and it is
+what &ldquo;show all work&rdquo; means here.</p>
+<p><strong>Before you hand in</strong>, check three things: every edge of
+Problem 1 has a cardinality at <em>both</em> ends; every schema in Problem 2
+has its foreign keys listed as well as its primary key; and every
+<code>SELECT</code> list is either grouped on or aggregated.</p></div>
+
+<div class="box extra"><span class="bt">What is not on it</span>
+<p>Everything up to Lecture 12 is examinable: ER and EER modelling, the mapping
+to relations, the relational model and its constraints, relational algebra, and
+SQL. Normalization, functional dependencies, transactions, concurrency,
+recovery and indexing are not &mdash; they come after the midterm. If you find
+yourself revising 3NF for this exam, you are revising for the next one.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-sql2.html"><span>Previous</span>Set 8. Queries on three databases</a>
+      <a class="next" href="setup-sql.html"><span>Next</span>Appendix A. Setting up SQL</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
