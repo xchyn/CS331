@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 9 — Normalization theory</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 9 &middot; Normalization</span>
+  <nav class="topnav">
+    <a href="ex-sql2.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-midterm.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#why"><span class="t">9.1</span>Why decompose at all</a></li>
+    <li><a href="#fd"><span class="t">9.2</span>Functional dependencies</a></li>
+    <li><a href="#rules"><span class="t">9.3</span>Armstrong's rules</a></li>
+    <li><a href="#closure"><span class="t">9.4</span>The closure of an attribute set</a></li>
+    <li><a href="#keys"><span class="t">9.5</span>Finding the candidate keys</a></li>
+    <li><a href="#cover"><span class="t">9.6</span>Equivalence and minimal cover</a></li>
+    <li><a href="#nf"><span class="t">9.7</span>The normal forms</a></li>
+    <li><a href="#split"><span class="t">9.8</span>Judging a decomposition</a></li>
+    <li><a href="#algo"><span class="t">9.9</span>Decomposing properly</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 9 &middot; Lectures 13 to 16</span>
+  <span class="chnum">Normalization</span>
+  <h1>Dependencies, keys and decomposition</h1>
+  <p class="chsum">The theory behind the schemas you have been writing since
+  Set 3: what a functional dependency is, how to compute the closure of an
+  attribute set, how to find every candidate key from it, what the normal
+  forms actually require, and how to split a schema so that the split loses
+  neither information nor dependencies. Twenty-three exercises from the problem
+  book, in the order Lectures 13 to 16 give the material.</p>
+</div>
+
+<p>Nothing on this page is a query. Everything is a calculation on attribute
+names, and almost all of it reduces to one routine &mdash; the closure
+algorithm of Lecture 14. Learn that one properly and the rest of the set is
+bookkeeping.</p>
+
+<div class="box note"><span class="bt">Notation, as the lectures write it</span>
+<p>Attribute sets are written without braces or commas: <code>AB</code> is the
+set containing <code>A</code> and <code>B</code>. A functional dependency is
+<code>X &rarr; Y</code>. The closure of an attribute set is
+<code>X<sup>+</sup></code>; the closure of a dependency set is
+<code>F<sup>+</sup></code>. They are different objects and the superscript is
+the only thing that distinguishes them, so read it carefully.</p>
+<p>Every answer below is checked the same way. A dependency is in
+<code>F<sup>+</sup></code> exactly when its right-hand side sits inside the
+closure of its left-hand side:</p>
+<pre>[ X &rarr; Y ] &isin; F&#8314;   &hArr;   Y &sube; X&#8314;</pre>
+<p>That equivalence is the whole of Lecture 14. Every question on this page
+about whether something holds, whether something is a key, or whether a schema
+is in some normal form, is that line applied to a different pair of sets.</p></div>
+
+<h2 id="why"><span class="secnum">9.1</span>Why decompose at all</h2>
+
+<p>Lecture 13 starts from the <strong>universal schema</strong> &mdash; one
+relation holding every attribute in the database. It is a legal relation and it
+is a terrible table, because you cannot store one fact in it without storing
+others alongside. Record that a student is enrolled in a course and you have
+also recorded the course's name, its credits, its teacher and that teacher's
+rank, every time.</p>
+
+<p>Breaking it into components fixes that only if the components are chosen
+well. Choose them badly and you get <strong>redundancy</strong> &mdash; the same
+fact stored in several rows, so that changing it in one place and not another
+makes the database say two contradictory things. Everything in this set is
+machinery for choosing well.</p>
+
+<details class="prob"><summary data-label="Exercise 9.1">Consider the following
+relational schema from your database:
+<pre>Attendance (student_id, student_name, course_name, classroom)</pre>
+Your data administrator claims that the following functional dependency holds:
+<pre>student_name, course_name  &rarr;  classroom</pre>
+<p>(a) List a sample content of the database that, if found, proves his claim,
+or explain why this is impossible.<br>
+(b) List a sample content that, if found, disproves his claim, or explain why
+this is impossible.</p></summary>
+<div class="sol">
+<p><strong>(a) Impossible.</strong> A functional dependency is a constraint
+imposed on the schema from outside &mdash; a statement about every state the
+database may ever be in. No particular content can establish it, because the
+very next row inserted might break it.</p>
+<p><strong>(b) Any two rows that agree on <code>student_name</code> and
+<code>course_name</code> and disagree on <code>classroom</code>.</strong> For
+instance:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="4"><code>Attendance</code></th></tr>
+<tr><th style="text-align:center">student_id</th><th style="text-align:center">student_name</th><th style="text-align:center">course_name</th><th style="text-align:center">classroom</th></tr></thead>
+<tbody>
+<tr><td>&hellip;</td><td>Oliver Twist</td><td>Database Systems</td><td>A103</td></tr>
+<tr><td>&hellip;</td><td>Oliver Twist</td><td>Database Systems</td><td>B131</td></tr>
+</tbody></table></div></div>
+<p><strong>The asymmetry is the point, and it is worth stating out loud.</strong>
+One counter-example settles a dependency for ever; a million confirming rows
+settle nothing. This is the same asymmetry you met in Set 3 and again in Set 8:
+an instance can disprove a key and can never prove one, because both a key and
+a dependency are claims about all possible content.</p>
+<p>So where do dependencies come from? From the people who know what the data
+means. They are part of the specification, like the cardinality on an ER edge,
+and the only honest answer to &ldquo;does this dependency hold?&rdquo; is
+&ldquo;ask whoever defined the database&rdquo;.</p>
+</div></details>
+
+<h2 id="fd"><span class="secnum">9.2</span>Functional dependencies</h2>
+
+<div class="box worked"><span class="bt">The definition</span>
+<p>Given a relation schema <code>R</code> and attribute sets <code>X</code> and
+<code>Y</code> of <code>R</code>, the dependency <code>X &rarr; Y</code> holds
+&mdash; read &ldquo;<code>X</code> functionally determines <code>Y</code>&rdquo;
+&mdash; if for any two tuples <code>t&#8321;</code> and <code>t&#8322;</code> of
+<code>R</code> with
+<code>t&#8321;[X] = t&#8322;[X]</code>, it must also be that
+<code>t&#8321;[Y] = t&#8322;[Y]</code>.</p>
+<p>Read it as a promise about <em>disagreement</em>: agree on the left and you
+are not allowed to disagree on the right. That reading is what turns several
+exercises below into one-line answers &mdash; &ldquo;can two tuples agree on
+<code>CL</code> but disagree on <code>G</code>?&rdquo; is just
+&ldquo;is <code>CL &rarr; G</code> in <code>F<sup>+</sup></code>?&rdquo;
+upside down.</p>
+<p>A dependency is <strong>trivial</strong> when the right side is already
+contained in the left: <code>AB &rarr; A</code> cannot fail. The normal forms
+all say &ldquo;for every <em>non-trivial</em> dependency&rdquo;, because the
+trivial ones constrain nothing.</p></div>
+
+<div class="box note"><span class="bt">How many dependencies a dependency implies</span>
+<p>Lecture 13 ends with an observation that is easy to skip and worth keeping:
+a single dependency <code>X &rarr; A&#8321;A&#8322;&hellip;A<sub>n</sub></code>
+already carries <code>2<sup>n</sup> &minus; 2</code> others with the same left
+side &mdash; one for every non-empty proper subset of the right-hand side. That
+is why <code>F<sup>+</sup></code> is enormous even when <code>F</code> is small,
+and why nobody ever computes <code>F<sup>+</sup></code> directly. The closure of
+an <em>attribute set</em> is the way round it.</p></div>
+
+
+<h2 id="rules"><span class="secnum">9.3</span>Armstrong's rules</h2>
+
+<p>Three rules generate every dependency that follows from a set
+<code>F</code>. Lecture 14 names them Armstrong's inference rules.</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Rule</th><th>Says</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Reflexive</td><td>if <code>A &sube; X</code> then <code>X &rarr; A</code></td></tr>
+<tr><td>2</td><td>Augmentation</td><td>if <code>X &rarr; Y</code> then <code>XA &rarr; YA</code></td></tr>
+<tr><td>3</td><td>Transitive</td><td>if <code>X &rarr; Y</code> and <code>Y &rarr; Z</code> then <code>X &rarr; Z</code></td></tr>
+</tbody></table></div>
+
+<p>Three more follow from those, and save a great deal of writing:</p>
+
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Rule</th><th>Says</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>Decomposition</td><td>if <code>X &rarr; YA</code> then <code>X &rarr; Y</code></td></tr>
+<tr><td>5</td><td>Union</td><td>if <code>X &rarr; Y</code> and <code>X &rarr; Z</code> then <code>X &rarr; YZ</code></td></tr>
+<tr><td>6</td><td>Pseudotransitive</td><td>if <code>X &rarr; Y</code> and <code>AY &rarr; Z</code> then <code>AX &rarr; Z</code></td></tr>
+</tbody></table></div>
+
+<details class="prob"><summary data-label="Exercise 9.2">Consider the following
+set <code>F</code> of functional dependencies:
+<pre>(a)  A  &rarr; BC
+(b)  B  &rarr; D
+(c)  DE &rarr; G</pre>
+Find six (or as many as you can) additional dependencies that are implied by
+<code>F</code>. For each one, give a short proof that it belongs to
+<code>F<sup>+</sup></code>, using Armstrong's axioms and the additional
+rules.</summary>
+<div class="sol">
+<pre>1.  BC  &rarr; CD     from (b), by augmentation (add C to both sides)
+2.  A   &rarr; CD     from (a) and 1., by transitivity
+3.  BE  &rarr; DE     from (b), by augmentation (add E to both sides)
+4.  BE  &rarr; G      from 3. and (c), by transitivity
+5.  ABE &rarr; BE     by reflexivity
+6.  ABE &rarr; G      from 5. and 4., by transitivity</pre>
+<p><strong>The pattern is augment, then chain.</strong> Transitivity is the only
+rule that produces something genuinely new, and it needs the right side of one
+dependency to match the left side of another <em>exactly</em>. Augmentation is
+how you make them match: step 1 pads <code>B &rarr; D</code> out to
+<code>BC &rarr; CD</code> so that it can be chained onto
+<code>A &rarr; BC</code>.</p>
+<p><strong>Reflexivity looks useless and is not.</strong> Step 5 produces a
+dependency that says nothing on its own &mdash; of course <code>ABE</code>
+determines <code>BE</code>. But it is a legal first link, and it lets you attach
+anything already known about <code>BE</code> to the larger set
+<code>ABE</code>.</p>
+<p>Six is what the question asks for; there are infinitely many, because
+step 5 works for any superset. A proof is only a proof if each line names the
+rule and the lines it came from.</p>
+<p><strong>The quick way to check any of these.</strong> Compute the closure of
+the left-hand side and look for the right-hand side inside it &mdash;
+<code>BE<sup>+</sup> = BDEG</code>, which contains <code>G</code>, so
+<code>BE &rarr; G</code> holds. That is &sect;9.4, and it is how you would
+check your own answer before handing it in. What it does not give you is the
+<em>derivation</em>, which is what this question asks for.</p>
+</div></details>
+
+<h2 id="closure"><span class="secnum">9.4</span>The closure of an attribute set</h2>
+
+<div class="box worked"><span class="bt">The algorithm, from Lecture 14</span>
+<p>Given <code>R</code>, a dependency set <code>F</code> and an attribute set
+<code>X</code>, the closure <code>X<sup>+</sup></code> is the set of attributes
+<code>A</code> for which <code>X &rarr; A</code> is derivable.</p>
+<pre>initialize  X&#8314; = X
+repeat:
+    for each dependency  A &rarr; B  in F:
+        if  A &sube; X&#8314;  then  X&#8314; = X&#8314; &cup; B
+stop when no change is possible</pre>
+<p>It runs in <code>O(|F|<sup>2</sup>)</code> and it always terminates, because
+<code>X<sup>+</sup></code> only grows and is bounded by <code>R</code>.</p>
+<p><strong>Keep a table as you go</strong> &mdash; round, which dependency fired,
+and the set so far. Every answer below is written that way, because it is what
+&ldquo;show your work&rdquo; means here and because it makes a dropped
+dependency easy to spot.</p>
+<p>One practical note: once a dependency has fired it can be crossed off, since
+its right-hand side is already in. That is the difference between the loop
+finishing in two passes and grinding through <code>|F|</code> of them.</p></div>
+
+<details class="prob"><summary data-label="Exercise 9.3">Consider the relational
+schema <code>ABCDEGHJ</code>, in which the following set <code>F</code> of
+functional dependencies holds:
+<pre>(1)  A  &rarr; BC
+(2)  B  &rarr; D
+(3)  DE &rarr; G
+(4)  B  &rarr; E
+(5)  E  &rarr; H
+(6)  GH &rarr; J</pre>
+Apply the appropriate algorithm to compute the closure <code>BC<sup>+</sup></code>
+of the attribute set <code>BC</code> with respect to <code>F</code>. Show your
+work.</summary>
+<div class="sol">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">Exercise 9.3</th></tr>
+<tr><th style="text-align:center">round</th><th style="text-align:center">dependency</th><th style="text-align:center">BC<sup>+</sup> so far</th></tr></thead>
+<tbody><tr><td>&mdash;</td><td>&mdash;</td><td>BC</td></tr>
+<tr><td>1</td><td>(2)</td><td>BCD</td></tr>
+<tr><td>1</td><td>(4)</td><td>BCDE</td></tr>
+<tr><td>1</td><td>(5)</td><td>BCDEH</td></tr>
+<tr><td>2</td><td>(3)</td><td>BCDEGH</td></tr>
+<tr><td>2</td><td>(6)</td><td>BCDEGHJ</td></tr>
+</tbody></table></div>
+<p>Hence <code>BC<sup>+</sup> = BCDEGHJ</code>.</p>
+<p><strong>Round 1 fires (2), (4) and (5)</strong> &mdash; everything whose left
+side is already inside <code>BC</code> or became so during the pass. Round 2
+can then fire (3), because <code>D</code> and <code>E</code> have both arrived,
+and (6), because <code>G</code> and <code>H</code> have. Round 3 changes
+nothing, so the loop stops.</p>
+<p><strong><code>A</code> never arrives</strong>, and that is not an accident:
+<code>A</code> appears on no right-hand side in <code>F</code>, so no dependency
+can ever introduce it. Scanning the right-hand sides before you start tells you
+which attributes are unreachable &mdash; and &sect;9.5 turns that observation
+into the method for finding keys.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.4">Consider the relational
+schema <code>R = ABCDEGHJKLMNP</code>, in which the following set <code>F</code>
+of functional dependencies holds:
+<pre>(1)  E  &rarr; H     (7)   A  &rarr; N
+(2)  GH &rarr; J     (8)   A  &rarr; B
+(3)  D  &rarr; E     (9)   DH &rarr; G
+(4)  AB &rarr; D     (10)  KL &rarr; A
+(5)  KL &rarr; M     (11)  KA &rarr; P
+(6)  MN &rarr; P     (12)  C  &rarr; K</pre>
+<p>(a) Does the dependency <code>AC &rarr; M</code> hold in <code>R</code> under
+<code>F</code>? Prove your answer.<br>
+(b) Is it possible for two tuples of <code>R</code> to agree (simultaneously) on
+the values of attributes <code>C</code> and <code>L</code>, but to disagree on
+the value of <code>G</code>? Prove your answer.</p></summary>
+<div class="sol">
+<p><strong>(a) No.</strong> The dependency holds only if
+<code>M &sube; AC<sup>+</sup></code>, so compute the closure:</p>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">Exercise 9.4(a)</th></tr>
+<tr><th style="text-align:center">round</th><th style="text-align:center">dependency</th><th style="text-align:center">AC<sup>+</sup> so far</th></tr></thead>
+<tbody><tr><td>&mdash;</td><td>&mdash;</td><td>AC</td></tr>
+<tr><td>1</td><td>(7)</td><td>ACN</td></tr>
+<tr><td>1</td><td>(8)</td><td>ABCN</td></tr>
+<tr><td>1</td><td>(12)</td><td>ABCKN</td></tr>
+<tr><td>2</td><td>(4)</td><td>ABCDKN</td></tr>
+<tr><td>2</td><td>(11)</td><td>ABCDKNP</td></tr>
+<tr><td>3</td><td>(3)</td><td>ABCDEKNP</td></tr>
+<tr><td>4</td><td>(1)</td><td>ABCDEHKNP</td></tr>
+<tr><td>4</td><td>(9)</td><td>ABCDEGHKNP</td></tr>
+<tr><td>5</td><td>(2)</td><td>ABCDEGHJKNP</td></tr>
+</tbody></table></div>
+<p><code>AC<sup>+</sup> = ABCDEGHJKNP</code>, and <code>M &notin;</code> it, so
+<code>[AC &rarr; M] &notin; F<sup>+</sup></code>.</p>
+<p><strong>Why it stalls.</strong> <code>M</code> arrives only through (5),
+<code>KL &rarr; M</code>, and <code>L</code> is never produced by anything
+&mdash; it appears on no right-hand side. So no closure that does not start with
+<code>L</code> can ever reach <code>M</code>.</p>
+
+<p><strong>(b) No</strong>, because <code>CL &rarr; G</code> does hold, and a
+dependency is precisely the promise that agreeing on the left forbids
+disagreeing on the right.</p>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">Exercise 9.4(b)</th></tr>
+<tr><th style="text-align:center">round</th><th style="text-align:center">dependency</th><th style="text-align:center">CL<sup>+</sup> so far</th></tr></thead>
+<tbody><tr><td>&mdash;</td><td>&mdash;</td><td>CL</td></tr>
+<tr><td>1</td><td>(12)</td><td>CKL</td></tr>
+<tr><td>2</td><td>(5)</td><td>CKLM</td></tr>
+<tr><td>2</td><td>(10)</td><td>ACKLM</td></tr>
+<tr><td>2</td><td>(11)</td><td>ACKLMP</td></tr>
+<tr><td>3</td><td>(7)</td><td>ACKLMNP</td></tr>
+<tr><td>3</td><td>(8)</td><td>ABCKLMNP</td></tr>
+<tr><td>4</td><td>(4)</td><td>ABCDKLMNP</td></tr>
+<tr><td>5</td><td>(3)</td><td>ABCDEKLMNP</td></tr>
+<tr><td>6</td><td>(1)</td><td>ABCDEHKLMNP</td></tr>
+<tr><td>6</td><td>(9)</td><td>ABCDEGHKLMNP</td></tr>
+<tr><td>7</td><td>(2)</td><td>ABCDEGHJKLMNP</td></tr>
+</tbody></table></div>
+<p><code>CL<sup>+</sup> = ABCDEGHJKLMNP</code>, which is all of <code>R</code>
+&mdash; so not only <code>G</code> but every attribute is determined, and
+<code>CL</code> is a superkey.</p>
+<p><strong>Read the question backwards.</strong> &ldquo;Can two tuples agree
+here and disagree there?&rdquo; is never a question about tuples; it is
+<code>[X &rarr; Y] &isin; F<sup>+</sup>?</code> with the answer negated. Yes
+they can means the dependency fails; no they cannot means it holds.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.5">Consider the same
+schema and dependency set as Exercise 9.4.
+<p>(a) Does the dependency <code>AC &rarr; J</code> hold in <code>R</code> under
+<code>F</code>? Prove your answer.<br>
+(b) Is it possible for two tuples of <code>R</code> to agree (simultaneously) on
+the values of attributes <code>A</code> and <code>P</code>, but to disagree on
+the value of <code>K</code>? Prove your answer.</p></summary>
+<div class="sol">
+<p><strong>(a) Yes.</strong> From Exercise 9.4(a),
+<code>AC<sup>+</sup> = ABCDEGHJKNP</code>, and <code>J</code> is in it &mdash;
+it arrived in the last round, from (2) <code>GH &rarr; J</code>, once
+<code>G</code> and <code>H</code> were both present. So
+<code>[AC &rarr; J] &isin; F<sup>+</sup></code>.</p>
+<p>Note that the same closure answers both this and Exercise 9.4(a). Compute a
+closure once and read several questions off it.</p>
+<p><strong>(b) Yes</strong>, they may disagree, because
+<code>AP &rarr; K</code> does <em>not</em> hold:</p>
+<pre>AP&#8314; = ABDEGHJNP</pre>
+<p><code>K</code> is absent. <code>K</code> is produced only by (12),
+<code>C &rarr; K</code>, and <code>C</code> &mdash; like <code>L</code> &mdash;
+appears on no right-hand side, so it can never be derived. Starting from
+<code>AP</code> there is no route to <code>C</code>, hence none to
+<code>K</code>.</p>
+<p><strong>Two attributes do all the work in this schema.</strong>
+<code>C</code> and <code>L</code> are the only ones that never appear on a right
+side. Everything in Exercises 9.4 and 9.5 turns on whether the set you started
+from happened to contain them.</p>
+</div></details>
+
+
+<h2 id="keys"><span class="secnum">9.5</span>Finding the candidate keys</h2>
+
+<div class="box worked"><span class="bt">The vocabulary, recalled</span>
+<p>A <strong>superkey</strong> is an attribute set <code>S</code> such that no
+two tuples agree on <code>S</code> &mdash; equivalently,
+<code>S<sup>+</sup> = R</code>. A <strong>key</strong> is a minimal superkey:
+remove any attribute and it stops being one. If a schema has several, each is a
+<strong>candidate key</strong>; one is designated the <strong>primary key</strong>
+and the rest are <strong>secondary</strong>.</p>
+<p>An attribute is <strong>prime</strong> if it belongs to <em>some</em>
+candidate key, and <strong>non-prime</strong> otherwise. Three of the four
+normal forms are stated in terms of that distinction, so you cannot test them
+until you have found every candidate key &mdash; not just one.</p></div>
+
+<div class="box worked"><span class="bt">The two algorithms, from Lecture 15</span>
+<p><strong>One candidate key.</strong> Start with <code>K = R</code>, which is
+trivially a superkey. For each attribute <code>A</code> in <code>K</code>,
+compute <code>(K &minus; A)<sup>+</sup></code>; if it still equals
+<code>R</code>, drop <code>A</code>. What is left when you have tried every
+attribute is a key.</p>
+<p><strong>Every candidate key.</strong> Set <code>K</code> to the attributes
+that appear on <em>no</em> right-hand side in <code>F</code>. They can never be
+derived, so every candidate key must contain them. If
+<code>K<sup>+</sup> = R</code>, that single <code>K</code> is the only key and
+you are finished. Otherwise try <code>K</code> plus one more attribute, then
+<code>K</code> plus two, and so on; at the first size that yields any keys,
+collect them all and stop.</p>
+<p>The &ldquo;stop at the first size that works&rdquo; is what keeps the answer
+minimal. Going on to larger sets would hand you superkeys that are not
+keys.</p></div>
+
+<details class="prob"><summary data-label="Exercise 9.6">For the schema
+<code>ABCDEGHJ</code> and dependency set <code>F</code> of Exercise 9.3, is
+<code>BC</code> a candidate key? Explain your answer.</summary>
+<div class="sol">
+<p><strong>No.</strong> From Exercise 9.3,
+<code>BC<sup>+</sup> = BCDEGHJ</code>, which is missing <code>A</code>. A
+candidate key must determine every attribute of the schema, and <code>BC</code>
+does not determine <code>A</code>, so it is not even a superkey &mdash; let
+alone a minimal one.</p>
+<p><strong>The actual key is <code>A</code> alone.</strong> <code>A</code> is
+the only attribute that never appears on a right-hand side, so it must be in
+every candidate key; and <code>A<sup>+</sup> = ABCDEGHJ = R</code>, so it is
+already a superkey by itself. A single-attribute superkey is automatically
+minimal, so <code>A</code> is the one and only candidate key.</p>
+<p><strong>Check the direction of the question.</strong> It is easy to compute
+<code>BC<sup>+</sup></code>, see seven of the eight attributes, and read that as
+success. The test is equality with <code>R</code>, not &ldquo;nearly
+<code>R</code>&rdquo;.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.7">Consider the relational
+schema <code>R = ABCDEGHJKLMNP</code>, in which the following set <code>F</code>
+of functional dependencies holds:
+<pre>(1)  E  &rarr; H     (7)   A  &rarr; N
+(2)  GH &rarr; J     (8)   A  &rarr; B
+(3)  D  &rarr; E     (9)   DH &rarr; G
+(4)  AB &rarr; D     (10)  KP &rarr; A
+(5)  KL &rarr; M     (11)  KA &rarr; P
+(6)  MN &rarr; P     (12)  C  &rarr; K</pre>
+Apply the appropriate algorithm to decide whether the attribute set
+<code>AC</code> is a candidate for the primary key of <code>R</code>. Show your
+work.</summary>
+<div class="sol">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">Exercise 9.7</th></tr>
+<tr><th style="text-align:center">round</th><th style="text-align:center">dependency</th><th style="text-align:center">AC<sup>+</sup> so far</th></tr></thead>
+<tbody><tr><td>&mdash;</td><td>&mdash;</td><td>AC</td></tr>
+<tr><td>1</td><td>(7)</td><td>ACN</td></tr>
+<tr><td>1</td><td>(8)</td><td>ABCN</td></tr>
+<tr><td>1</td><td>(12)</td><td>ABCKN</td></tr>
+<tr><td>2</td><td>(4)</td><td>ABCDKN</td></tr>
+<tr><td>2</td><td>(11)</td><td>ABCDKNP</td></tr>
+<tr><td>3</td><td>(3)</td><td>ABCDEKNP</td></tr>
+<tr><td>4</td><td>(1)</td><td>ABCDEHKNP</td></tr>
+<tr><td>4</td><td>(9)</td><td>ABCDEGHKNP</td></tr>
+<tr><td>5</td><td>(2)</td><td>ABCDEGHJKNP</td></tr>
+</tbody></table></div>
+<p><code>AC<sup>+</sup> = ABCDEGHJKNP</code>, which does not contain
+<code>L</code> or <code>M</code>. So <code>AC</code> is not a superkey, and
+therefore not a candidate key.</p>
+<p><strong>Note that this dependency set is not the one in Exercise 9.4</strong>
+&mdash; dependency (10) is <code>KP &rarr; A</code> here, where it was
+<code>KL &rarr; A</code> there. The closure comes out the same anyway, which is
+worth a moment's thought: in Exercise 9.4 the route to <code>A</code> was never
+taken, because <code>A</code> was in the starting set already.</p>
+<p><strong><code>L</code> is the obstacle, as usual.</strong> It appears on no
+right-hand side, so it must be in every candidate key of <code>R</code>, and no
+set lacking it can be one. Scanning the right-hand sides takes ten seconds and
+would have answered this question before any closure was computed &mdash; though
+the question asks you to apply the algorithm, so apply it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.8">Consider a relational
+schema <code>R = ABCDEGHJK</code> with the set of functional dependencies
+<code>F</code>:
+<pre>(1)  ADG  &rarr; BC
+(2)  ABDG &rarr; E
+(3)  C    &rarr; G
+(4)  BJ   &rarr; HK</pre>
+<p>(a) Is the schema <code>R</code> in Boyce-Codd Normal Form? Prove your
+answer.<br>
+(b) Is the attribute set <code>ABCD</code> a superkey for <code>R</code>? Prove
+your answer.<br>
+(c) Does the dependency <code>ACDJ &rarr; K</code> hold in <code>R</code> under
+<code>F</code>? Prove your answer.<br>
+(d) Is it possible for two tuples of <code>R</code> to agree (simultaneously) on
+the values of attributes <code>A</code> and <code>C</code>, but to disagree on
+the value of <code>B</code>? Prove your answer.</p></summary>
+<div class="sol">
+<p><strong>(a) No.</strong> BCNF demands that the left side of every
+non-trivial dependency be a superkey. Dependency (3) has <code>C</code> on the
+left, and <code>C<sup>+</sup> = CG</code>, which is nowhere near
+<code>R</code>. One violation is enough.</p>
+<p><strong>(b) No.</strong></p>
+<pre>ABCD  &rarr;(3)  ABCDG  &rarr;(1)  ABCDG  &rarr;(2)  ABCDEG</pre>
+<p><code>ABCD<sup>+</sup> = ABCDEG &sub; R</code> &mdash; the attributes
+<code>H</code>, <code>J</code> and <code>K</code> are missing. Dependency (4)
+never fires because <code>J</code> is absent, and <code>J</code> appears on no
+right-hand side, so it can never arrive.</p>
+<p><strong>(c) Yes.</strong></p>
+<pre>ACDJ  &rarr;(3)  ACDGJ  &rarr;(1)  ABCDGJ  &rarr;(2)  ABCDEGJ  &rarr;(4)  ABCDEGHJK</pre>
+<p><code>K &sube; ACDJ<sup>+</sup></code>, so the dependency is in
+<code>F<sup>+</sup></code>. Notice that <code>ACDJ<sup>+</sup> = R</code>, so
+<code>ACDJ</code> is in fact a superkey &mdash; the question only asked about
+<code>K</code>, but the closure tells you more than you asked for.</p>
+<p><strong>(d) Yes, they may disagree</strong>, because <code>AC &rarr; B</code>
+does not hold: <code>AC<sup>+</sup> = ACG</code>, and <code>B</code> is not in
+it. Dependency (1) needs <code>D</code> and <code>G</code> as well as
+<code>A</code>; <code>G</code> arrives from (3) but <code>D</code> never
+does.</p>
+<p><strong>Four questions, four closures, one method.</strong> That is the
+shape of this kind of exam problem: each part is the same calculation on a
+different starting set.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.9">Consider a relational
+schema <code>R = ABCDEGHJK</code> with the set of functional dependencies
+<code>F</code>:
+<pre>(1)  ADG  &rarr; BC
+(2)  ABDG &rarr; E
+(3)  C    &rarr; GJ
+(4)  BJ   &rarr; HK
+(5)  AH   &rarr; K</pre>
+<p>(a) Is <code>R</code> in Boyce-Codd Normal Form?<br>
+(b) Is <code>ABCD</code> a superkey for <code>R</code>?<br>
+(c) Does <code>ACD &rarr; H</code> hold in <code>R</code> under <code>F</code>?<br>
+(d) Is it possible for two tuples of <code>R</code> to agree on <code>A</code>
+and <code>B</code> but disagree on <code>C</code>?<br>
+(e) Find a candidate key for <code>R</code> and prove that it is indeed a
+candidate key.</p></summary>
+<div class="sol">
+<p><strong>(a) No.</strong> Dependency (3) has <code>C</code> on the left and
+<code>C<sup>+</sup> = CGJ &ne; R</code>, so <code>C</code> is not a
+superkey.</p>
+<p><strong>(b) Yes</strong>, and this is where this schema differs from
+Exercise 9.8. The extra <code>J</code> on the right of (3) changes everything:</p>
+<pre>ABCD  &rarr;(3)  ABCDGJ  &rarr;(1)  ABCDGJ  &rarr;(2)  ABCDEGJ  &rarr;(4)  ABCDEGHJK = R</pre>
+<p>Once <code>J</code> arrives, (4) can fire, and <code>H</code> and
+<code>K</code> follow. In Exercise 9.8 nothing produced <code>J</code> and the
+closure stalled.</p>
+<p><strong>(c) Yes.</strong> <code>ACD<sup>+</sup> = ABCDEGHJK = R</code>, so
+<code>ACD</code> determines everything, <code>H</code> included.</p>
+<p><strong>(d) Yes, they may disagree.</strong> <code>AB<sup>+</sup> = AB</code>
+&mdash; no dependency has a left side inside <code>AB</code>, so the closure
+never grows at all, and <code>C</code> is certainly not in it.</p>
+<p><strong>(e) <code>ACD</code> and <code>ADG</code> are both candidate
+keys.</strong> Every candidate key must contain <code>A</code> and
+<code>D</code>, since neither ever appears on a right-hand side. But
+<code>AD<sup>+</sup> = AD</code>, so at least one more attribute is needed.
+Adding <code>C</code> works, by part (c); adding <code>G</code> works too:</p>
+<pre>ADG  &rarr;(1)  ABCDG  &rarr;(2)  ABCDEG  &rarr;(3)  ABCDEGJ  &rarr;(4)  ABCDEGHJK = R</pre>
+<p>Both are minimal, since <code>AD</code> alone is not a superkey and neither
+<code>C</code> nor <code>G</code> can be dropped. Trying the other candidates
+one at a time &mdash; <code>ADB</code>, <code>ADE</code>, <code>ADH</code>,
+<code>ADJ</code>, <code>ADK</code> &mdash; none reaches <code>R</code>, so
+those two are the complete answer.</p>
+<p><strong>&ldquo;Find a candidate key&rdquo; asks for one; the question of
+whether there are others is a different one.</strong> Here there are two, and
+on the exam that distinction matters, because the prime attributes &mdash; and
+therefore 3NF &mdash; depend on having found all of them.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.10">Consider a relational
+schema <code>R = ABCDEGHJK</code> with the set of functional dependencies
+<code>F</code>:
+<pre>(1)  BC &rarr; A     (4)  G &rarr; BE
+(2)  DB &rarr; C     (5)  H &rarr; K
+(3)  E  &rarr; D     (6)  J &rarr; H</pre>
+List all candidate keys for <code>R</code>, stating clearly how many there are
+altogether. For each one, prove that it is indeed a candidate key, and prove
+that there are no others.</summary>
+<div class="sol">
+<p><strong>There is exactly one: <code>GJ</code>.</strong></p>
+<p><strong>Every candidate key must contain <code>G</code> and
+<code>J</code></strong>, because neither appears on the right-hand side of any
+dependency in <code>F</code>, so nothing can ever derive them. Scan the right
+sides to confirm: <code>A</code>, <code>C</code>, <code>D</code>,
+<code>BE</code>, <code>K</code>, <code>H</code> &mdash; no <code>G</code>, no
+<code>J</code>.</p>
+<p><strong><code>GJ</code> is already a superkey</strong>, so nothing more is
+needed and nothing less will do:</p>
+<pre>GJ  &rarr;(4)  BEGJ  &rarr;(6)  BEGHJ  &rarr;(3)  BDEGHJ
+    &rarr;(5)  BDEGHJK  &rarr;(2)  BCDEGHJK  &rarr;(1)  ABCDEGHJK = R</pre>
+<p>Since <code>GJ<sup>+</sup> = R</code>, the algorithm of Lecture 15 stops at
+once: the forced attributes alone form a key, so there is no larger set to try
+and no other candidate key exists.</p>
+<p><strong>That last step is the proof of uniqueness</strong>, and it is easy to
+leave out. Any other candidate key would have to contain <code>GJ</code> &mdash;
+and any proper superset of a key is a superkey, not a key. So <code>GJ</code>
+being a key by itself settles that it is the only one.</p>
+<p><strong>A second question the same closure answers.</strong> Can two tuples
+agree on <code>G</code> and <code>E</code> but disagree on <code>C</code>? No
+&mdash; <code>GE<sup>+</sup></code> reaches <code>C</code> by the same chain
+<code>E &rarr; D</code>, then <code>DB &rarr; C</code> once <code>B</code> has
+arrived from <code>G &rarr; BE</code>.</p>
+</div></details>
+
+
+<h2 id="cover"><span class="secnum">9.6</span>Equivalence and minimal cover</h2>
+
+<p>Two different-looking dependency sets can constrain a schema identically, and
+one of them is usually shorter. Lecture 15 gives the test for sameness and the
+algorithm for finding the short one &mdash; which is the input every
+decomposition algorithm in &sect;9.9 expects.</p>
+
+<div class="box worked"><span class="bt">Equivalence, and the lecture's example</span>
+<p><code>F</code> <strong>covers</strong> <code>G</code> when every dependency
+of <code>G</code> follows from <code>F</code>; that is,
+<code>G<sup>+</sup> &sube; F<sup>+</sup></code>. Two sets are
+<strong>equivalent</strong>, written <code>F &equiv; G</code>, when each covers
+the other.</p>
+<p>Nobody builds <code>F<sup>+</sup></code> to check this. For each dependency
+<code>X &rarr; Y</code> of <code>G</code>, compute <code>X<sup>+</sup></code>
+<em>under <code>F</code></em> and look for <code>Y</code> inside it. That is the
+same <code>Y &sube; X<sup>+</sup></code> test as everywhere else, and it takes
+one closure per dependency.</p>
+<p>Lecture 15 works this schema <code>ABDEH</code> with two dependency sets:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>F</code> and <code>G</code> on <code>ABDEH</code></th></tr>
+<tr><th style="text-align:center"><code>F</code></th><th style="text-align:center"><code>G</code></th></tr></thead>
+<tbody>
+<tr><td><code>(1)  A &rarr; BH</code></td><td><code>(a)  B &rarr; DEH</code></td></tr>
+<tr><td><code>(2)  B &rarr; AH</code></td><td><code>(b)  H &rarr; A</code></td></tr>
+<tr><td><code>(3)  H &rarr; BDE</code></td><td><code>(c)  A &rarr; B</code></td></tr>
+</tbody></table></div></div>
+<p><strong>Step 1 &mdash; does <code>F</code> cover <code>G</code>?</strong>
+Take each dependency of <code>G</code> and close its left side under
+<code>F</code>:</p>
+<pre>B  &rarr;(2)  ABH  &rarr;(3)  ABDEH      so  DEH &sube; B&#8314;,  (a) holds
+H  &rarr;(3)  BDEH &rarr;(2)  ABDEH      so  A   &sube; H&#8314;,  (b) holds
+A  &rarr;(1)  ABH                   so  B   &sube; A&#8314;,  (c) holds</pre>
+<p><strong>Step 2 &mdash; does <code>G</code> cover <code>F</code>?</strong>
+Now close each left side of <code>F</code> under <code>G</code>:</p>
+<pre>A  &rarr;(c)  AB   &rarr;(a)  ABDEH      so  BH  &sube; A&#8314;,  (1) holds
+B  &rarr;(a)  BDEH &rarr;(b)  ABDEH      so  AH  &sube; B&#8314;,  (2) holds
+H  &rarr;(b)  AH   &rarr;(c)  ABH  &rarr;(a)  ABDEH   so  BDE &sube; H&#8314;,  (3) holds</pre>
+<p>Both directions hold, so <code>F<sup>+</sup> = G<sup>+</sup></code> and the
+two sets are equivalent &mdash; they describe the same schema.</p>
+<p><strong>One direction is not enough.</strong> Lecture 15's counter-example is
+<code>F = {A &rarr; B, B &rarr; C}</code> against
+<code>G = {A &rarr; C}</code>. <code>F</code> covers <code>G</code>, since
+<code>A &rarr; C</code> follows by transitivity. <code>G</code> does not cover
+<code>F</code>: under <code>G</code>, <code>A<sup>+</sup> = AC</code>, which
+does not contain <code>B</code>.</p></div>
+
+<div class="box worked"><span class="bt">Minimal cover, and the algorithm</span>
+<p>A dependency set <code>F</code> is <strong>minimal</strong> when all three
+hold:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Condition</th><th>What it rules out</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>every right-hand side is a single attribute</td><td><code>X &rarr; ABC</code>, which is really three dependencies in a trench coat</td></tr>
+<tr><td>2</td><td>no redundant attribute on a left-hand side</td><td><code>XAB &rarr; Y</code> where <code>AB &rarr; Y</code> already does the job</td></tr>
+<tr><td>3</td><td>no redundant dependency</td><td>a dependency whose removal leaves an equivalent set</td></tr>
+</tbody></table></div>
+<p>A <strong>minimal cover</strong> of a set <code>E</code> is a minimal set
+equivalent to <code>E</code>. Every set has at least one, found by establishing
+the three conditions <em>in that order</em> &mdash; after which no further
+iteration is needed:</p>
+<pre>1.  replace each  X &rarr; A&#8321;A&#8322;&hellip;A&#8345;  by  X &rarr; A&#8321;, &hellip;, X &rarr; A&#8345;
+
+2.  for each  X &rarr; A  in F, for each attribute B in X:
+        if  (F &minus; {X &rarr; A}) &cup; {(X&minus;B) &rarr; A}  is equivalent to F
+        then replace  X &rarr; A  by  (X&minus;B) &rarr; A
+
+3.  for each remaining  X &rarr; A  in F:
+        if  F &minus; {X &rarr; A}  is equivalent to F
+        then remove  X &rarr; A</pre>
+<p>Every test inside steps 2 and 3 is an equivalence test, and every equivalence
+test is a closure. There is nothing else in the algorithm.</p>
+<p><strong>Lecture 15's first example.</strong>
+<code>E = {B &rarr; A, D &rarr; A, AB &rarr; D}</code>.</p>
+<pre>step 1:  nothing to do &mdash; all right sides are single already.
+step 2:  can  AB &rarr; D  lose a left attribute?
+             A &rarr; D ?  under E, A&#8314; = A.  No.
+             B &rarr; D ?  under E, B&#8314; = AB, and with B &rarr; D added
+                        the set still proves AB &rarr; D.  Yes &mdash; replace it.
+         F is now  {B &rarr; A, D &rarr; A, B &rarr; D}
+step 3:  B &rarr; A is redundant: B &rarr; D &rarr; A already gives it.  Drop it.
+
+minimal cover:  { B &rarr; D,  D &rarr; A }</pre>
+<p><strong>Lecture 15's second example.</strong>
+<code>G = {A &rarr; BCDE, CD &rarr; E}</code>.</p>
+<pre>step 1:  A &rarr; B,  A &rarr; C,  A &rarr; D,  A &rarr; E,  CD &rarr; E
+step 2:  can  CD &rarr; E  lose an attribute?
+             C &rarr; E ?  No.    D &rarr; E ?  No.    Keep CD &rarr; E.
+step 3:  A &rarr; E is redundant: A &rarr; CD &rarr; E.  Drop it.
+
+minimal cover:  { A &rarr; B,  A &rarr; C,  A &rarr; D,  CD &rarr; E }</pre>
+<p>Those four may be written informally as
+<code>{A &rarr; BCD, CD &rarr; E}</code>, recombining the common left sides by
+the union rule. That form is convenient to read but no longer satisfies
+condition 1, so the split form is what the decomposition algorithm takes as
+input.</p></div>
+
+<details class="prob"><summary data-label="Exercise 9.11">Consider the relational
+schema <code>R = ABCDEGHJKLMN</code> with the set of functional dependencies
+<code>F</code>:
+<pre>(1)  A &rarr; E     (6)   B &rarr; A
+(2)  H &rarr; C     (7)   K &rarr; D
+(3)  D &rarr; K     (8)   C &rarr; N
+(4)  M &rarr; G     (9)   E &rarr; M
+(5)  L &rarr; J     (10)  G &rarr; L</pre>
+<p>(a) Prove that <code>F</code> is a minimal cover.<br>
+(b) Find one candidate key of <code>R</code> and prove that it is indeed a
+candidate key.</p></summary>
+<div class="sol">
+<p><strong>(a) Check the three conditions, in order.</strong></p>
+<p><em>Condition 1</em> &mdash; every right-hand side here is a single
+attribute. By inspection, true of all ten.</p>
+<p><em>Condition 2</em> &mdash; every left-hand side here is a single attribute
+as well, so there is nothing to remove: dropping the only attribute would delete
+the dependency rather than weaken it.</p>
+<p><em>Condition 3</em> &mdash; no dependency is redundant. Each one has the
+shape <code>X &rarr; Y</code> where <code>X</code> is a single attribute that
+appears on no other left-hand side in <code>F</code>. Remove that dependency and
+<code>X<sup>+</sup></code> collapses to <code>X</code> alone, because nothing
+else in <code>F</code> can fire on it; before the removal
+<code>X<sup>+</sup></code> contained <code>Y</code>. So the smaller set is not
+equivalent, and the argument runs the same way for all ten.</p>
+<p><strong>(b) <code>BHD</code> is a candidate key</strong> (and so is
+<code>BHK</code>; either answers the question). Every candidate key must contain
+<code>B</code> and <code>H</code>, since neither appears on any right-hand side.
+But those two alone are not enough:</p>
+<pre>BH  &rarr;(2)  BCH  &rarr;(6)  ABCH  &rarr;(8)  ABCHN  &rarr;(1)  ABCEHN
+    &rarr;(9)  ABCEHMN  &rarr;(4)  ABCEGHMN  &rarr;(10)  ABCEGHLMN
+    &rarr;(5)  ABCEGHJLMN = BH&#8314;</pre>
+<p><code>D</code> and <code>K</code> are missing, and they are the only two
+attributes outside <code>BH<sup>+</sup></code>, so exactly one more is needed.
+Adding either works, since (3) and (7) run in both directions:</p>
+<pre>BHD  &rarr;(above)  ABCEGHJLMN + D  &rarr;(3)  ABCDEGHJKLMN = R
+BHK  &rarr;(above)  ABCEGHJLMN + K  &rarr;(7)  ABCDEGHJKLMN = R</pre>
+<p>Each is minimal, because <code>BH</code> is not a superkey and both
+<code>B</code> and <code>H</code> are forced.</p>
+<p><strong>Why the proof of (a) is so short here.</strong> Ten dependencies
+would normally mean ten equivalence tests in condition 3. They collapse to one
+argument because every left-hand side is a <em>distinct single attribute</em>:
+no dependency can help derive another one's left side on its own, so removing
+any of them strands its right-hand side. Notice the shape before you start
+grinding.</p>
+<p>This schema returns in Exercise 9.13, once the normal forms are defined.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.12">Consider again the
+schema <code>ABCDEGHJ</code> and the dependency set <code>F</code> of
+Exercise 9.3:
+<pre>(1)  A  &rarr; BC     (4)  B  &rarr; E
+(2)  B  &rarr; D      (5)  E  &rarr; H
+(3)  DE &rarr; G      (6)  GH &rarr; J</pre>
+Is the dependency set <code>F</code> a minimal cover? Explain your answer. If it
+is not, produce one.</summary>
+<div class="sol">
+<p><strong>No.</strong> Condition 1 requires a single attribute on every right
+side, and dependency (1) <code>A &rarr; BC</code> has two. That one observation
+is the whole answer to the question as asked.</p>
+<p><strong>Producing a minimal cover takes one more step and two checks.</strong>
+Split (1) by the decomposition rule:</p>
+<pre>A &rarr; B,   A &rarr; C,   B &rarr; D,   DE &rarr; G,   B &rarr; E,   E &rarr; H,   GH &rarr; J</pre>
+<p><em>Condition 2.</em> Only <code>DE &rarr; G</code> and
+<code>GH &rarr; J</code> have more than one attribute on the left. Neither can
+shed one: under <code>F</code>, <code>D<sup>+</sup> = D</code> and
+<code>E<sup>+</sup> = EH</code>, so neither <code>D &rarr; G</code> nor
+<code>E &rarr; G</code> holds; likewise <code>G<sup>+</sup> = G</code> and
+<code>H<sup>+</sup> = H</code>, so neither half of <code>GH</code> determines
+<code>J</code> alone.</p>
+<p><em>Condition 3.</em> No dependency is redundant &mdash; drop any one of the
+seven and recompute, and the right-hand side is no longer in the closure of the
+left. <code>A &rarr; C</code> is the clearest case: <code>C</code> appears on no
+other right-hand side at all, so removing it makes <code>C</code> underivable
+from anything.</p>
+<p>The seven dependencies above are therefore a minimal cover of
+<code>F</code>.</p>
+<p><strong>Splitting is almost always step one and almost never the last step.</strong>
+Here it happened to be enough, but only because the checks in conditions 2 and
+3 both came back clean. The checks are the work; the splitting is bookkeeping.</p>
+</div></details>
+
+<h2 id="nf"><span class="secnum">9.7</span>The normal forms</h2>
+
+<div class="box worked"><span class="bt">The four forms, as Lecture 16 states them</span>
+<p>An attribute is <strong>prime</strong> if it belongs to some candidate key,
+and <strong>non-prime</strong> otherwise. Every normal form below is a sentence
+about non-trivial dependencies and candidate keys, so you cannot test any of
+them until you have found <em>all</em> the candidate keys &mdash; which is why
+&sect;9.5 comes first.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Form</th><th>Requires</th></tr></thead>
+<tbody>
+<tr><td>1NF</td><td>every attribute's domain holds only atomic values, and every attribute of a tuple holds a single value from that domain</td></tr>
+<tr><td>2NF</td><td>1NF, and every non-prime attribute is <em>fully</em> functionally dependent on the key &mdash; no non-prime attribute is determined by a proper part of it</td></tr>
+<tr><td>3NF</td><td>2NF, and no non-prime attribute is transitively dependent on the key. Equivalently: for every non-trivial <code>X &rarr; A</code>, either <code>X</code> is a superkey or <code>A</code> is prime</td></tr>
+<tr><td>BCNF</td><td>for every non-trivial <code>X &rarr; A</code>, <code>X</code> is a superkey. No escape clause</td></tr>
+</tbody></table></div>
+<p>The second 3NF phrasing is the one to use on paper: it is a loop over
+<code>F</code>, not a hunt for transitive chains. BCNF is the same loop with the
+words &ldquo;or <code>A</code> is prime&rdquo; deleted, which is why every BCNF
+schema is automatically in 3NF and the converse fails.</p>
+<p><strong>Where they bite.</strong> A dependency that violates BCNF stores the
+same fact twice &mdash; one row per occurrence of the left side. 3NF tolerates
+exactly the violations in which the repeated attribute is itself part of a key,
+and &sect;9.9 explains what is bought by tolerating them.</p></div>
+
+<details class="prob"><summary data-label="Exercise 9.13">Consider again the schema
+<code>R = ABCDEGHJKLMN</code> and the minimal cover <code>F</code> of
+Exercise 9.11:
+<pre>(1)  A &rarr; E     (6)   B &rarr; A
+(2)  H &rarr; C     (7)   K &rarr; D
+(3)  D &rarr; K     (8)   C &rarr; N
+(4)  M &rarr; G     (9)   E &rarr; M
+(5)  L &rarr; J     (10)  G &rarr; L</pre>
+<p>(a) List all dependencies that respect BCNF in <code>R</code>, and prove
+your listing is correct.<br>
+(b) List all dependencies that violate BCNF in <code>R</code>, and prove your
+listing is correct.</p></summary>
+<div class="sol">
+<p><strong>(a) There are none.</strong> BCNF asks that the left side of every
+non-trivial dependency be a superkey of <code>R</code>. Every superkey of
+<code>R</code> contains <code>BH</code> &mdash; that was the first step of
+Exercise 9.11(b), and it follows from <code>B</code> and <code>H</code>
+appearing on no right-hand side. But every left-hand side in <code>F</code> is
+a <em>single</em> attribute, so none of them can contain both. The list is
+empty.</p>
+<p><strong>(b) All ten</strong>, which is the same observation read the other
+way round. Not one dependency in <code>F</code> respects BCNF, so the schema
+sits at 1NF and nothing higher &mdash; 3NF fails too, since the right-hand
+sides are <code>E, C, K, G, J, A, D, N, M, L</code> and the prime attributes
+are only <code>B, D, H, K</code> (from the two keys <code>BDH</code> and
+<code>BHK</code>), so <code>A &rarr; E</code> alone already fails both
+clauses.</p>
+<p><strong>A schema in which every dependency violates BCNF is not
+pathological.</strong> It is what a schema looks like when the key is wide and
+the dependencies are narrow, and it is exactly the case the decomposition
+algorithm of &sect;9.9 is built for &mdash; which is why that algorithm produces
+one small component per dependency, plus one more to hold the key.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.14">Consider the relational
+schema <code>R = ABCDE</code> with the following set <code>F</code> of
+functional dependencies:
+<pre>AB &rarr; D
+E  &rarr; C
+C  &rarr; A</pre>
+<p>(a) Does the dependency <code>E &rarr; A</code> hold in
+<code>F<sup>+</sup></code>? Prove your answer.<br>
+(b) Determine if <code>EB</code> is a key of the schema <code>R</code> and prove
+your answer.<br>
+(c) Determine if <code>EA</code> is a key of the schema <code>R</code> and prove
+your answer.<br>
+(d) Is the schema <code>R</code> in BCNF? Prove your answer.<br>
+(e) Is the schema <code>R</code> in 3NF? Prove your answer.</p></summary>
+<div class="sol">
+<p><strong>(a) Yes</strong> &mdash; by transitivity on
+<code>E &rarr; C</code> and <code>C &rarr; A</code>.</p>
+<p><strong>(b) Yes, <code>EB</code> is a key.</strong> Both <code>E</code> and
+<code>B</code> must be in every key, since neither appears on a right-hand side,
+so no key is smaller. And it is a superkey:</p>
+<pre>EB  &rarr;(E&rarr;C)  BCE  &rarr;(C&rarr;A)  ABCE  &rarr;(AB&rarr;D)  ABCDE = R</pre>
+<p><strong>(c) No.</strong> <code>EA<sup>+</sup> = ACE</code> &mdash;
+<code>E &rarr; C</code> fires and then nothing else can, since
+<code>AB &rarr; D</code> needs <code>B</code>. <code>B</code> and <code>D</code>
+are both missing, so <code>EA</code> is not even a superkey.</p>
+<p><strong>(d) No.</strong> <code>E &rarr; C</code> is non-trivial and
+<code>E</code> is not a superkey &mdash; if it were, <code>EA</code> would be
+one too, and part (c) says it is not.</p>
+<p><strong>(e) No</strong>, and this is the part worth reading twice.
+<code>E &rarr; C</code> fails 3NF as well, which needs both escape clauses to
+fail. <code>E</code> is not a superkey, by (d). And <code>C</code> is not prime:
+<code>BE</code> is the only candidate key, so the prime attributes are exactly
+<code>B</code> and <code>E</code>.</p>
+<p><strong>Why <code>BE</code> is the only key.</strong> Every key contains
+<code>BE</code>, and <code>BE</code> is itself a key by (b); any proper superset
+of a key is a superkey, not a candidate key. So there is nothing else to check
+&mdash; and the prime set is settled in one line, which is what (e) needs.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.15">Consider a relational
+schema <code>R = ABCDEGHJK</code> with the set of functional dependencies
+<code>F</code>:
+<pre>(1)  BC &rarr; A     (4)  G &rarr; BE
+(2)  DB &rarr; C     (5)  H &rarr; K
+(3)  E  &rarr; D     (6)  J &rarr; H</pre>
+<p>(a) List all candidate keys for <code>R</code>, stating clearly how many
+there are altogether, and prove there are no others.<br>
+(b) Does <code>R</code> satisfy BCNF? Prove your answer.<br>
+(c) Does <code>R</code> satisfy 3NF? Prove your answer.</p></summary>
+<div class="sol">
+<p><strong>(a) Exactly one: <code>GJ</code></strong> &mdash; this is the schema
+of Exercise 9.10, and the proof is the one given there. Neither <code>G</code>
+nor <code>J</code> appears on a right-hand side, so both belong to every key;
+and <code>GJ<sup>+</sup> = R</code>, so no key is larger.</p>
+<pre>GJ  &rarr;(4)  BEGJ  &rarr;(6)  BEGHJ  &rarr;(3)  BDEGHJ
+    &rarr;(5)  BDEGHJK  &rarr;(2)  BCDEGHJK  &rarr;(1)  ABCDEGHJK = R</pre>
+<p><strong>(b) No.</strong> BCNF requires every left-hand side to be a superkey,
+and every superkey contains <code>GJ</code>. Not one dependency in
+<code>F</code> has both <code>G</code> and <code>J</code> on the left &mdash; in
+fact none has either, except (4), which has <code>G</code> but not
+<code>J</code>.</p>
+<p><strong>(c) No.</strong> Since no left-hand side is a superkey, 3NF falls
+back on its second clause for every dependency: the right-hand side must be
+prime. The prime attributes are exactly <code>G</code> and <code>J</code>,
+because <code>GJ</code> is the only candidate key. Scanning the right-hand sides
+&mdash; <code>A</code>, <code>C</code>, <code>D</code>, <code>BE</code>,
+<code>K</code>, <code>H</code> &mdash; not one of them is <code>G</code> or
+<code>J</code>. Every dependency fails, so <code>R</code> bears no normal form
+above 1NF.</p>
+<p><strong>Two questions, one piece of work.</strong> Parts (b) and (c) are
+answered entirely from the key found in (a). That is the usual shape of a
+normalization question, and it is why a wrong or incomplete key list poisons
+everything downstream.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.16">Consider the relational
+schema <code>ABCD</code> with the dependency set <code>F</code>:
+<pre>AC &rarr; B
+AC &rarr; D
+D  &rarr; C</pre>
+<p>(a) Is <code>ABCD</code> in 3NF with respect to <code>F</code>? Prove your
+answer.<br>
+(b) Regardless of your conclusion in part (a), remove one dependency from
+<code>F</code> so that <code>ABCD</code> is in BCNF with respect to the new set
+of dependencies. Explain your answer. If this is impossible, prove it.</p></summary>
+<div class="sol">
+<p><strong>First, the candidate keys &mdash; there are two:
+<code>AC</code> and <code>AD</code>.</strong>
+<code>A</code> is on no right-hand side, so it is in every key, but
+<code>A<sup>+</sup> = A</code>. Adding <code>C</code>:
+<code>AC<sup>+</sup> = ABCD = R</code>. Adding <code>D</code>:</p>
+<pre>AD  &rarr;(D&rarr;C)  ACD  &rarr;(AC&rarr;B)  ABCD = R</pre>
+<p><code>AB<sup>+</sup> = AB</code>, so <code>AB</code> is not a key, and both
+of the above are minimal. The prime attributes are therefore <code>A</code>,
+<code>C</code> and <code>D</code>; only <code>B</code> is non-prime.</p>
+<p><strong>(a) Yes, <code>ABCD</code> is in 3NF.</strong> Take the dependencies
+one at a time. <code>AC &rarr; B</code> and <code>AC &rarr; D</code> have a
+candidate key on the left, so they pass on the first clause.
+<code>D &rarr; C</code> does not &mdash; <code>D<sup>+</sup> = CD</code>, not
+<code>R</code> &mdash; but its right-hand side <code>C</code> is prime, so it
+passes on the second. No dependency fails, and 2NF holds for the same reason
+(the only non-prime attribute <code>B</code> is not determined by any proper
+part of either key: <code>A<sup>+</sup> = A</code>, <code>C<sup>+</sup> = C</code>,
+<code>D<sup>+</sup> = CD</code>).</p>
+<p><strong>(b) Remove <code>D &rarr; C</code>.</strong> It is the only
+dependency whose left side is not a superkey, so it is the only BCNF violation;
+and removing it leaves <code>{AC &rarr; B, AC &rarr; D}</code>, in which
+<code>AC</code> is now the only candidate key &mdash; without
+<code>D &rarr; C</code>, <code>AD<sup>+</sup> = AD</code> &mdash; and both
+remaining dependencies have exactly that key on the left. BCNF holds.</p>
+<p>Neither other removal works. Drop <code>AC &rarr; B</code> and the keys
+become <code>ABC</code> and <code>ABD</code>, while <code>D &rarr; C</code>
+survives with a non-superkey left side. Drop <code>AC &rarr; D</code> and the
+only key is <code>AD</code>, so now <code>AC &rarr; B</code> violates BCNF as
+well.</p>
+<div class="box warn"><span class="bt">A note on the printed answer</span>
+<p>The problem book's hint for part (b) reads &ldquo;<code>AC</code> is the only
+key&rdquo;. That is true of the <em>reduced</em> set, after
+<code>D &rarr; C</code> has gone, and it is the reason the removal works. Under
+the original <code>F</code> it is not true: <code>AD</code> is a second
+candidate key, as computed above. Read the hint as describing the answer to
+(b), not the schema in (a) &mdash; and in part (a) do not take
+&ldquo;<code>AC</code> is the only key&rdquo; on faith, because if you did, you
+would conclude that <code>D</code> is non-prime and that the schema fails 3NF.
+It does not.</p></div>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.17">Give an example of a
+relational schema which is not in BCNF, but is in 3NF, and explain your example.
+You may use abstract attribute names, and you need not have in mind any
+reasonable interpretation. If such a schema does not exist, prove it.</summary>
+<div class="sol">
+<p><strong>The smallest one has three attributes.</strong> Take
+<code>R = ABC</code> with</p>
+<pre>AB &rarr; C
+C  &rarr; B</pre>
+<p><strong>There are two candidate keys, <code>AB</code> and
+<code>AC</code>.</strong> <code>A</code> is on no right-hand side, so it is in
+every key, and <code>A<sup>+</sup> = A</code>. Then
+<code>AB<sup>+</sup> = ABC</code> directly, and
+<code>AC<sup>+</sup> &rarr;(C&rarr;B) ABC</code>. So every attribute is prime.</p>
+<p><strong>Not in BCNF:</strong> <code>C &rarr; B</code> is non-trivial and
+<code>C<sup>+</sup> = BC &ne; R</code>, so <code>C</code> is not a superkey.</p>
+<p><strong>In 3NF:</strong> <code>AB &rarr; C</code> has a key on the left.
+<code>C &rarr; B</code> does not, but <code>B</code> is prime &mdash; it belongs
+to the key <code>AB</code> &mdash; so the second clause saves it. No dependency
+fails, so 3NF holds.</p>
+<p><strong>This is the whole gap between the two forms, in one schema.</strong>
+3NF differs from BCNF only in forgiving a dependency whose right-hand side is
+part of some key. Any example of the kind the question asks for must therefore
+contain a dependency shaped exactly like <code>C &rarr; B</code>: a non-superkey
+on the left, a prime attribute on the right. &sect;9.9 returns to this and
+explains why the forgiveness is worth something.</p>
+</div></details>
+
+
+<h2 id="split"><span class="secnum">9.8</span>Judging a decomposition</h2>
+
+<p>Splitting a schema is easy; splitting it without breaking something is not.
+Lecture 16 names the two things a decomposition can break, and each has a test
+that is a closure in disguise.</p>
+
+<div class="box worked"><span class="bt">What a lossy join looks like</span>
+<p>Decompose <code>R = ABC</code> into <code>R&#8321; = AB</code> and
+<code>R&#8322; = BC</code> by projection, then join the two pieces back:</p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>R</code></th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>3</td></tr>
+<tr><td>4</td><td>5</td><td>6</td></tr>
+<tr><td>2</td><td>4</td><td>6</td></tr>
+<tr><td>1</td><td>3</td><td>5</td></tr>
+<tr><td>2</td><td>3</td><td>4</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>R&#8321;</code></th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td></tr>
+<tr><td>4</td><td>5</td></tr>
+<tr><td>2</td><td>4</td></tr>
+<tr><td>1</td><td>3</td></tr>
+<tr><td>2</td><td>3</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>R&#8322;</code></th></tr>
+<tr><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>3</td></tr>
+<tr><td>5</td><td>6</td></tr>
+<tr><td>4</td><td>6</td></tr>
+<tr><td>3</td><td>5</td></tr>
+<tr><td>3</td><td>4</td></tr>
+</tbody></table></div>
+</div>
+<p>The join brings back all five original rows and two more besides &mdash;
+<code>(1,3,4)</code> and <code>(2,3,5)</code> &mdash; because <code>B = 3</code>
+occurs twice on each side and every combination is produced. Rows that were
+never in <code>R</code> are now indistinguishable from rows that were. That is
+the failure mode: not lost data, but <em>invented</em> data, and no query can
+tell the difference afterwards.</p>
+<p><strong>Definition.</strong> The decomposition has a <strong>lossless
+join</strong> if <code>R&#8321; &bowtie; R&#8322; = R</code> for every legal
+content of <code>R</code>. Otherwise
+<code>R &sub; R&#8321; &bowtie; R&#8322;</code> and the join is
+<strong>lossy</strong>. Note which way the containment runs: the join is always
+a superset, never a subset.</p>
+<p><strong>Theorem (Lecture 16).</strong> For a two-way decomposition, the join
+is lossless <em>if and only if</em> at least one of</p>
+<pre>R&#8321; &cap; R&#8322;  &rarr;  R&#8321;
+    or
+R&#8321; &cap; R&#8322;  &rarr;  R&#8322;</pre>
+<p>belongs to <code>F<sup>+</sup></code>. In practice: intersect the two
+component schemas, close the intersection, and see whether the result swallows
+either component. One closure, one comparison, done.</p></div>
+
+<div class="box note"><span class="bt">Dependency loss</span>
+<p>Given <code>R</code>, a minimal cover <code>F</code> and a decomposition
+<code>{R&#8321;, &hellip;, R<sub>n</sub></code>}, a dependency
+<code>[X &rarr; A] &isin; F</code> is <strong>lost</strong> if no single
+component contains all of <code>XA</code>.</p>
+<p>A lost dependency is not a lost fact &mdash; it still holds of the data. It
+is a lost <em>constraint</em>: the DBMS can no longer enforce it from inside one
+table, so an insertion that breaks it can only be caught by joining the pieces
+back together first. Lecture 16's example is the universal schema
+<code>City, Street, Zip</code> with <code>Z &rarr; C</code> and
+<code>CS &rarr; Z</code>; split off <code>ZC</code> and the second dependency
+has nowhere left to live.</p>
+<p><strong>The two properties are independent.</strong> A decomposition can be
+lossless and lose dependencies, can preserve every dependency and be lossy, can
+fail both, or can manage both. Exercises 9.18 and 9.19 give you one of each of
+the first two.</p></div>
+
+<details class="prob"><summary data-label="Exercise 9.18">Consider the relational
+schema <code>R = ABDEGHJKLMP</code>, in which the following set <code>F</code>
+of functional dependencies holds:
+<pre>(1)  M  &rarr; LP     (6)  GH &rarr; J
+(2)  L  &rarr; P      (7)  AJ &rarr; K
+(3)  DE &rarr; G      (8)  A  &rarr; D
+(4)  M  &rarr; E      (9)  B  &rarr; ML
+(5)  LE &rarr; H</pre>
+<p>(a) For each of the following dependencies, determine whether it belongs to
+<code>F<sup>+</sup></code>, and prove your answer:
+<code>(I) AM &rarr; K</code>, <code>(II) A &rarr; B</code>,
+<code>(III) M &rarr; J</code>.<br>
+(b) If <code>R</code> is decomposed into
+<code>R&#8321; = ABDEGHKLMP</code> and <code>R&#8322; = GHJ</code>, does this
+decomposition preserve dependencies? Prove your answer.<br>
+(c) For the same decomposition, does the join of <code>R&#8321;</code> and
+<code>R&#8322;</code> have a lossless join? Prove your answer.</p></summary>
+<div class="sol">
+<p><strong>(a)(I) Yes.</strong> Compute <code>AM<sup>+</sup></code> and look for
+<code>K</code>:</p>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">Exercise 9.18(a), part (I)</th></tr>
+<tr><th style="text-align:center">round</th><th style="text-align:center">dependency</th><th style="text-align:center">AM<sup>+</sup> so far</th></tr></thead>
+<tbody><tr><td>&mdash;</td><td>&mdash;</td><td>AM</td></tr>
+<tr><td>1</td><td>(1)</td><td>ALMP</td></tr>
+<tr><td>1</td><td>(4)</td><td>AELMP</td></tr>
+<tr><td>1</td><td>(5)</td><td>AEHLMP</td></tr>
+<tr><td>1</td><td>(8)</td><td>ADEHLMP</td></tr>
+<tr><td>2</td><td>(3)</td><td>ADEGHLMP</td></tr>
+<tr><td>2</td><td>(6)</td><td>ADEGHJLMP</td></tr>
+<tr><td>2</td><td>(7)</td><td>ADEGHJKLMP</td></tr>
+</tbody></table></div>
+<p><code>AM<sup>+</sup> = ADEGHJKLMP</code>, which contains <code>K</code>, so
+<code>[AM &rarr; K] &isin; F<sup>+</sup></code>.</p>
+<p><strong>(a)(II) No</strong>, and no closure is needed. <code>B</code> appears
+on the right-hand side of no dependency in <code>F</code>, so nothing can ever
+introduce it; <code>B &notin; A<sup>+</sup></code> and
+<code>[A &rarr; B] &notin; F<sup>+</sup></code>. (In fact
+<code>A<sup>+</sup> = AD</code>.)</p>
+<p><strong>(a)(III) No.</strong></p>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">Exercise 9.18(a), part (III)</th></tr>
+<tr><th style="text-align:center">round</th><th style="text-align:center">dependency</th><th style="text-align:center">M<sup>+</sup> so far</th></tr></thead>
+<tbody><tr><td>&mdash;</td><td>&mdash;</td><td>M</td></tr>
+<tr><td>1</td><td>(1)</td><td>LMP</td></tr>
+<tr><td>1</td><td>(4)</td><td>ELMP</td></tr>
+<tr><td>1</td><td>(5)</td><td>EHLMP</td></tr>
+</tbody></table></div>
+<p><code>M<sup>+</sup> = EHLMP</code>, and <code>J &notin;</code> it, so
+<code>[M &rarr; J] &notin; F<sup>+</sup></code>. The route to <code>J</code> is
+(6) <code>GH &rarr; J</code>, and <code>G</code> never arrives: it needs (3)
+<code>DE &rarr; G</code>, and <code>D</code> comes only from <code>A</code>,
+which is not in the set we started from.</p>
+<p><strong>(b) No &mdash; dependency (7) <code>AJ &rarr; K</code> is lost.</strong>
+A dependency survives only if some component holds every one of its attributes.
+Here <code>AJK</code> is split across both: <code>R&#8321;</code> has
+<code>A</code> and <code>K</code> but not <code>J</code>;
+<code>R&#8322; = GHJ</code> has <code>J</code> but neither <code>A</code> nor
+<code>K</code>. Checking the other eight, each lands inside
+<code>R&#8321;</code> except (6) <code>GH &rarr; J</code>, which lands inside
+<code>R&#8322;</code>; so (7) is the only casualty.</p>
+<p><strong>(c) Yes, the join is lossless.</strong> The two components overlap in
+<code>GH</code>:</p>
+<pre>R&#8321; &cap; R&#8322;  =  ABDEGHKLMP &cap; GHJ  =  GH</pre>
+<p>and dependency (6) is <code>GH &rarr; J</code>, so
+<code>GH<sup>+</sup> = GHJ = R&#8322;</code>. The intersection determines the
+whole of <code>R&#8322;</code>, which is one of the two conditions in the
+theorem, so the condition is met.</p>
+<p><strong>Lossless and lossy are not about how big the pieces are.</strong>
+<code>R&#8322;</code> here has three attributes out of eleven, and the split is
+still perfectly reversible, because the overlap <code>GH</code> is a key of the
+small piece. What the theorem actually asks is whether the shared columns pin
+down one of the two sides &mdash; and that is a closure, nothing more.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.19">Consider a relational
+schema <code>R = ABCDEGH</code> with the dependency set <code>F</code>:
+<pre>(1)  ABCD &rarr; H
+(2)  CD   &rarr; E
+(3)  G    &rarr; C</pre>
+<code>R</code> is decomposed into <code>R&#8321;</code> and
+<code>R&#8322;</code> as follows:
+<pre>R&#8321; = ABCDH          R&#8322; = CDEG</pre>
+<p>(a) Does this decomposition have a lossless join? Prove your answer.<br>
+(b) Does this decomposition preserve dependencies? Prove your answer.<br>
+(c) Which &mdash; if any &mdash; of the highest normal forms (BCNF, 3NF) is
+attained by the component schema <code>R&#8321;</code>? Prove your answer.<br>
+(d) The same question for <code>R&#8322;</code>.</p></summary>
+<div class="sol">
+<p><strong>(a) No, the join is lossy.</strong> The components overlap in
+<code>CD</code>, and</p>
+<pre>CD  &rarr;(2)  CDE  =  CD&#8314;</pre>
+<p>Neither component fits inside that: <code>ABCDH &nsube; CDE</code> and
+<code>CDEG &nsube; CDE</code>. Both conditions of the theorem fail, so the join
+is lossy.</p>
+<p><strong>(b) Yes, every dependency survives.</strong> (1) <code>ABCD &rarr; H</code>
+has all five attributes inside <code>R&#8321; = ABCDH</code>; (2)
+<code>CD &rarr; E</code> and (3) <code>G &rarr; C</code> both fit inside
+<code>R&#8322; = CDEG</code>. Nothing is split.</p>
+<p><strong>(c) <code>R&#8321;</code> is in BCNF</strong>, and therefore in 3NF
+as well. Of the three dependencies only (1) holds inside <code>ABCDH</code>
+&mdash; (2) and (3) mention <code>E</code> and <code>G</code>, which are not
+there. And the left side of (1) is <code>ABCD</code>, which is the candidate key
+of this component: <code>ABCD<sup>+</sup> = ABCDH = R&#8321;</code>, and no
+proper subset reaches <code>H</code>. A single dependency whose left side is the
+key satisfies BCNF by definition.</p>
+<p><strong>(d) <code>R&#8322;</code> attains neither.</strong> Inside
+<code>CDEG</code> the surviving dependencies are (2) <code>CD &rarr; E</code>
+and (3) <code>G &rarr; C</code>. The only candidate key is <code>DG</code>:
+neither <code>D</code> nor <code>G</code> appears on a right-hand side, so both
+are forced, and <code>DG<sup>+</sup> = CDEG = R&#8322;</code>. Now look at (3):
+its left side <code>G</code> is not a superkey, so BCNF fails; and its right
+side <code>C</code> is not prime &mdash; the only key is <code>DG</code> &mdash;
+so 3NF fails too. The component bears no normal form above 1NF.</p>
+<p><strong>This is the lesson of &sect;9.8 in one exercise.</strong> The
+decomposition preserves every dependency and still destroys the data, and one
+of its two components is worse normalized than you would want. Preservation,
+losslessness and normal form are three separate questions, and a decomposition
+has to answer all three before it is worth writing down. &sect;9.9 is the
+algorithm that answers all three by construction.</p>
+</div></details>
+
+
+<h2 id="algo"><span class="secnum">9.9</span>Decomposing properly</h2>
+
+<p>Everything so far has been a test applied to a decomposition someone else
+wrote down. Lecture 16 ends with the two constructions that produce one, and
+with an honest account of what each can and cannot promise.</p>
+
+<div class="box worked"><span class="bt">Decomposition into BCNF</span>
+<p><strong>Input:</strong> a schema <code>R</code> and a minimal cover
+<code>F</code>. <strong>Output:</strong> a decomposition in which every
+component is in BCNF.</p>
+<pre>let  X &rarr; A  be a dependency that violates BCNF in R
+decompose R into   R&#8321; = XA   and   R&#8322; = R &minus; A
+continue on R&#8321; and R&#8322; as needed</pre>
+<p><strong>Why <code>X &rarr; A</code> never troubles you again.</strong> In
+<code>R&#8321;</code> it cannot: <code>X<sup>+</sup> = XA = R&#8321;</code>, so
+<code>X</code> is a superkey there and BCNF holds. In <code>R&#8322;</code> it
+cannot either, because <code>R&#8322;</code> no longer contains <code>A</code>,
+so the dependency is not even expressible. Each step removes one violation for
+good, and the attribute count strictly decreases, so the process stops.</p>
+<p><strong>Each split is lossless</strong> &mdash; the intersection of the two
+halves is <code>X</code>, and <code>X &rarr; A</code> gives
+<code>X &rarr; R&#8321;</code>, which is exactly the theorem's first condition.
+So the whole construction is lossless, step by step.</p>
+<p><strong>What it does not promise is dependency preservation</strong>, and
+Lecture 16's CollegeDB run shows it going wrong. Decomposing
+<code>SNACEDPFTMKLHYG</code> by the dependencies
+<code>S &rarr; NA</code>, <code>T &rarr; MK</code>, <code>DP &rarr; F</code>,
+<code>C &rarr; ED</code>, <code>CY &rarr; TLH</code>, <code>Y &rarr; P</code>,
+<code>SCY &rarr; G</code> in a different order strands
+<code>DP &rarr; F</code>: by the time its turn comes, <code>D</code>,
+<code>P</code> and <code>F</code> no longer sit together in any component, and
+the constraint is lost. <strong>The order in which you take the violations
+matters</strong>, and the algorithm gives you no rule for choosing it.</p></div>
+
+<div class="box worked"><span class="bt">The modified algorithm &mdash; 3NF by synthesis</span>
+<p>The fix is to stop decomposing and start <em>building</em>, one component per
+dependency.</p>
+<p><strong>Input:</strong> a schema <code>R</code> and a minimal cover
+<code>F</code>. <strong>Output:</strong> a decomposition that is lossless,
+preserves every dependency, and has every component in at least 3NF &mdash; all
+three, guaranteed.</p>
+<pre>1.  any attribute appearing in no dependency of F gets a table of its own
+2.  for each dependency  X &rarr; A  in F, build the component  XA
+3.  if some component already contains a candidate key of R, stop;
+    otherwise add one more component consisting of a candidate key of R</pre>
+<p><strong>Step 3 is what buys the lossless join</strong>, and it is the step
+students drop. Without it the pieces need not rejoin: the key component is the
+spine that every other component can be joined back onto.</p>
+<p><strong>Step 2 is what buys dependency preservation</strong>, trivially
+&mdash; every dependency of <code>F</code> has a component built to hold exactly
+its attributes, so none can be lost. This is also why the input must be a
+minimal cover and not just any equivalent set: condition 1 of minimality keeps
+the components small, and condition 3 keeps you from building components nobody
+needs.</p>
+<p><strong>The price is 3NF rather than BCNF.</strong> A component <code>XA</code>
+built from <code>X &rarr; A</code> is in 3NF but may fail BCNF if some other
+dependency of <code>F<sup>+</sup></code> happens to hold inside it. That is the
+trade the next three exercises are about: BCNF buys zero redundancy from
+functional dependencies but may cost a constraint; 3NF keeps every constraint
+but may leave some redundancy behind. You cannot always have both.</p></div>
+
+<details class="prob"><summary data-label="Exercise 9.20">Consider again the
+schema <code>R = ABCDEGH</code> and dependency set <code>F</code> of
+Exercise 9.19:
+<pre>(1)  ABCD &rarr; H
+(2)  CD   &rarr; E
+(3)  G    &rarr; C</pre>
+Since the decomposition of Exercise 9.19 was found wanting, propose a better
+one, and prove that it is better. If it is impossible to construct a better
+decomposition, prove that.</summary>
+<div class="sol">
+<p><strong>First check the input.</strong> <code>F</code> is already a minimal
+cover: every right side is a single attribute; <code>ABCD &rarr; H</code> cannot
+shed a left attribute (<code>BCD<sup>+</sup> = BCDE</code>,
+<code>ACD<sup>+</sup> = ACDE</code>, <code>ABD<sup>+</sup> = ABD</code> and
+<code>ABC<sup>+</sup> = ABC</code>, none reaching <code>H</code>), nor can
+<code>CD &rarr; E</code> (<code>C<sup>+</sup> = C</code>,
+<code>D<sup>+</sup> = D</code>); and no dependency is redundant, since
+<code>H</code>, <code>E</code> and <code>C</code> appear on only one right side
+each.</p>
+<p><strong>Now run the algorithm.</strong> Step 1: every attribute of
+<code>R</code> occurs somewhere in <code>F</code>, so nothing is set aside.
+Step 2 gives one component per dependency:</p>
+<pre>X&#8321; = ABCDH          X&#8322; = CDE          X&#8323; = GC</pre>
+<p>Step 3: is a candidate key of <code>R</code> inside one of those? The only
+candidate key is <code>ABDG</code> &mdash; <code>A</code>, <code>B</code>,
+<code>D</code> and <code>G</code> appear on no right-hand side, so all four are
+forced, and</p>
+<pre>ABDG  &rarr;(3)  ABCDG  &rarr;(1)  ABCDGH  &rarr;(2)  ABCDEGH = R</pre>
+<p>No component contains <code>ABDG</code>, so add a fourth:</p>
+<pre>X&#8324; = ABDG</pre>
+<p><strong>Why this one is better, on all three counts.</strong></p>
+<p><em>Lossless.</em> Guaranteed by step 3, which is exactly what the
+decomposition of Exercise 9.19 was missing.</p>
+<p><em>Dependency-preserving.</em> Guaranteed by step 2: (1) lives in
+<code>X&#8321;</code>, (2) in <code>X&#8322;</code>, (3) in
+<code>X&#8323;</code>.</p>
+<p><em>Normalized.</em> The algorithm promises 3NF, and here it happens to
+deliver BCNF in all four. In <code>X&#8321;</code>, <code>X&#8322;</code> and
+<code>X&#8323;</code> exactly one dependency holds, and its left side is that
+component's key. In <code>X&#8324; = ABDG</code> no dependency holds at all
+&mdash; none of the three has its whole attribute set inside it &mdash; so BCNF
+is satisfied vacuously.</p>
+<p><strong>The fourth component looks pointless and is the only reason the
+first three work.</strong> <code>ABDG</code> stores no dependency and enforces
+no constraint; it exists so that the join has something to hang on. Leave it
+out and you are back to Exercise 9.19.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.21">Consider the relational
+schema <code>R = ABCDEGH</code> with the same dependency set <code>F</code>:
+<pre>(1)  ABCD &rarr; H
+(2)  CD   &rarr; E
+(3)  G    &rarr; C</pre>
+This time <code>R</code> is decomposed into three schemas:
+<pre>R&#8321; = ABCDH          R&#8322; = CDE          R&#8323; = GC</pre>
+<p>(a) For each of the three components, determine whether it is in BCNF, and
+prove your answer.<br>
+(b) For each component you found <em>not</em> to be in BCNF, determine whether
+it is in 3NF, and prove your answer.<br>
+(c) Does this decomposition have a lossless join? Prove your answer.<br>
+(d) Does this decomposition preserve dependencies? Prove your answer.<br>
+(e) If your answer to either (c) or (d) is no, propose a better decomposition
+and prove that it is better. If this is impossible, prove it.</p></summary>
+<div class="sol">
+<p><strong>(a) All three are in BCNF.</strong> Exactly one dependency of
+<code>F</code> holds inside each component &mdash; (1) in <code>R&#8321;</code>,
+(2) in <code>R&#8322;</code>, (3) in <code>R&#8323;</code> &mdash; and in each
+case its left side is precisely the key of that component:
+<code>ABCD<sup>+</sup> = ABCDH</code>, <code>CD<sup>+</sup> = CDE</code>,
+<code>G<sup>+</sup> = CG</code>.</p>
+<p><strong>(b) Nothing to do</strong>, since no component failed (a). Every
+BCNF schema is in 3NF anyway.</p>
+<p><strong>(c) No, the join is lossy.</strong> Consider the step that produces
+<code>R&#8323; = GC</code>. The attribute <code>G</code> appears in no other
+component, so the intersection of <code>R&#8323;</code> with any other schema at
+any stage can only be <code>C</code>. But <code>C<sup>+</sup> = C</code>, so
+<code>C</code> determines neither <code>R&#8323;</code> nor any other piece, and
+the theorem's condition fails at that step. One bad step is enough: the join of
+the three is lossy.</p>
+<p><strong>(d) Yes.</strong> Dependency <code>(k)</code> is preserved in
+component <code>R<sub>k</sub></code>, for each of <code>k = 1, 2, 3</code>, by
+construction &mdash; this decomposition is precisely step 2 of the algorithm.</p>
+<p><strong>(e) Add the key.</strong> <code>F</code> is already a minimal cover
+and <code>R&#8321;</code>, <code>R&#8322;</code>, <code>R&#8323;</code> are
+already what step 2 produces. All that is missing is step 3: no component
+contains a candidate key of <code>R</code>. The only candidate key is
+<code>ABDG</code>, the four attributes that never appear on a right-hand side,
+and <code>ABDG<sup>+</sup> = R</code>. So the repaired decomposition is</p>
+<pre>R&#8321; = ABCDH     R&#8322; = CDE     R&#8323; = GC     R&#8324; = ABDG</pre>
+<p><code>R&#8321;</code> to <code>R&#8323;</code> remain in BCNF, and
+<code>R&#8324;</code> is vacuously in BCNF since no dependency holds in it. By
+the theorem the join is now lossless, and dependency preservation was never in
+question.</p>
+<p><strong>Compare this with Exercise 9.20 and notice they end in the same
+place.</strong> There, a two-way split was thrown away and the algorithm run
+from scratch; here, three quarters of the algorithm's output was handed to you
+and only the last step was missing. The repair is the same component either way,
+which is a good sign you have understood what step 3 is for.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.22">Consider a relational
+schema <code>R = ABCDEGHJK</code> with the dependency set <code>F</code>:
+<pre>(1)  AC  &rarr; B     (4)  BK &rarr; G
+(2)  BE  &rarr; C     (5)  CH &rarr; D
+(3)  BHJ &rarr; E     (6)  HJ &rarr; K</pre>
+<code>R</code> is decomposed into <code>R&#8321;</code> and
+<code>R&#8322;</code> as follows:
+<pre>R&#8321; = ABCGHJK          R&#8322; = CDEHJ</pre>
+<p>(a) Does this decomposition have a lossless join? Prove your answer.<br>
+(b) Does it preserve dependencies? Prove your answer.<br>
+(c) Which &mdash; if any &mdash; of the highest normal forms (BCNF, 3NF) is
+attained by <code>R&#8321;</code>? Prove your answer.<br>
+(d) The same question for <code>R&#8322;</code>.<br>
+(e) Find a candidate key of <code>R</code> and prove that it is one.<br>
+(f) Is this decomposition satisfactory? Explain your answer.<br>
+(g) If your answer to (f) is no, propose a better decomposition. If it is
+impossible to construct a better one, prove it.</p></summary>
+<div class="sol">
+<p><strong>(a) No, the join is lossy.</strong> The components overlap in
+<code>CHJ</code>, and</p>
+<pre>CHJ  &rarr;(6)  CHJK  &rarr;(5)  CDHJK  =  CHJ&#8314;</pre>
+<p>Neither <code>R&#8321; = ABCGHJK</code> nor <code>R&#8322; = CDEHJ</code>
+fits inside <code>CDHJK</code>, so both conditions of the theorem fail.</p>
+<p><strong>(b) No &mdash; dependencies (2) and (3) are lost.</strong> (2)
+<code>BE &rarr; C</code> needs <code>BCE</code> in one component;
+<code>R&#8321;</code> lacks <code>E</code> and <code>R&#8322;</code> lacks
+<code>B</code>. (3) <code>BHJ &rarr; E</code> needs <code>BEHJ</code>; the same
+two gaps. The other four survive: (1) and (4) and (6) inside
+<code>R&#8321;</code>, (5) inside <code>R&#8322;</code>.</p>
+<p><strong>(c) <code>R&#8321;</code> attains neither.</strong> Three
+dependencies of <code>F</code> sit entirely inside <code>ABCGHJK</code>:</p>
+<pre>(1)  AC &rarr; B      (4)  BK &rarr; G      (6)  HJ &rarr; K</pre>
+<p>Judging <code>R&#8321;</code> by those three, every candidate key must
+contain <code>ACHJ</code> &mdash; none of those four appears on a right-hand
+side &mdash; and <code>ACHJ<sup>+</sup> = ABCGHJK = R&#8321;</code>, so
+<code>ACHJ</code> is the key. Dependency (1) then violates 3NF: its left side
+<code>AC</code> is not a superkey of <code>R&#8321;</code>, and its right side
+<code>B</code> is not prime. Failing 3NF, it fails BCNF too.</p>
+<p><strong>(d) <code>R&#8322;</code> attains neither either.</strong> Only (5)
+<code>CH &rarr; D</code> holds inside <code>CDEHJ</code>. Every candidate key
+must contain <code>CEHJ</code>, and <code>CEHJ<sup>+</sup> = CDEHJ = R&#8322;</code>,
+so that is the key. Dependency (5) violates 3NF: <code>CH</code> is not a
+superkey and <code>D</code> is not prime.</p>
+<p><strong>(e) <code>ABHJ</code> is a candidate key</strong> (so is
+<code>ACHJ</code>; either answers the question). Every key must contain
+<code>AHJ</code>, since none of those three appears on a right-hand side of
+<code>F</code>. But <code>AHJ<sup>+</sup> = AHJK &ne; R</code>, so at least one
+more attribute is needed, and <code>B</code> suffices:</p>
+<pre>ABHJ  &rarr;(3)  ABEHJ  &rarr;(6)  ABEHJK  &rarr;(2)  ABCEHJK
+      &rarr;(4)  ABCEGHJK  &rarr;(5)  ABCDEGHJK = R</pre>
+<p>It is minimal because <code>AHJ</code> is not a superkey and all three of its
+attributes are forced.</p>
+<p><strong>(f) No &mdash; it is unsatisfactory on every count</strong> that
+&sect;9.8 and &sect;9.9 measure: the join is lossy by (a), two dependencies are
+lost by (b), and neither component reaches even 3NF by (c) and (d).</p>
+<p><strong>(g) Run the algorithm.</strong> <code>F</code> is a minimal cover
+&mdash; single attributes on every right side, no left attribute droppable, no
+dependency redundant &mdash; and every attribute of <code>R</code> appears in
+it, so step 1 is empty. Step 2 gives one component per dependency, and step 3
+adds the key, since none of the six contains one:</p>
+<pre>R&#8321; = <u>AC</u>B       R&#8325; = <u>CH</u>D
+R&#8322; = <u>BE</u>C       R&#8326; = <u>HJ</u>K
+R&#8323; = <u>BHJ</u>E      R&#8327; = <u>ABHJ</u>
+R&#8324; = <u>BK</u>G</pre>
+<p>Every dependency now lives inside its own component, so none is lost; the key
+component <code>R&#8327;</code> makes the join lossless; and each of the first
+six is in 3NF, with its underlined left side as key.</p>
+<div class="box warn"><span class="bt">A subtlety in part (c)</span>
+<p>The answer above judges <code>R&#8321;</code> by the dependencies of
+<code>F</code> that <em>syntactically</em> fit inside it, which is the standard
+reading and gives <code>ACHJ</code> as the only key. If instead you project the
+whole of <code>F<sup>+</sup></code> onto <code>R&#8321;</code> &mdash; keeping
+every dependency that holds among <code>R&#8321;</code>'s attributes, including
+ones proved through attributes outside it &mdash; then <code>ABHJ</code> is a
+second key of <code>R&#8321;</code>, since
+<code>ABHJ &rarr; E &rarr; C</code> by (3) and (2). The conclusion in (c) is
+unaffected: dependency (1) still violates 3NF, because under either reading
+<code>AC</code> is not a superkey and <code>B</code> is not prime. But if an
+exam question asks for &ldquo;all candidate keys of the component&rdquo;, say
+which reading you are using.</p></div>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 9.23">
+<p>(a) Explain the advantages of decompositions into 3NF, compared to
+decompositions into BCNF. If such advantages do not exist, explain why.<br>
+(b) Explain the disadvantages of decompositions into 3NF, compared to
+decompositions into BCNF. If such disadvantages do not exist, explain why.</p></summary>
+<div class="sol">
+<p><strong>(a) 3NF decompositions keep every constraint; BCNF ones may not.</strong>
+A correct decomposition into BCNF is guaranteed to have a lossless join &mdash;
+that falls out of the construction, as the box above shows &mdash; but it
+carries no guarantee of dependency preservation, and Lecture 16's CollegeDB run
+is a worked case of it losing one. The 3NF algorithm guarantees both: lossless
+join from step 3, dependency preservation from step 2. That is the advantage,
+and it is the only one.</p>
+<p><strong>(b) 3NF schemas may still carry redundancy; BCNF ones do not.</strong>
+BCNF eliminates every redundancy that arises from a functional dependency,
+because no non-superkey is ever allowed to determine anything. 3NF forgives
+exactly the dependencies whose right-hand side is prime, and each one forgiven
+is a fact that will be stored more than once. (Neither form says anything about
+redundancy arising from multi-valued dependencies, which is a separate
+machinery.)</p>
+<p><strong>The trade, in one sentence.</strong> BCNF buys a cleaner table at the
+risk of a constraint the DBMS can no longer check from inside one relation; 3NF
+keeps every constraint checkable at the price of some repetition. Which is worse
+depends on the database, which is why both algorithms are in the lecture and
+neither is called the right one.</p>
+<p><strong>Where to look for the forgiven dependency.</strong> It is the shape
+of Exercise 9.17: a non-superkey on the left, a prime attribute on the right. If
+a 3NF schema contains no dependency of that shape, it is in BCNF too, and the
+question does not arise.</p>
+</div></details>
+
+<div class="box note"><span class="bt">Where this set ends up</span>
+<p>Twenty-three exercises, and almost all of them were the same calculation.
+Given <code>X</code> and <code>F</code>, compute <code>X<sup>+</sup></code>:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Question</th><th>Answered by</th></tr></thead>
+<tbody>
+<tr><td>Does <code>X &rarr; Y</code> hold?</td><td><code>Y &sube; X<sup>+</sup></code></td></tr>
+<tr><td>Can two tuples agree on <code>X</code> and disagree on <code>Y</code>?</td><td>the same test, negated</td></tr>
+<tr><td>Is <code>X</code> a superkey?</td><td><code>X<sup>+</sup> = R</code></td></tr>
+<tr><td>Is <code>F</code> equivalent to <code>G</code>?</td><td>one closure per dependency, both directions</td></tr>
+<tr><td>Is a dependency or an attribute redundant?</td><td>close without it and compare</td></tr>
+<tr><td>Is <code>R</code> in 3NF or BCNF?</td><td>close every left side; compare against <code>R</code> and against the prime set</td></tr>
+<tr><td>Is a two-way split lossless?</td><td>close the intersection</td></tr>
+</tbody></table></div>
+<p>Only two things on this page are not a closure: finding <em>all</em> candidate
+keys, which starts from the attributes that appear on no right-hand side; and
+checking dependency preservation, which is a containment test on attribute sets.
+Everything else is Lecture 14, applied to a different pair of sets.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-sql2.html"><span>Previous</span>Set 8. SQL: three more databases</a>
+      <a class="next" href="ex-midterm.html"><span>Next</span>Midterm review</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
