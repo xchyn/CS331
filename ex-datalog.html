@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 10 — Datalog</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 10 &middot; Datalog</span>
+  <nav class="topnav">
+    <a href="ex-norm.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-storage.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#what"><span class="t">10.1</span>Predicates and rules</a></li>
+    <li><a href="#ops"><span class="t">10.2</span>The algebra, in Datalog</a></li>
+    <li><a href="#db"><span class="t">10.3</span>The Employee database</a></li>
+    <li><a href="#scratch"><span class="t">10.4</span>Writing a query from scratch</a></li>
+    <li><a href="#neg"><span class="t">10.5</span>Negation and auxiliary predicates</a></li>
+    <li><a href="#known"><span class="t">10.6</span>Four databases you already know</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 10 &middot; Lecture 17</span>
+  <span class="chnum">Datalog</span>
+  <h1>Queries as logical rules</h1>
+  <p class="chsum">A third query language, after the algebra of Set 5 and the
+  SQL of Sets 6 to 8, and the shortest of the three to learn: a query is a
+  rule, a rule has a head and a body, and the body is a list of table names
+  with variables in their columns. Sixteen exercises from the problem book on
+  five databases, four of which you have already queried in SQL.</p>
+</div>
+
+<p>Nothing here is new information about databases. Every query on this page
+could be written in the algebra or in SQL, and many of them already were, in
+earlier sets. What changes is how you say it &mdash; and the saying turns out
+to be shorter than either.</p>
+
+<h2 id="what"><span class="secnum">10.1</span>Predicates and rules</h2>
+
+<div class="box worked"><span class="bt">What Datalog is</span>
+<p><strong>Datalog is a declarative logic programming language designed for
+databases.</strong> Logic programming is the paradigm built on symbolic logic
+&mdash; predicate calculus: the programmer states logical rules describing the
+relationships between objects, and the machine uses those rules to deduce
+answers.</p>
+<p>The word that matters is <strong>declarative</strong>:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Style</th><th>You specify</th><th>On this site</th></tr></thead>
+<tbody>
+<tr><td>declarative</td><td><em>what</em> has to be accomplished</td><td>SQL, Datalog</td></tr>
+<tr><td>procedural</td><td><em>how</em> to perform every step</td><td>the relational algebra</td></tr>
+</tbody></table></div>
+<p>Set 5's algebra tells the machine to take this product, then select these
+rows, then project these columns, in that order. SQL and Datalog describe the
+answer and leave the order to the system. That is the same distinction Lecture
+10 drew between the algebra and SQL, and Datalog sits on the SQL side of it.</p></div>
+
+<div class="box worked"><span class="bt">Predicates are tables</span>
+<p>The two building blocks of logic programming are <strong>predicates</strong>
+and <strong>rules</strong>.</p>
+<p>A <strong>predicate</strong> is a statement expressing a relationship
+between one or more objects. In a database the correspondence is exact:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>In logic</th><th>In the database</th></tr></thead>
+<tbody>
+<tr><td>the name of the predicate</td><td>the name of the table</td></tr>
+<tr><td>the variables of the predicate</td><td>the columns of the table</td></tr>
+<tr><td><code>R(x, y, z)</code> is true</td><td>the row <code>[x, y, z]</code> is in <code>R</code></td></tr>
+</tbody></table></div>
+<p>So with this content of <code>R</code>:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>R</code></th></tr>
+<tr><th style="text-align:center">A</th><th style="text-align:center">B</th><th style="text-align:center">C</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>3</td></tr>
+<tr><td>4</td><td>5</td><td>6</td></tr>
+<tr><td>1</td><td>3</td><td>5</td></tr>
+<tr><td>2</td><td>4</td><td>6</td></tr>
+</tbody></table></div></div>
+<pre>R(1,2,3)  is true    since  [1,2,3] &isin; R
+R(3,2,1)  is false   since  [3,2,1] &notin; R</pre>
+<p>A <strong>rule</strong> is a logical statement defining a relationship
+between predicates. It is written <code>head &larr; body</code>: the head names
+the predicate being derived, the body states the conditions that must hold for
+it to be true. Taking the lecture's rule against the table above:</p>
+<pre>P(x)  &larr;  R(x, y, 6)  and  y &lt; 5</pre>
+<p>Read it left to right as a definition and right to left as a search: a row
+<code>x</code> belongs to <code>P</code> whenever <code>R</code> holds some row
+whose first column is <code>x</code>, whose third column is <code>6</code>, and
+whose second column is below <code>5</code>. Two rows of <code>R</code> end in
+<code>6</code>; of those, <code>[4,5,6]</code> fails <code>y &lt; 5</code> and
+<code>[2,4,6]</code> passes. So <code>P</code> holds one row:</p>
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th><code>P</code></th></tr>
+<tr><th style="text-align:center">x</th></tr></thead>
+<tbody><tr><td>2</td></tr></tbody></table></div></div>
+<p><strong>Three things that take practice.</strong> A constant written in an
+argument position, like the <code>6</code> above, is a condition, not a name.
+The same variable written twice means the two positions must be <em>equal</em>
+&mdash; which is how Datalog does everything the algebra does with a product
+and a selection. And the number of arguments must match the number of columns,
+every time, which is why the schema sits beside you while you write.</p></div>
+
+<div class="box note"><span class="bt">Notation, as Lecture 17 writes it</span>
+<p>The arrow is <code>&larr;</code>, written <code>:-</code> in some systems and
+<code>&lt;--</code> in the problem book. Conditions in the body are separated by
+<code>and</code>. Comparison is <code>=</code>, <code>!=</code>,
+<code>&lt;</code>, <code>&gt;</code>, <code>&le;</code>, <code>&ge;</code>. A
+string constant is written in single quotes.</p>
+<p>The head predicate is usually called <code>R</code> or <code>Result</code>;
+both appear in the problem book and the two are interchangeable. This page uses
+<code>Result</code> wherever a program has more than one rule, so that the
+auxiliary predicates of &sect;10.5 are easy to tell apart from the answer.</p>
+<p><strong>Variable scope is local to one rule</strong> &mdash; head and body
+together. The <code>y</code> in one rule has nothing to do with the
+<code>y</code> in the next, which is what makes the union of &sect;10.2 work.</p></div>
+
+<h2 id="ops"><span class="secnum">10.2</span>The algebra, in Datalog</h2>
+
+<p>Lecture 17 introduces Datalog by walking the five operations of Lecture 8
+through it, on a schema close to the CollegeDB of Set 5:</p>
+
+<pre>Person      (<u>id</u>, name, address, yearborn)
+Teacher     (<u>tid</u>, rank, salary)
+Student     (<u>sid</u>, yearenroll)
+Department  (<u>code</u>, name, chair)
+Course      (<u>dcode</u>, <u>number</u>, name, credit)
+Section     (<u>regNum</u>, dcode, cnum, <u>year</u>)
+GradeSheet  (<u>sid</u>, <u>regNum</u>, <u>year</u>, grade)</pre>
+
+<div class="box worked"><span class="bt">The five correspondences</span>
+<p><strong>1. No operation at all.</strong> &ldquo;Find all people.&rdquo;</p>
+<pre>RA:       R = Person
+SQL:      SELECT * FROM Person;
+datalog:  R(i, n, a, y)  &larr;  Person(i, n, a, y)</pre>
+<p><strong>2. Projection.</strong> &ldquo;Find all people's id and name.&rdquo;
+Drop the unwanted variables from the head:</p>
+<pre>RA:       R = &Pi;[id, name] Person
+SQL:      SELECT id, name FROM Person;
+datalog:  R(i, n)  &larr;  Person(i, n, a, y)
+          R(i, n)  &larr;  Person(i, n, _, _)</pre>
+<p>Both rules say the same thing. The second uses <strong>unnamed
+variables</strong> &mdash; the underscore stands for &ldquo;some value, I do not
+care which, and I will not refer to it again&rdquo;. Prefer it: a named variable
+that occurs once is a reader's false alarm, because every other repeated name
+in the rule <em>is</em> doing work.</p>
+<p><strong>3. Selection.</strong> &ldquo;Find all 3-credit courses.&rdquo;</p>
+<pre>RA:       R = &sigma;[credit = 3] Course
+SQL:      SELECT * FROM Course WHERE credit = 3;
+datalog:  R(d, n, c, k)  &larr;  Course(d, n, c, k) and k = 3</pre>
+<p>And the two combined &mdash; names of all 3-credit courses:</p>
+<pre>R(c)  &larr;  Course(_, _, c, k) and k = 3</pre>
+<p><strong>4. Union.</strong> &ldquo;Find all years in the database in which
+people were born or are taking classes.&rdquo; Write <em>two rules with the same
+head</em>; both add rows to the same answer:</p>
+<pre>RA:       R = (&Pi;[yearborn] Person) &cup; (&Pi;[year] Section)
+datalog:  R(y)  &larr;  Person(_, _, _, y)
+          R(t)  &larr;  Section(_, _, _, t)</pre>
+<p>The variable is named <code>y</code> in one and <code>t</code> in the other
+to make the point: scope is local to a rule, so the names need not agree and
+agreeing would mean nothing.</p>
+<p><strong>5. Subtraction.</strong> &ldquo;Find the id of students who never
+failed a course.&rdquo; Put <code>not</code> in front of a predicate:</p>
+<pre>RA:       R = (&Pi;[sid] Student) \ (&Pi;[sid] &sigma;[grade = 'F'] GradeSheet)
+datalog:  R(i)  &larr;  Student(i, _) and
+                   not GradeSheet(i, _, _, g) and g = 'F'</pre>
+<p>And if the names are wanted rather than the ids, bring in the table that has
+them, matching on <code>i</code>:</p>
+<pre>R(n)  &larr;  Student(i, _) and Person(i, n, _, _) and
+          not GradeSheet(i, _, _, g) and g = 'F'</pre></div>
+
+<div class="box note"><span class="bt">Where are product and join?</span>
+<p>They have no symbol in Datalog because they need none. Listing two
+predicates in a body is already the product; repeating a variable across them
+is already the matching condition. The rule</p>
+<pre>R(n)  &larr;  Student(i, _) and Person(i, n, _, _)</pre>
+<p>is the product of <code>Student</code> and <code>Person</code>, selected
+where the two ids agree, projected on the name &mdash; three algebra operations,
+one line, no operator written at all. The <code>i</code> appearing twice is the
+whole of it.</p>
+<p>That is also the answer to a question Set 5 raised and Set 6 repeated: the
+join is a convenience, not a necessity. Datalog gets along without it, and so
+do all the answers on this site.</p></div>
+
+
+<h2 id="db"><span class="secnum">10.3</span>The Employee database</h2>
+
+<p>Eleven of the sixteen exercises are set against one small schema, Appendix
+B.6 of the problem book. It is worth the page it takes, because its four tables
+produce every shape of query this set has to teach &mdash; matching,
+self-matching, negation and the auxiliary predicate &mdash; without a single
+column you have to look up twice.</p>
+
+<pre>employee (<u>employee_name</u>, street, city)
+works    (<u>employee_name</u>, <u>company_name</u>, salary)
+company  (<u>company_name</u>, <u>city</u>)
+manages  (<u>employee_name</u>, <u>manager_name</u>, <u>company_name</u>)</pre>
+
+<p>The book's narrative: an employee may be unemployed or work for one or more
+companies, and has exactly one address. A company must be located in one or
+more cities. <code>works</code> gives the salary an employee earns at an
+individual company. An employee need not have a manager, or may have one or
+more, in an individual company.</p>
+
+<div class="box note"><span class="bt">Where the content comes from</span>
+<p>The schemas above are the book's. The book prints no content for this
+database, so the rows below are ours &mdash; small, and chosen so that every one
+of the eleven queries returns something worth reading and so that the careless
+version of a query returns something visibly different. Three features are
+deliberate and several exercises turn on them: <strong>Ida Frost is
+unemployed</strong> and appears in no table but <code>employee</code>;
+<strong>Anna Karenina and Rose Purple each work for two companies</strong> and
+everybody else who works at all works for exactly one; and <strong>First Bank
+and Quiet Motors are each located in two cities</strong>, so
+&ldquo;the city of the company&rdquo; is never a single value.</p>
+<p>One spelling note. The book writes the city two ways across these problems
+&mdash; <code>'NY'</code> in Problems 482 and 483, <code>'New York'</code> in
+Problems 485 to 492. This page writes <code>'New York'</code> in both places,
+so that one database serves all eleven.</p>
+<p>Load it with <code>sql/employee.sql</code>.</p></div>
+
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>employee</code></th></tr>
+<tr><th style="text-align:center">employee_name</th><th style="text-align:center">street</th><th style="text-align:center">city</th></tr></thead>
+<tbody>
+<tr><td>Anna Karenina</td><td>5 Oak Avenue</td><td>Boston</td></tr>
+<tr><td>Hugo Vance</td><td>6 Alder Place</td><td>Detroit</td></tr>
+<tr><td>Ida Frost</td><td>4 Ash Boulevard</td><td>Chicago</td></tr>
+<tr><td>Jim Wild</td><td>10 Elm Street</td><td>New York</td></tr>
+<tr><td>John Boss</td><td>2 Pine Road</td><td>New York</td></tr>
+<tr><td>Luna Lovegood</td><td>8 Birch Way</td><td>Detroit</td></tr>
+<tr><td>Mina Grey</td><td>3 Spruce Court</td><td>Flushing</td></tr>
+<tr><td>Oliver Twist</td><td>1 Cedar Lane</td><td>Boston</td></tr>
+<tr><td>Paul Stone</td><td>9 Willow Street</td><td>Boston</td></tr>
+<tr><td>Rose Purple</td><td>7 Maple Drive</td><td>Chicago</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2"><code>company</code></th></tr>
+<tr><th style="text-align:center">company_name</th><th style="text-align:center">city</th></tr></thead>
+<tbody>
+<tr><td>Blue Press</td><td>Chicago</td></tr>
+<tr><td>First Bank</td><td>Boston</td></tr>
+<tr><td>First Bank</td><td>New York</td></tr>
+<tr><td>Quiet Motors</td><td>Chicago</td></tr>
+<tr><td>Quiet Motors</td><td>Detroit</td></tr>
+<tr><td>Red Press</td><td>New York</td></tr>
+<tr><td>Small Bank</td><td>Boston</td></tr>
+</tbody></table></div></div>
+
+<div class="ttrow"><div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>works</code></th></tr>
+<tr><th style="text-align:center">employee_name</th><th style="text-align:center">company_name</th><th style="text-align:center">salary</th></tr></thead>
+<tbody>
+<tr><td>Anna Karenina</td><td>First Bank</td><td>52000</td></tr>
+<tr><td>Anna Karenina</td><td>Red Press</td><td>28000</td></tr>
+<tr><td>Hugo Vance</td><td>Quiet Motors</td><td>22000</td></tr>
+<tr><td>Jim Wild</td><td>First Bank</td><td>45000</td></tr>
+<tr><td>John Boss</td><td>First Bank</td><td>90000</td></tr>
+<tr><td>Luna Lovegood</td><td>Quiet Motors</td><td>18000</td></tr>
+<tr><td>Mina Grey</td><td>Quiet Motors</td><td>26000</td></tr>
+<tr><td>Oliver Twist</td><td>Small Bank</td><td>19000</td></tr>
+<tr><td>Paul Stone</td><td>Small Bank</td><td>31000</td></tr>
+<tr><td>Rose Purple</td><td>Blue Press</td><td>35000</td></tr>
+<tr><td>Rose Purple</td><td>Red Press</td><td>40000</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3"><code>manages</code></th></tr>
+<tr><th style="text-align:center">employee_name</th><th style="text-align:center">manager_name</th><th style="text-align:center">company_name</th></tr></thead>
+<tbody>
+<tr><td>Anna Karenina</td><td>John Boss</td><td>First Bank</td></tr>
+<tr><td>Anna Karenina</td><td>Rose Purple</td><td>Red Press</td></tr>
+<tr><td>Jim Wild</td><td>Anna Karenina</td><td>First Bank</td></tr>
+<tr><td>Jim Wild</td><td>John Boss</td><td>First Bank</td></tr>
+<tr><td>Luna Lovegood</td><td>Hugo Vance</td><td>Quiet Motors</td></tr>
+<tr><td>Mina Grey</td><td>Hugo Vance</td><td>Quiet Motors</td></tr>
+<tr><td>Oliver Twist</td><td>Paul Stone</td><td>Small Bank</td></tr>
+</tbody></table></div></div>
+
+<div class="box worked"><span class="bt">Turning a rule into SQL, to check it</span>
+<p>There is no Datalog engine on this page, and you will not be asked to run
+one. But every answer here was checked, and the recipe is worth knowing because
+it is also the fastest way to convince yourself a rule is right:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>In the rule</th><th>In the SQL</th></tr></thead>
+<tbody>
+<tr><td>each body predicate</td><td>one table in the <code>FROM</code> list, with an alias</td></tr>
+<tr><td>a variable appearing twice</td><td>an equality in the <code>WHERE</code> clause</td></tr>
+<tr><td>a constant in an argument position</td><td>an equality against that constant</td></tr>
+<tr><td>an unnamed variable <code>_</code></td><td>nothing at all</td></tr>
+<tr><td><code>not P(&hellip;)</code></td><td><code>NOT IN</code> against a subquery over <code>P</code></td></tr>
+<tr><td>the head variables</td><td>the <code>SELECT</code> list, with <code>DISTINCT</code></td></tr>
+</tbody></table></div>
+<p><code>DISTINCT</code> is not optional. Datalog has set semantics &mdash; a
+row is either in the answer or it is not &mdash; and SQL has bag semantics, so
+the translation needs it wherever a rule could match twice. Exercise 10.13 is
+built on exactly that difference.</p>
+<p>The file <code>sql/verify_set10.sql</code> holds the translation of every
+rule on this page.</p></div>
+
+<p>The first three exercises give you the algebra and ask only for the Datalog,
+which is the direction Lecture 17 teaches in. After that you are on your own
+with the English.</p>
+
+<details class="prob"><summary data-label="Exercise 10.1">In the Employee
+database, write a set of safe datalog rules for the query given by the
+following relational algebra expression:
+<pre>R = &Pi;[employee_name] &sigma;[F] (employee)
+
+where  F &equiv; [ city = 'New York' ]</pre></summary>
+<div class="sol">
+<pre>Result(n)  &larr;  employee(n, s, c) and c = 'New York'</pre>
+<p>Or, since <code>s</code> is never used again:</p>
+<pre>Result(n)  &larr;  employee(n, _, c) and c = 'New York'</pre>
+<p>Either is correct, and the second is the one to write. A one-line query
+needs one rule; the selection became a condition and the projection became the
+choice of head variables.</p>
+<p><strong>The rows it returns:</strong></p>
+<pre>Jim Wild
+John Boss</pre>
+<p><strong>The constant could also go inside the predicate.</strong>
+<code>employee(n, _, 'New York')</code> says the same thing in fewer symbols.
+The lecture writes the condition out, and so does the problem book, so this
+page does too &mdash; but recognise the short form when you meet it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.2">In the Employee
+database, write a set of safe datalog rules for the query given by the
+following relational algebra expression:
+<pre>R = &Pi;[employee_name] &sigma;[F] (employee)
+
+where  F &equiv; [ city &ne; 'New York' ]</pre></summary>
+<div class="sol">
+<pre>Result(n)  &larr;  employee(n, _, c) and not c = 'New York'</pre>
+<p>which may equally be written <code>c != 'New York'</code>.</p>
+<p><strong>The rows it returns</strong> &mdash; the other eight employees:</p>
+<pre>Anna Karenina   Luna Lovegood   Oliver Twist
+Hugo Vance      Mina Grey       Paul Stone
+Ida Frost       Rose Purple</pre>
+<p><strong>This <code>not</code> is not the <code>not</code> of &sect;10.5.</strong>
+Here it negates a <em>comparison</em>, which is a test on values already bound
+by <code>employee(n, _, c)</code>. In &sect;10.5 it negates a
+<em>predicate</em>, which is a different and more delicate thing. The symbol is
+the same; the question of what the rule is safe to range over is not.</p>
+<p><strong>Ida Frost appears here and did not in Exercise 10.1</strong>, and
+will keep reappearing. She is in <code>employee</code> and in nothing else, so
+any query that starts from <code>employee</code> sees her and any query that
+starts from <code>works</code> does not.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.3">In the Employee
+database, write a set of safe datalog rules for the query given by the
+following relational algebra expression:
+<pre>R = &Pi;[employee_name&#8321;, salary&#8322;] &sigma;[F] (employee&#8321; &times; works&#8322;)
+
+where  F &equiv; [ employee_name&#8321; = employee_name&#8322; &and;
+                 salary&#8322; &le; 20,000 ]</pre></summary>
+<div class="sol">
+<pre>Result(n, r)  &larr;  employee(n, _, _) and works(n, _, r) and r &le; 20000</pre>
+<p>The two predicates share the variable <code>n</code>, which is the whole of
+the matching condition; the comparison is a condition like any other.</p>
+<p><strong>The rows it returns:</strong></p>
+<pre>Luna Lovegood   18000
+Oliver Twist    19000</pre>
+<p><strong>The <code>employee</code> predicate is doing nothing here</strong>
+and the rule is just as correct without it:</p>
+<pre>Result(n, r)  &larr;  works(n, _, r) and r &le; 20000</pre>
+<p>Every name in <code>works</code> is already a name in <code>employee</code>,
+by the foreign key, so dropping the table cannot change the answer. Keeping it
+mirrors the algebra expression you were given, which is why it is written above
+&mdash; but a body predicate that constrains nothing is worth noticing, because
+in a query with a <code>not</code> in it the same predicate may be the only
+thing keeping the rule safe.</p>
+<div class="box note"><span class="bt">On the join</span>
+<p>The problem book prints this expression with the join:
+<code>&Pi;[employee_name, salary] &sigma;[salary &le; 20,000] (employee &bowtie;
+works)</code>. It is written above as a product with the matching condition
+spelled out, which is how Set 5 writes every algebra expression on this site.
+The two are the same query. Datalog needs neither form, as &sect;10.2 said: the
+repeated <code>n</code> is the join.</p></div>
+</div></details>
+
+
+<h2 id="scratch"><span class="secnum">10.4</span>Writing a query from scratch</h2>
+
+<p>No algebra is given from here on. The method is always the same three steps,
+and it is worth doing them in order until they stop needing to be:</p>
+
+<div class="box worked"><span class="bt">The three steps</span>
+<ol>
+<li><strong>Name the tables the answer needs</strong>, including any you need
+only to get from one to another. Write one predicate per table, with a distinct
+variable in every column.</li>
+<li><strong>Join them by renaming.</strong> Wherever two columns must hold the
+same value, give both positions the same variable. This is the step people get
+wrong, and the schema is how you check it: two columns can only be matched if
+one of them refers to the other.</li>
+<li><strong>Fill in the constants and the head.</strong> Conditions from the
+English become comparisons; the attributes the question asks for become the
+head variables; everything else becomes an underscore.</li>
+</ol>
+<p>Step 3 last, not first. Writing the head before you know which variables
+exist is how you end up with a head variable that appears nowhere in the body
+&mdash; a rule that is not <em>safe</em>, and that no system will run, because
+the variable ranges over every value in the universe rather than over the
+database.</p></div>
+
+<details class="prob"><summary data-label="Exercise 10.4">In the Employee
+database, find the city and street of every manager of <code>Jim Wild</code>.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong></p>
+<pre>R = &Pi;[city&#8321;, street&#8321;] &sigma;[F] (employee&#8321; &times; manages&#8322;)
+
+where  F &equiv; [ employee_name&#8321; = manager_name&#8322; &and;
+                 employee_name&#8322; = 'Jim Wild' ]</pre>
+<p><strong>(b)</strong></p>
+<pre>Result(c, s)  &larr;  employee(n, s, c) and manages(j, n, _) and j = 'Jim Wild'</pre>
+<p><strong>The rows it returns:</strong></p>
+<pre>Boston     5 Oak Avenue
+New York   2 Pine Road</pre>
+<p>Anna Karenina and John Boss, who both manage Jim Wild at First Bank.</p>
+<p><strong>Which column of <code>manages</code> is which.</strong> The schema is
+<code>manages(employee_name, manager_name, company_name)</code>, so
+<code>Jim Wild</code> belongs in the <em>first</em> position and the person
+whose address we want belongs in the second. Put them the other way round and
+the query runs, returns rows, and answers a different question &mdash; the
+addresses of everyone Jim Wild manages, which is nobody. A rule that returns
+the empty set is at least loud about it; a rule that returns plausible wrong
+rows is not.</p>
+<p><strong>The address comes from <code>employee</code>, not from
+<code>manages</code></strong>, which is why the rule needs two predicates at
+all. <code>manages</code> knows only names.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.5">In the Employee
+database, find all the cities in which the companies for which
+<code>Anna Karenina</code> works are located.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong></p>
+<pre>R = &Pi;[city&#8322;] &sigma;[F] (works&#8321; &times; company&#8322;)
+
+where  F &equiv; [ company_name&#8321; = company_name&#8322; &and;
+                 employee_name&#8321; = 'Anna Karenina' ]</pre>
+<p><strong>(b)</strong></p>
+<pre>Result(c)  &larr;  works(n, p, _) and company(p, c) and n = 'Anna Karenina'</pre>
+<p><strong>The rows it returns:</strong></p>
+<pre>Boston
+New York</pre>
+<p><strong>Two companies, three rows of <code>company</code>, two cities in the
+answer.</strong> Anna Karenina works for First Bank, which is located in New
+York and in Boston, and for Red Press, which is located in New York. The
+matching produces New York twice, and the answer holds it once, because Datalog
+is a set. Translate this to SQL without <code>DISTINCT</code> and you will see
+the duplicate.</p>
+<p><strong>&ldquo;The city of a company&rdquo; is a trap in this
+schema</strong>, and the narrative warned about it: a company must be located in
+one or more cities. Any query that assumes one city per company is reading a
+different database.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.6">In the Employee
+database, find the cities of location of those companies in which
+<code>John Boss</code> manages some employee who lives in
+<code>New York</code>.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> Let <code>P</code> hold the names of those companies in
+which John Boss manages some employee who lives in New York:</p>
+<pre>P = &Pi;[company_name&#8322;] &sigma;[G] (employee&#8321; &times; manages&#8322;)
+
+where  G &equiv; [ employee_name&#8321; = employee_name&#8322; &and;
+                 city&#8321; = 'New York' &and;
+                 manager_name&#8322; = 'John Boss' ]
+
+R = &Pi;[city&#8322;] &sigma;[company_name&#8321; = company_name&#8322;] (P&#8321; &times; company&#8322;)</pre>
+<p><strong>(b)</strong> Two rules, following the algebra exactly &mdash; the
+first defines the intermediate predicate, the second uses it:</p>
+<pre>P(p)       &larr;  employee(n, _, c) and manages(n, m, p) and
+               c = 'New York' and m = 'John Boss'
+Result(c)  &larr;  P(p) and company(p, c)</pre>
+<p><strong>What each rule returns:</strong></p>
+<pre>P       =  First Bank
+Result  =  Boston, New York</pre>
+<p><strong>It can also be written as one rule</strong>, by substituting the
+body of the first into the second:</p>
+<pre>Result(c)  &larr;  employee(n, _, k) and manages(n, m, p) and company(p, c) and
+               k = 'New York' and m = 'John Boss'</pre>
+<p>Both are correct and the one-rule version is shorter. The two-rule version
+is better, and not only because it matches the algebra: it gives the
+intermediate result a name, which is the only documentation a rule ever gets,
+and it is the pattern &sect;10.5 cannot do without.</p>
+<p><strong>Notice that the answer leaves New York.</strong> The query asks for
+employees who live in New York, and returns Boston among the cities, because
+First Bank is located in both. Reading the answer and expecting only New York
+is a misreading of the question, not a bug in the rule &mdash; which is the kind
+of thing worth checking against real rows before handing an answer in.</p>
+</div></details>
+
+<h2 id="neg"><span class="secnum">10.5</span>Negation and auxiliary predicates</h2>
+
+<div class="box worked"><span class="bt">Three things <code>not</code> needs</span>
+<p>Putting <code>not</code> in front of a predicate is how Datalog subtracts,
+and &sect;10.2 showed the simple case. Three rules govern it.</p>
+<p><strong>1. A negated predicate cannot be the only thing in the body.</strong>
+A rule is <strong>safe</strong> when every variable in it also appears in some
+<em>positive</em> predicate. Write</p>
+<pre>Result(n)  &larr;  not works(n, _, _)                 &larr; not safe</pre>
+<p>and you have asked for every value in the universe that is not an employee
+name in <code>works</code>, which is infinite. The fix is always the same:
+range over a table first.</p>
+<pre>Result(n)  &larr;  employee(n, _, _) and not works(n, _, _)</pre>
+<p><strong>2. Which table you range over decides the answer.</strong> The rule
+above finds the unemployed, because it ranges over <code>employee</code>. Range
+over <code>works</code> instead and the unemployed cannot appear at all, since
+they have no row there. The problem book makes the same point about Problem 488
+and prefers the former; Exercise 10.7 is where it bites.</p>
+<p><strong>3. When the thing to be subtracted takes more than one rule, give it
+a name.</strong> This is the <strong>auxiliary predicate</strong>, and it is the
+pattern the rest of this section is built on:</p>
+<pre>Fail(x)    &larr;  &hellip; one way of failing &hellip;
+Fail(x)    &larr;  &hellip; another way of failing &hellip;
+Result(x)  &larr;  &hellip; range over a table &hellip; and not Fail(x)</pre>
+<p>Several rules with the head <code>Fail</code> are a union, by &sect;10.2;
+<code>not Fail</code> then subtracts the union in one go. Without the name you
+would have to negate each way of failing separately, which is a different and
+usually wrong query.</p></div>
+
+<details class="prob"><summary data-label="Exercise 10.7">In the Employee
+database, find names of all employees who are not managers and do not earn a
+salary of more than <code>$30,000</code> in any company for which they work.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> First the employees that fail the test, because they
+are managers or because their salary is too high:</p>
+<pre>&Psi; = &Pi;[employee_name&#8321;] &sigma;[F] (employee&#8321; &times; works&#8322; &times; manages&#8323;)
+
+where  F &equiv; [ employee_name&#8321; = manager_name&#8323;
+                 &or;
+                 ( employee_name&#8321; = employee_name&#8322; &and; salary&#8322; &gt; 30,000 ) ]
+
+R = &Pi;[employee_name] (employee) \ &Psi;</pre>
+<p><strong>(b)</strong></p>
+<pre>Fail(n)    &larr;  employee(n, _, _) and manages(_, n, _)
+Fail(n)    &larr;  employee(n, _, _) and works(n, _, r) and r &gt; 30000
+Result(n)  &larr;  employee(n, _, _) and not Fail(n)</pre>
+<p><strong>What each predicate holds:</strong></p>
+<pre>Fail    =  Anna Karenina, Hugo Vance, Jim Wild,
+           John Boss, Paul Stone, Rose Purple
+Result  =  Ida Frost, Luna Lovegood, Mina Grey, Oliver Twist</pre>
+<p><strong>Ida Frost is in the answer, and that is the whole exercise.</strong>
+She is unemployed: she is not a manager, and there is no company in which she
+earns more than $30,000 because there is no company in which she earns
+anything. The book makes the point explicitly &mdash; taking the complement in
+<code>works</code> rather than in <code>employee</code> would look for suitable
+employees among those who are actually employed, leaving out the unemployed,
+and the book believes the former interpretation is preferable. Whichever you
+choose, choose it deliberately and say which you chose.</p>
+<p><strong>Two rules for <code>Fail</code>, not one.</strong> &ldquo;Is a
+manager&rdquo; and &ldquo;earns too much somewhere&rdquo; are two independent
+ways of failing, joined by <em>or</em>, and a Datalog body has no
+<em>or</em> &mdash; it has only <em>and</em>. Two rules with the same head is
+how you write a disjunction, which is exactly the union of &sect;10.2 doing a
+job you would not have guessed it was for.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.8">In the Employee
+database, find names of all employees who work for exactly one company.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> The employees that work for at least one company:</p>
+<pre>&xi; = &Pi;[employee_name] (works)</pre>
+<p>The employees found to work for at least two different companies:</p>
+<pre>&Psi; = &Pi;[employee_name&#8321;] &sigma;[F] (works&#8321; &times; works&#8322;)
+
+where  F &equiv; [ employee_name&#8321; = employee_name&#8322; &and;
+                 company_name&#8321; &ne; company_name&#8322; ]
+
+R = &xi; \ &Psi;</pre>
+<p><strong>(b)</strong></p>
+<pre>Fail(n)    &larr;  works(n, p, _) and works(n, q, _) and not p = q
+Result(n)  &larr;  works(n, _, _) and not Fail(n)</pre>
+<p><strong>What each predicate holds:</strong></p>
+<pre>Fail    =  Anna Karenina, Rose Purple
+Result  =  Hugo Vance, Jim Wild, John Boss, Luna Lovegood,
+           Mina Grey, Oliver Twist, Paul Stone</pre>
+<p><strong>&ldquo;Exactly one&rdquo; is &ldquo;at least one&rdquo; minus
+&ldquo;at least two&rdquo;</strong>, and Datalog can count no higher than that.
+There is no counting in the language &mdash; no <code>COUNT</code>, no
+<code>HAVING</code>. What there is instead is the same predicate written twice
+in one body with different variables, which says &ldquo;two rows&rdquo;, plus a
+<code>!=</code> to say they are different rows. Everything you can express about
+cardinality is built from that.</p>
+<p><strong>Ida Frost is <em>not</em> in this answer</strong>, where she was in
+the last one, and the difference is one word: this rule ranges over
+<code>works</code> and Exercise 10.7 ranged over <code>employee</code>. Here
+that is right &mdash; somebody who works for no company does not work for
+exactly one.</p>
+<p><strong>Leaving out <code>not p = q</code></strong> would make
+<code>Fail</code> hold everyone who works anywhere, since the two
+<code>works</code> predicates would happily match the same row twice, and
+<code>Result</code> would be empty. If a negated rule returns nothing at all,
+this is the first thing to look for.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.9">In the Employee
+database, find names of all companies in which <code>Rose Purple</code> is
+employed, but not as a manager.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> The companies where Rose Purple works, and the
+companies where she manages somebody:</p>
+<pre>&xi; = &Pi;[company_name] &sigma;[employee_name = 'Rose Purple'] (works)
+
+&Psi; = &Pi;[company_name] &sigma;[manager_name = 'Rose Purple'] (manages)
+
+R = &xi; \ &Psi;</pre>
+<p><strong>(b)</strong></p>
+<pre>Fail(p)    &larr;  manages(_, m, p) and m = 'Rose Purple'
+Result(p)  &larr;  works(n, p, _) and n = 'Rose Purple' and not Fail(p)</pre>
+<p><strong>What each predicate holds:</strong></p>
+<pre>Fail    =  Red Press
+Result  =  Blue Press</pre>
+<p>Rose Purple works for Red Press and Blue Press, and manages somebody at Red
+Press only.</p>
+<p><strong>The constant is needed in both rules</strong>, and forgetting it in
+the first is the usual error. Write <code>Fail(p) &larr; manages(_, _, p)</code>
+and <code>Fail</code> becomes every company in which <em>anybody</em> manages
+anybody, which here is four companies and would make the answer empty. The two
+rules are about the same person, but nothing in the language says so except the
+constant appearing in each.</p>
+<p><strong>Why <code>Fail</code> needs a name here at all</strong>, when it has
+only one rule: because <code>not</code> may only be applied to a predicate, and
+the thing being subtracted is a <em>derived</em> set, not a stored table. You
+could inline it &mdash; <code>not manages(_, 'Rose Purple', p)</code> &mdash;
+and many systems would accept that; the book's style, and the style that keeps
+working when the subtracted set needs two rules, is to name it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.10">In the Employee
+database, find the names and cities of residence of those employees who
+<em>don't</em> live in <code>New York</code>, <em>and</em> don't work for a
+company located in <code>New York</code>, <em>and</em> don't have a manager who
+lives in <code>New York</code>.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> There are three ways to fail, and failing any one of
+them is enough, so the set to subtract is their union:</p>
+<pre>&Psi; = &Psi;&#8321; &cup; &Psi;&#8322; &cup; &Psi;&#8323;</pre>
+<p>Employees living in New York:</p>
+<pre>&Psi;&#8321; = &Pi;[employee_name] &sigma;[city = 'New York'] (employee)</pre>
+<p>Employees working for a company located in New York:</p>
+<pre>&Psi;&#8322; = &Pi;[employee_name&#8321;] &sigma;[G] (works&#8321; &times; company&#8322;)
+
+where  G &equiv; [ company_name&#8321; = company_name&#8322; &and; city&#8322; = 'New York' ]</pre>
+<p>Employees with a manager who lives in New York:</p>
+<pre>&Psi;&#8323; = &Pi;[employee_name&#8322;] &sigma;[J] (&Psi;&#8321;&#8321; &times; manages&#8322;)
+
+where  J &equiv; [ manager_name&#8322; = employee_name&#8321; ]
+
+R = &Pi;[employee_name&#8321;, city&#8321;] &sigma;[K] ( ((&Pi;[employee_name] employee) \ &Psi;)&#8322; &times; employee&#8321; )
+
+where  K &equiv; [ employee_name&#8321; = employee_name&#8322; ]</pre>
+<p><strong>(b)</strong> Each <code>&Psi;</code> becomes an auxiliary predicate,
+and the three are negated separately in the one result rule:</p>
+<pre>Live(e)       &larr;  employee(e, _, c) and c = 'New York'
+Located(e)    &larr;  works(e, p, _) and company(p, c) and c = 'New York'
+Boss(e)       &larr;  Live(b) and manages(e, b, _)
+Result(e, c)  &larr;  employee(e, _, c) and
+                  not Live(e) and not Located(e) and not Boss(e)</pre>
+<p><strong>What each predicate holds:</strong></p>
+<pre>Live     =  Jim Wild, John Boss
+Located  =  Anna Karenina, Jim Wild, John Boss, Rose Purple
+Boss     =  Anna Karenina, Jim Wild
+
+Result   =  Hugo Vance      Detroit
+            Ida Frost       Chicago
+            Luna Lovegood   Detroit
+            Mina Grey       Flushing
+            Oliver Twist    Boston
+            Paul Stone      Boston</pre>
+<p><strong><code>Boss</code> is defined in terms of <code>Live</code></strong>,
+not in terms of <code>employee</code> all over again. A derived predicate may
+be used in a body exactly like a stored one, and that is what makes the
+auxiliary-predicate style pay: the condition &ldquo;lives in New York&rdquo; is
+written once and used twice.</p>
+<p><strong>Three separate <code>not</code>s, not one <code>Fail</code>.</strong>
+The English says <em>and</em> &mdash; all three must be avoided &mdash; so the
+three negations sit side by side in one body. Exercise 10.11 asks the same
+question with <em>or</em> and the shape changes completely. Read those two
+answers next to each other; the pair is the point of both.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.11">In the Employee
+database, find the names and cities of residence of those employees who
+<em>don't</em> live in <code>New York</code>, <em>or</em> don't work for a
+company located in <code>New York</code>, <em>or</em> don't have a manager who
+lives in <code>New York</code>.
+<p>(a) in the relational algebra, using only
+<code>&sigma;</code>, <code>&Pi;</code>, <code>&times;</code>,
+<code>&cup;</code>, <code>\</code>.<br>
+(b) as a set of safe datalog rules.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> Now there is only one way to fail &mdash; by being
+caught by all three at once &mdash; so the union of Exercise 10.10 becomes an
+intersection, with <code>&Psi;&#8321;</code>, <code>&Psi;&#8322;</code> and
+<code>&Psi;&#8323;</code> exactly as computed there:</p>
+<pre>&Psi; = &Psi;&#8321; &cap; &Psi;&#8322; &cap; &Psi;&#8323;
+
+R = &Pi;[employee_name&#8321;, city&#8321;] &sigma;[K] ( ((&Pi;[employee_name] employee) \ &Psi;)&#8322; &times; employee&#8321; )
+
+where  K &equiv; [ employee_name&#8321; = employee_name&#8322; ]</pre>
+<p><strong>(b)</strong> The three auxiliary predicates are unchanged; what
+changes is that they are now combined into one <code>Fail</code> before being
+negated:</p>
+<pre>Live(e)       &larr;  employee(e, _, c) and c = 'New York'
+Located(e)    &larr;  works(e, p, _) and company(p, c) and c = 'New York'
+Boss(e)       &larr;  Live(b) and manages(e, b, _)
+Fail(e)       &larr;  Live(e) and Located(e) and Boss(e)
+Result(e, c)  &larr;  employee(e, _, c) and not Fail(e)</pre>
+<p><strong>What it returns:</strong></p>
+<pre>Fail    =  Jim Wild
+
+Result  =  Anna Karenina   Boston      Luna Lovegood   Detroit
+           Hugo Vance      Detroit     Mina Grey       Flushing
+           Ida Frost       Chicago     Oliver Twist    Boston
+           John Boss       New York    Paul Stone      Boston
+                                       Rose Purple     Chicago</pre>
+<p>Nine of the ten employees. Jim Wild lives in New York, works for First Bank
+which is located there, and is managed by John Boss who lives there, so he is
+the only one all three catch.</p>
+<p><strong>This is De Morgan, and it is worth saying out loud.</strong>
+&ldquo;Not A and not B and not C&rdquo; is &ldquo;not (A or B or C)&rdquo; &mdash;
+three negations beside each other, as in Exercise 10.10. &ldquo;Not A or not B
+or not C&rdquo; is &ldquo;not (A and B and C)&rdquo; &mdash; one negation of a
+conjunction, which is why this version needs the extra <code>Fail</code> rule
+and the previous one did not. A Datalog body can only say <em>and</em>, so an
+<em>or</em> has to be pushed outward into separate rules or inward past a
+<code>not</code>; recognising which of the two a question wants is most of the
+work in these.</p>
+<p><strong>John Boss is in this answer and not in the previous one.</strong> He
+lives in New York and works for a company located there, so Exercise 10.10
+excludes him twice over &mdash; but nobody manages him, so the third condition
+does not catch him, and here that is enough to let him through.</p>
+</div></details>
+
+
+<h2 id="known"><span class="secnum">10.6</span>Four databases you already know</h2>
+
+<p>The last five exercises are the problem book's Datalog questions on four
+schemas from earlier sets. Nothing new is introduced; what changes is that you
+have to find your way around a schema you last used in SQL, which is most of
+the difficulty in a real query and none of the difficulty in a textbook one.</p>
+
+<div class="box note"><span class="bt">A note on the names in the data</span>
+<p>Two of these questions name a person or a company: the book asks about a
+mechanic called <code>Adjuster Crack Hide</code> and a designer called
+<code>Crocodile Garment</code>. The book prints no content for either database,
+so the rows on this site are ours and use different names. The exercises below
+name somebody who is actually in the data &mdash; a mechanic called
+<code>Constructor Break Fixer</code> and a designer called
+<code>Smart Dresser</code> &mdash; so that the answers can be run and shown.
+Nothing else about either question is changed.</p></div>
+
+<details class="prob"><summary data-label="Exercise 10.12">Refer to the
+<strong>Car Repair Shop</strong> database of Set 8:
+<pre>mechanic     (<u>socSecNum</u>, name)
+manufacturer (<u>name</u>, address)
+car          (<u>manufacturerId</u>, <u>model</u>, price)
+carInstance  (<u>VIN</u>, manufacturerId, modelCode, dateMade)
+repairJob    (<u>workOrderID</u>, carID, officer, dateBrought)</pre>
+Write a set of safe datalog rules for: find manufacturer name, manufacturer
+address, and car price of those cars that have been brought in for a repair job
+where the officer in charge was a mechanic by name of
+<code>Constructor Break Fixer</code>.</summary>
+<div class="sol">
+<pre>Result(k, a, p)  &larr;  manufacturer(k, a) and
+                     car(k, m, p) and
+                     carInstance(v, k, m, _) and
+                     repairJob(_, v, f, _) and
+                     mechanic(f, e) and
+                     e = 'Constructor Break Fixer'</pre>
+<p><strong>The rows it returns:</strong></p>
+<pre>HappyForgerWorks   1 Anvil Road     21000
+GreatConjurer      9 Spell Street   25000</pre>
+<p><strong>Five predicates and not one of them is optional.</strong> Read the
+chain of repeated variables, because that is the query:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Variable</th><th>Links</th></tr></thead>
+<tbody>
+<tr><td><code>k</code></td><td><code>manufacturer.name</code> to <code>car.manufacturerId</code> to <code>carInstance.manufacturerId</code></td></tr>
+<tr><td><code>m</code></td><td><code>car.model</code> to <code>carInstance.modelCode</code></td></tr>
+<tr><td><code>v</code></td><td><code>carInstance.VIN</code> to <code>repairJob.carID</code></td></tr>
+<tr><td><code>f</code></td><td><code>repairJob.officer</code> to <code>mechanic.socSecNum</code></td></tr>
+</tbody></table></div>
+<p>Five tables, four links, and the whole query is in the choice of letters.
+Compare the SQL you wrote for this database in Set 8: the same query there is
+a <code>FROM</code> list of five tables and a <code>WHERE</code> clause of four
+equalities, which is the same information with more punctuation.</p>
+<p><strong><code>k</code> and <code>m</code> together</strong> are what link
+<code>car</code> to <code>carInstance</code>, because the key of
+<code>car</code> is the pair. Matching on <code>k</code> alone would ask for
+cars of the right make and any model, which is the half-a-composite-key error
+Set 8 ends on &mdash; and in Datalog it is easier to spot, because the
+unmatched variable just sits there with nothing to pair with.</p>
+<p><strong>The question asks about cars, and the answer is about models.</strong>
+Two instances of the same model repaired by the same mechanic give one row,
+not two, because <code>v</code> does not appear in the head and Datalog is a
+set. That is almost certainly what was wanted; it is worth being sure.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.13">Refer to the
+<strong>Professor Payroll</strong> database of Sets 5 and 7:
+<pre>professor  (<u>socSecNum</u>, firstName, lastName, salary, rank, wizardID)
+department (<u>name</u>, office, phone, chairId)</pre>
+Write a set of safe datalog rules for: find full name (first and last) of those
+professors who serve as department chairs.</summary>
+<div class="sol">
+<pre>Result(fn, ln)  &larr;  professor(d, fn, ln, _, _, _) and
+                    department(_, _, _, d)</pre>
+<p><strong>The rows it returns:</strong></p>
+<pre>Minerva   McGonagall
+Severus   Snape
+Pomona    Sprout
+Dolores   Umbridge</pre>
+<p><strong>Five departments, four professors.</strong> Dolores Umbridge chairs
+both Divination and Muggle Studies, so the matching produces her row twice and
+the answer holds it once. Translate this rule to SQL and leave out
+<code>DISTINCT</code> and you get five rows &mdash; the single clearest example
+on this page of what &ldquo;Datalog is a set&rdquo; buys you. SQL made you ask
+for duplicate removal; Datalog makes you ask for duplicates, and there is no
+way to ask.</p>
+<p><strong>The whole query is the variable <code>d</code></strong> appearing in
+two places: the social security number of a professor, and the
+<code>chairId</code> of a department. Everything else in the rule is an
+underscore. When a rule comes out looking like this, you have found the
+foreign key the question was really about.</p>
+<p><strong>Naming the shared variable <code>d</code> is a small lie worth
+avoiding.</strong> It holds a social security number, not a department &mdash;
+the name was picked because it is the <em>department's</em> column that it is
+being matched against. The book writes it this way; a letter closer to
+<code>s</code> would read better. Names in a rule are documentation and nothing
+else, so choose them for the reader.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.14">Refer to the
+<strong>Cool Cotton</strong> database of Set 8:
+<pre>shirt     (<u>styleCode</u>, salesPrice)
+shirtSize (<u>basicStyle</u>, <u>sizeOption</u>)</pre>
+Write a set of safe datalog rules to select styles and sales prices of all
+shirts that are available in sizes greater than 10.</summary>
+<div class="sol">
+<pre>Result(s, p)  &larr;  shirt(s, p) and shirtSize(s, t) and t &gt; 10</pre>
+<p><strong>The rows it returns</strong> &mdash; all six styles:</p>
+<pre>S-1001    6.50
+S-1002   12.00
+S-1003   24.99
+S-1004    9.75
+S-1005   null
+S-1006   24.99</pre>
+<p><strong>A condition that excludes nothing is still worth writing.</strong>
+Every size in this content is 16 or more, so <code>t &gt; 10</code> passes
+every row and the answer is every shirt that has a size at all. That is the
+right answer to the question asked, and it is also a warning: an answer that
+looks like &ldquo;the whole table&rdquo; is the one case where you cannot tell a
+working query from a broken one by reading the output. Check it by changing the
+constant &mdash; at <code>t &gt; 20</code> the answer drops to two styles,
+<code>S-1002</code> and <code>S-1003</code>.</p>
+<p><strong>S-1005 has no sales price</strong> and is in the answer anyway. The
+variable <code>p</code> binds to the null and carries it into the head; nothing
+in the rule looks at <code>p</code>, so nothing can object. Had the question
+asked for shirts priced above something, that row would have vanished without
+comment &mdash; which is the null behaviour Set 8 spends four exercises on, and
+it is no different here.</p>
+<p><strong>Every shirt in <code>shirtSize</code> is also in <code>shirt</code></strong>,
+so <code>shirt(s, p)</code> is not acting as a filter. It is in the body because
+the head needs <code>p</code>, and <code>shirtSize</code> does not have it.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.15">Refer again to the
+<strong>Cool Cotton</strong> database:
+<pre>designer       (<u>designerId</u>, designerName)
+originalDesign (<u>theStyle</u>, theDesigner, adoptedWhen, designPlan)
+factory        (<u>factoryId</u>, factoryName)
+purchaseDeal   (<u>item</u>, <u>producedBy</u>, <u>productName</u>,
+                purchasePrice, quantity, orderDue)</pre>
+Write a set of safe datalog rules to find names of all factories that have
+produced some shirt style(s) designed by <code>Smart Dresser</code>
+designers.</summary>
+<div class="sol">
+<pre>Result(fn)  &larr;  designer(di, dn) and
+                originalDesign(s, di, _, _) and
+                purchaseDeal(s, fi, _, _, _, _) and
+                factory(fi, fn) and
+                dn = 'Smart Dresser'</pre>
+<p><strong>The rows it returns:</strong></p>
+<pre>Superb Seamstress Star
+Tiny Thread
+Rapid Stitch</pre>
+<p><strong>Two designer ids share the name Smart Dresser</strong>, and the
+question says <em>designers</em>, plural. <code>D-01</code> designed S-1002 and
+S-1003; <code>D-03</code> designed S-1004. Match on the name, as above, and all
+three factories appear. Match on one id instead &mdash;</p>
+<pre>Result(fn)  &larr;  originalDesign(s, 'D-01', _, _) and
+                purchaseDeal(s, fi, _, _, _, _) and
+                factory(fi, fn)          &larr; answers a different question</pre>
+<p>&mdash; and the answer silently drops to two:</p>
+<pre>Superb Seamstress Star
+Tiny Thread</pre>
+<p><strong>This is the reason the <code>designer</code> predicate is in the
+body at all.</strong> The link from a style to a factory never passes through
+it; it is there only so that the name can be matched rather than the id. When a
+question names somebody in English, it is naming a <em>value</em> in some
+column, and finding which column &mdash; and whether that column is unique
+&mdash; is the first thing to settle.</p>
+<p><strong><code>purchaseDeal</code> takes six arguments</strong>, four of them
+underscores. Count the columns in the schema before you write the predicate,
+every time; a predicate written with the wrong number of arguments is the one
+error Datalog cannot interpret charitably.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 10.16">Refer to the
+<strong>Hotel</strong> database of Set 8:
+<pre>hotel   (<u>hnumber</u>, name, address)
+guest   (<u>gnumber</u>, name, address)
+room    (<u>rnumber</u>, <u>hnumber</u>, type, price_night)
+booking (<u>hnumber</u>, <u>gnumber</u>, arrived, left, <u>rnumber</u>)</pre>
+Write a set of safe datalog rules to find names of all guests that have never
+stayed in the <code>New Hotel</code>.</summary>
+<div class="sol">
+<pre>Discard(g)  &larr;  guest(g, _, _) and hotel(h, n, _) and
+                booking(h, g, _, _, _) and n = 'New Hotel'
+Result(n)   &larr;  guest(g, n, _) and not Discard(g)</pre>
+<p><strong>What each predicate holds:</strong></p>
+<pre>Discard  =  1212, 3456, 7171
+
+Result   =  Nice Guy        Any Guy
+            Mary Clever     Former Student
+            Smart Student   Poor Student
+            Fine Lady       Nasty Professor</pre>
+<p>Eight of the eleven guests.</p>
+<p><strong>&ldquo;Never&rdquo; is the word that tells you a negation is
+coming</strong>, along with &ldquo;no&rdquo;, &ldquo;not any&rdquo; and
+&ldquo;only&rdquo;. And as always, the thing to negate is a derived set, so it
+needs a rule and a name of its own: <code>Discard</code> holds the guests who
+<em>have</em> stayed there, and the answer is everybody else.</p>
+<p><strong><code>Discard</code> holds numbers and <code>Result</code> holds
+names.</strong> The negation must be on the key, not on the name &mdash;
+<code>guest.name</code> is not declared unique in this schema, so two guests
+could share one and negating the name would throw away the innocent one along
+with the guilty. It is a small thing and it is the kind of small thing that
+makes a query wrong on real data and right on the ten rows you tested it
+with.</p>
+<p><strong>The rule is safe</strong> because <code>g</code> and <code>n</code>
+both appear in <code>guest(g, n, _)</code>, which is positive. Drop that
+predicate and keep only <code>not Discard(g)</code> and the rule asks for every
+value in the universe that is not one of three guest numbers, which no system
+will run and none should.</p>
+</div></details>
+
+<div class="box note"><span class="bt">Where this set ends up</span>
+<p>Three query languages now, and every one of these sixteen queries could have
+been written in any of them. What Datalog contributes is not power but
+clarity about where the power comes from:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Algebra</th><th>SQL</th><th>Datalog</th></tr></thead>
+<tbody>
+<tr><td><code>&times;</code> then <code>&sigma;</code> on equality</td><td><code>FROM</code> two tables, <code>WHERE</code> they match</td><td>the same variable written twice</td></tr>
+<tr><td><code>&sigma;</code> on a constant</td><td><code>WHERE</code> a comparison</td><td>a comparison in the body</td></tr>
+<tr><td><code>&Pi;</code></td><td>the <code>SELECT</code> list</td><td>the head variables</td></tr>
+<tr><td><code>&cup;</code></td><td><code>UNION</code></td><td>two rules with the same head</td></tr>
+<tr><td><code>\</code></td><td><code>NOT IN</code></td><td><code>not</code> before a predicate</td></tr>
+<tr><td>a named intermediate result</td><td>a subquery</td><td>an auxiliary predicate</td></tr>
+<tr><td>sets throughout</td><td>bags, unless <code>DISTINCT</code></td><td>sets throughout</td></tr>
+</tbody></table></div>
+<p>Read the bottom two rows together. The auxiliary predicate is the one piece
+of Datalog with no single counterpart in the other two &mdash; it is a
+subquery you can reuse, a view you do not have to create, and a name for the
+intermediate step that the algebra lets you write but SQL mostly does not.
+Every hard query on this page is hard only until it is given one.</p>
+<p>What this set has not asked: anything that counts, averages or orders. There
+is no aggregation in the Datalog of Lecture 17, and no recursion either &mdash;
+the feature that makes Datalog more than a notation for the algebra. Both are
+real and neither is in this course.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-norm.html"><span>Previous</span>Set 9. Normalization theory</a>
+      <a class="next" href="ex-storage.html"><span>Next</span>Set 11. Storage structures</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

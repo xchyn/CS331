@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 11 — Storage structures</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 11 &middot; Storage</span>
+  <nav class="topnav">
+    <a href="ex-datalog.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-midterm.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#hier"><span class="t">11.1</span>The memory hierarchy</a></li>
+    <li><a href="#disk"><span class="t">11.2</span>Inside a disk</a></li>
+    <li><a href="#size"><span class="t">11.3</span>How big is a file</a></li>
+    <li><a href="#search"><span class="t">11.4</span>Searching a file</a></li>
+    <li><a href="#sort"><span class="t">11.5</span>Sorting a file</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 11 &middot; Lectures 18 and 19</span>
+  <span class="chnum">Storage</span>
+  <h1>Disks, file sizes and sorting</h1>
+  <p class="chsum">Why a database lives on a disk, what a disk costs you every
+  time you touch it, and the three numbers that decide how long any operation
+  on a stored file will take: the length of a record, the number of records,
+  and the size of a block. Twelve exercises from the problem book, all of them
+  arithmetic in powers of two, and most of them answerable in four lines once
+  the three numbers are on the page.</p>
+</div>
+
+<p>Every set until now has been about what a database <em>means</em>. This one
+is about what it <em>costs</em>, and the answers are startling: the same file,
+read the obvious way, takes seven weeks; sorted by the obvious algorithm, takes
+five centuries. Both numbers come out of the same short calculation.</p>
+
+<div class="box note"><span class="bt">Notation, as Lectures 18 and 19 write it</span>
+<div class="tablewrap"><table>
+<thead><tr><th>Symbol</th><th>Is</th></tr></thead>
+<tbody>
+<tr><td><code>&#8467;</code></td><td>the length of one record, in bytes &mdash; the sum of its field lengths</td></tr>
+<tr><td><code>T</code></td><td>the number of records in the file</td></tr>
+<tr><td><code>b</code></td><td>the block size, in bytes</td></tr>
+<tr><td><code>B</code></td><td>the number of blocks the file occupies</td></tr>
+<tr><td><code>t<sub>b</sub></code></td><td>the block access time, in seconds</td></tr>
+<tr><td><code>M</code></td><td>the size of main memory, in blocks</td></tr>
+</tbody></table></div>
+<p>Everything on this page is built from the first five, and the sorting of
+&sect;11.5 adds the sixth. <strong>Write every quantity as a power of two before
+you do anything with it</strong> &mdash; that is not a stylistic preference, it
+is the method: multiplication becomes addition of exponents, division becomes
+subtraction, and a logarithm is read straight off. The problem book asks you to
+round sizes and counts up to the nearest power of two for exactly this reason,
+and <code>2<sup>10</sup> &asymp; 10<sup>3</sup></code> is the only conversion
+you need to remember.</p></div>
+
+<h2 id="hier"><span class="secnum">11.1</span>The memory hierarchy</h2>
+
+<p>A database is stored physically as files of records, and those files live on
+a disk. Lecture 18 begins with why.</p>
+
+<div class="box worked"><span class="bt">Four levels, and the line through the middle</span>
+<div class="fig" style="--figmax:36rem">
+<svg viewBox="0 0 660 330" role="img" aria-label="The memory hierarchy as a four-level pyramid">
+  <g class="wire">
+    <path d="M310 20 L560 280 L60 280 Z"/>
+    <path d="M247.5 85 L372.5 85"/>
+    <path d="M185 150 L435 150"/>
+    <path d="M122.5 215 L497.5 215"/>
+  </g>
+  <g class="wire"><path d="M212 58 L292 58"/></g>
+  <g class="lbl"><text x="206" y="62" font-size="14" text-anchor="end">Processor cache</text></g>
+  <g class="lbl" text-anchor="middle">
+    <text x="310" y="120" font-size="14">Primary memory</text>
+    <text x="310" y="138" font-size="12">(main memory, RAM)</text>
+    <text x="310" y="183" font-size="14">Secondary memory</text>
+    <text x="310" y="201" font-size="12">(disk &mdash; HDD, SSD, flash)</text>
+    <text x="310" y="255" font-size="14">Tertiary memory</text>
+  </g>
+  <g class="wire" stroke-dasharray="5 4"><path d="M40 150 L580 150"/></g>
+  <g class="lbl">
+    <text x="44" y="142" font-size="12">volatile &#8593;</text>
+    <text x="44" y="166" font-size="12">non-volatile &#8595;</text>
+    <text x="598" y="60" font-size="12">smaller</text>
+    <text x="598" y="76" font-size="12">faster</text>
+    <text x="598" y="92" font-size="12">dearer</text>
+    <text x="598" y="250" font-size="12">larger</text>
+    <text x="598" y="266" font-size="12">slower</text>
+    <text x="598" y="282" font-size="12">cheaper</text>
+  </g>
+</svg>
+<figcaption>The memory hierarchy. The dashed line is the one that matters:
+above it the contents vanish when the power goes off.</figcaption>
+</div>
+<div class="tablewrap"><table>
+<thead><tr><th>Level</th><th>Capacity</th><th>Access time</th></tr></thead>
+<tbody>
+<tr><td>processor cache</td><td>~1 MB</td><td>~1 ns</td></tr>
+<tr><td>primary memory</td><td>~10 GB</td><td>~10 &micro;s</td></tr>
+<tr><td>secondary memory</td><td>~10 TB</td><td>~1 ms</td></tr>
+<tr><td>tertiary memory</td><td>unbounded</td><td>~100 s</td></tr>
+</tbody></table></div>
+<p><strong>Databases are stored permanently on secondary storage</strong>, for
+three reasons Lecture 18 gives in order: they are too large to fit entirely in
+main memory, permanent loss of stored data arises less frequently there, and
+the cost of storage is cheaper.</p>
+<p><strong>Read the access-time column as the whole of this set.</strong>
+Primary memory is about a hundred times slower than cache, and disk is about a
+hundred <em>thousand</em> times slower than memory. That last ratio is why,
+when the cost of a database operation is estimated, only block accesses to
+secondary storage are counted: everything the processor does in between is
+several orders of magnitude too small to matter.</p></div>
+
+<div class="box worked"><span class="bt">Units, and order of magnitude</span>
+<p>The <strong>order of magnitude</strong> of a quantity is the
+<code>k</code> in</p>
+<pre>N = a &times; 10&#7503;    with   1 &le; a &lt; 10</pre>
+<p>which is the exponent you would read off in scientific notation. The one
+approximation this set runs on is</p>
+<pre>2&#185;&#8304; = 1024 &asymp; 10&#179;</pre>
+<p>from which every row of the left-hand table follows by multiplying the
+exponent by one, two, three&hellip;</p>
+<div class="ttrow">
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="3">bytes</th></tr>
+<tr><th style="text-align:center">unit</th><th style="text-align:center">exact</th><th style="text-align:center">&asymp;</th></tr></thead>
+<tbody>
+<tr><td>bit (b)</td><td colspan="2">one binary value, 0 or 1</td></tr>
+<tr><td>byte (B)</td><td colspan="2">8 bits</td></tr>
+<tr><td>kilobyte (KB)</td><td>2<sup>10</sup> B</td><td>10<sup>3</sup> B</td></tr>
+<tr><td>megabyte (MB)</td><td>2<sup>20</sup> B</td><td>10<sup>6</sup> B</td></tr>
+<tr><td>gigabyte (GB)</td><td>2<sup>30</sup> B</td><td>10<sup>9</sup> B</td></tr>
+<tr><td>terabyte (TB)</td><td>2<sup>40</sup> B</td><td>10<sup>12</sup> B</td></tr>
+<tr><td>petabyte (PB)</td><td>2<sup>50</sup> B</td><td>10<sup>15</sup> B</td></tr>
+<tr><td>exabyte (EB)</td><td>2<sup>60</sup> B</td><td>10<sup>18</sup> B</td></tr>
+<tr><td>zettabyte (ZB)</td><td>2<sup>70</sup> B</td><td>10<sup>21</sup> B</td></tr>
+<tr><td>yottabyte (YB)</td><td>2<sup>80</sup> B</td><td>10<sup>24</sup> B</td></tr>
+</tbody></table></div>
+<div class="tablewrap"><table class="ttab">
+<thead><tr><th colspan="2">seconds</th></tr>
+<tr><th style="text-align:center">unit</th><th style="text-align:center">is</th></tr></thead>
+<tbody>
+<tr><td>millisecond (ms)</td><td>10<sup>&minus;3</sup> s</td></tr>
+<tr><td>microsecond (&micro;s)</td><td>10<sup>&minus;6</sup> s</td></tr>
+<tr><td>nanosecond (ns)</td><td>10<sup>&minus;9</sup> s</td></tr>
+<tr><td>picosecond (ps)</td><td>10<sup>&minus;12</sup> s</td></tr>
+</tbody></table></div>
+</div>
+<p><strong>The two tables are on different bases and it does not matter.</strong>
+Bytes go up by <code>2<sup>10</sup></code> a step and seconds by
+<code>10<sup>3</sup></code>, and since those two are equal to within 2.4%, a
+step is a step: three orders of magnitude either way. Any answer on this page
+that is right to within a factor of two is right.</p></div>
+
+<div class="box note"><span class="bt">Moore's Law, and what it does not cover</span>
+<p>Some properties of computers improve so that the relevant numbers
+<strong>double approximately every two years</strong>. Which ones do, and which
+do not, is the point:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Follows Moore's Law</th><th>Does not</th></tr></thead>
+<tbody>
+<tr><td>memory capacity</td><td>access to memory</td></tr>
+<tr><td>disk capacity</td><td>access to disk</td></tr>
+</tbody></table></div>
+<p>Capacity doubles; <em>speed of access</em> does not, because it is limited
+by physics rather than by lithography &mdash; a disk has to spin and a head has
+to move. Lecture 18's twenty-year table makes the gap visible:</p>
+<div class="tablewrap"><table>
+<thead><tr><th></th><th>2000</th><th>2005</th><th>2010</th><th>2015</th><th>2020</th></tr></thead>
+<tbody>
+<tr><td>main memory</td><td>256 MB<br>10 ns<br>$1000&ndash;1500</td><td>1 GB<br>5 ns<br>$200&ndash;300</td><td>4 GB<br>2 ns<br>$50&ndash;100</td><td>8 GB<br>1 ns<br>$20&ndash;40</td><td>16 GB<br>0.5 ns<br>$10&ndash;20</td></tr>
+<tr><td>secondary<br>(HDD / SSD)</td><td>20 GB<br>10 ms<br>$5&ndash;10</td><td>120 GB<br>8 ms<br>$0.5&ndash;1</td><td>256 GB<br>0.1 ms<br>$1&ndash;2 (SSD)</td><td>512 GB<br>0.05 ms<br>$0.5&ndash;1</td><td>1 TB<br>0.02 ms<br>$0.1&ndash;0.2</td></tr>
+</tbody></table></div>
+<p>Capacity per dollar improves by three orders of magnitude over the twenty
+years; memory access time improves by a factor of twenty. Prices are per GB for
+the secondary row and for the whole module in the primary row.</p></div>
+
+<details class="prob"><summary data-label="Exercise 11.1">Using the figures for
+the year 2000 in the table above, give the order of magnitude of each of the
+following fractions.
+<p>(a) main memory access speed &divide; disk access speed<br>
+(b) main memory access speed &divide; cache access speed<br>
+(c) disk cost in dollars &divide; disk capacity in megabytes<br>
+(d) main memory cost in dollars &divide; main memory capacity in megabytes</p></summary>
+<div class="sol">
+<div class="tablewrap"><table>
+<thead><tr><th></th><th>Fraction</th><th>Order of magnitude</th></tr></thead>
+<tbody>
+<tr><td>(a)</td><td>memory access &divide; disk access</td><td>10<sup>5</sup></td></tr>
+<tr><td>(b)</td><td>memory access &divide; cache access</td><td>10<sup>&minus;1</sup></td></tr>
+<tr><td>(c)</td><td>disk $ &divide; disk MB</td><td>10<sup>&minus;2</sup></td></tr>
+<tr><td>(d)</td><td>memory $ &divide; memory MB</td><td>1</td></tr>
+</tbody></table></div>
+<p><strong>(a)</strong> In 2000 a disk access took about 10 ms and a memory
+access about 10 ns, so the disk is <code>10<sup>&minus;2</sup> /
+10<sup>&minus;8</sup> = 10<sup>6</sup></code> times slower. Read as
+&ldquo;speed&rdquo; rather than &ldquo;time&rdquo; the fraction inverts, and the
+book's answer is <code>10<sup>5</sup></code> &mdash; within one order of
+magnitude either way, which is all the question asks for. <strong>The useful
+form of this number is the one in words:</strong> a single disk access costs
+what something between a hundred thousand and a million memory accesses cost.
+That is the sentence the whole of &sect;11.3 to &sect;11.5 is built on.</p>
+<p><strong>(b)</strong> Cache was a few nanoseconds and memory about 10 ns, so
+they are within one order of magnitude of each other &mdash; memory is slower by
+a factor of about ten, giving <code>10<sup>&minus;1</sup></code>. Cache and
+memory are near neighbours; memory and disk are not.</p>
+<p><strong>(c)</strong> 20 GB for $5&ndash;10 per GB is roughly $200 for
+<code>2 &times; 10<sup>4</sup></code> MB, so about
+<code>10<sup>&minus;2</sup></code> dollars per megabyte.</p>
+<p><strong>(d)</strong> 256 MB for about $1000 is roughly 4 dollars per
+megabyte &mdash; order of magnitude 1. <strong>Compare (c) and (d):</strong> in
+2000, memory cost about four hundred times as much per megabyte as disk did,
+which is the economic half of the answer to &ldquo;why does the database live
+on the disk?&rdquo;. The physical half is that the disk remembers when the power
+goes off.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.2">
+<p>(a) How many megabytes are there in a terabyte?<br>
+(b) How many kilobytes are there in a petabyte?<br>
+(c) How many nanoseconds are there in a millisecond?<br>
+(d) How many microseconds are there in a second?</p></summary>
+<div class="sol">
+<div class="tablewrap"><table>
+<thead><tr><th></th><th>Question</th><th>Exactly</th><th>&asymp;</th></tr></thead>
+<tbody>
+<tr><td>(a)</td><td>MB in a TB</td><td>2<sup>20</sup></td><td>10<sup>6</sup></td></tr>
+<tr><td>(b)</td><td>KB in a PB</td><td>2<sup>40</sup></td><td>10<sup>12</sup></td></tr>
+<tr><td>(c)</td><td>ns in a ms</td><td colspan="2">10<sup>6</sup></td></tr>
+<tr><td>(d)</td><td>&micro;s in a s</td><td colspan="2">10<sup>6</sup></td></tr>
+</tbody></table></div>
+<p>Count steps on the ladder, do not multiply anything out. A terabyte is two
+steps above a megabyte, so <code>2<sup>10</sup> &times; 2<sup>10</sup> =
+2<sup>20</sup></code>. A petabyte is four steps above a kilobyte, so
+<code>2<sup>40</sup></code>. A millisecond is two steps above a nanosecond and
+a second is two steps above a microsecond, so both of those are
+<code>10<sup>6</sup></code>.</p>
+<p><strong>All four answers are a million</strong>, give or take the 2.4% in
+<code>2<sup>10</sup> &asymp; 10<sup>3</sup></code>, because all four questions
+are &ldquo;two steps&rdquo;. Seeing that before computing anything is the skill
+the rest of this set needs.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.3">
+<p>(a) Name two parameters that obey Moore's Law.<br>
+(b) Name two parameters that do not obey Moore's Law.<br>
+(c) Which memory type is called volatile, and why?<br>
+(d) Which operations, performed by the disk hardware in the process of
+fetching a block of data, are responsible for the major part of the access
+time?</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> Processor speed and its speed-to-cost ratio; memory
+chip capacity and its specific cost; disk capacity and its specific cost.</p>
+<p><strong>(b)</strong> Memory access time, and disk rotation speed. Capacity
+is a matter of how small a feature can be printed; access time is a matter of
+how fast a signal or a motor can move, and those improve slowly.</p>
+<p><strong>(c) Main memory is volatile</strong>, because its content is lost
+when the power is switched off. So is the cache. Everything below the dashed
+line in &sect;11.1 &mdash; disk and tape &mdash; is non-volatile, which is the
+first of the three reasons a database is stored there.</p>
+<p><strong>(d) Seek time and rotational latency.</strong> The major part of the
+disk access time is spent positioning the heads over the required cylinder
+(seek), and then waiting for the required sector in that cylinder to rotate
+under the head (latency). &sect;11.2 puts numbers on both.</p>
+<p><strong>Why these four questions belong together.</strong> Moore's Law
+improves the two quantities in (a) and leaves the two in (b) alone; the two in
+(b) are exactly the ones in (d). So the gap between what a disk can
+<em>hold</em> and how fast it can be <em>reached</em> widens every year, and
+every technique in the rest of this set exists to work around it.</p>
+</div></details>
+
+
+<h2 id="disk"><span class="secnum">11.2</span>Inside a disk</h2>
+
+<div class="box worked"><span class="bt">The parts, and the two that cost time</span>
+<div class="fig" style="--figmax:38rem">
+<svg viewBox="0 0 680 270" role="img" aria-label="A disk platter with a track and a sector, and a side view of a stack of platters with the read/write arm">
+  <g class="wire">
+    <ellipse cx="160" cy="130" rx="130" ry="56"/>
+    <ellipse cx="160" cy="130" rx="92" ry="40"/>
+    <ellipse cx="160" cy="130" rx="22" ry="10"/>
+    <path d="M191.5 92.4 A92 40 0 0 1 243.4 113.1 L277.8 106.3 A130 56 0 0 0 204.5 77.4 Z"/>
+  </g>
+  <g class="lbl">
+    <text x="18" y="40" font-size="12">track</text>
+    <text x="300" y="72" font-size="12">sector</text>
+    <text x="106" y="212" font-size="12">spindle</text>
+  </g>
+  <g class="wire">
+    <path d="M60 60 L120 92"/><path d="M296 76 L248 92"/><path d="M146 196 L156 146"/>
+  </g>
+
+  <g class="wire">
+    <ellipse cx="500" cy="66" rx="112" ry="26"/>
+    <ellipse cx="500" cy="126" rx="112" ry="26"/>
+    <ellipse cx="500" cy="186" rx="112" ry="26"/>
+    <path d="M500 40 L500 212"/>
+    <path d="M396 44 L396 208"/>
+    <path d="M396 66 L452 66"/><path d="M396 126 L452 126"/><path d="M396 186 L452 186"/>
+  </g>
+  <g class="dot">
+    <circle cx="452" cy="66" r="4"/><circle cx="452" cy="126" r="4"/><circle cx="452" cy="186" r="4"/>
+  </g>
+  <g class="wire" stroke-dasharray="4 4"><path d="M612 54 L612 198"/></g>
+  <g class="lbl">
+    <text x="372" y="34" font-size="12" text-anchor="end">arm</text>
+    <text x="500" y="236" font-size="12" text-anchor="middle">platters on one spindle</text>
+    <text x="624" y="130" font-size="12">cylinder</text>
+  </g>
+  <g class="wire"><path d="M376 38 L396 50"/></g>
+</svg>
+<figcaption>Left: one platter, showing a track and a sector of that track.
+Right: several platters on a spindle; the heads move together, so the tracks
+at one arm position form a <b>cylinder</b>.</figcaption>
+</div>
+<p>Two definitions, and the difference between them is the one students lose
+marks on:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Term</th><th>Is</th></tr></thead>
+<tbody>
+<tr><td><strong>sector</strong></td><td>the smallest addressable unit on the disk device &mdash; a property of the hardware</td></tr>
+<tr><td><strong>block</strong></td><td>the unit of transfer between disk and CPU &mdash; a property of the system, usually several sectors</td></tr>
+</tbody></table></div>
+<p><strong>Everything on this page is counted in blocks</strong>, because the
+block is what crosses the wire. A query that needs one byte pays for a whole
+block; a query that needs a whole block pays the same.</p></div>
+
+<div class="box worked"><span class="bt">The four factors, and which two matter</span>
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Factor</th><th>Is</th><th>Size</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>seek time</td><td>time for the read/write head to move from one track to another</td><td>large</td></tr>
+<tr><td>2</td><td>latency time</td><td>time for the wanted sector to rotate under the head</td><td>large</td></tr>
+<tr><td>3</td><td>processing time</td><td>the controller's own work</td><td>&asymp; 0, typically ns</td></tr>
+<tr><td>4</td><td>transfer time</td><td>moving the bytes once they are under the head</td><td>small, &micro;s or ns</td></tr>
+</tbody></table></div>
+<p><strong>Latency comes straight off the rotation speed.</strong> At 6,400
+revolutions per minute:</p>
+<pre>one revolution  =  60 s / 6400  &asymp;  0.01 s  =  10 ms
+
+average latency =  half a revolution  =  5 ms</pre>
+<p>Half a revolution, because on average the sector you want is half a turn
+away &mdash; sometimes it has just passed, sometimes it is just arriving.</p>
+<p><strong>Factors 1 and 2 dominate; 3 and 4 are noise.</strong> That is why
+<code>t<sub>b</sub></code>, the block access time, is treated as a single
+constant for the whole of this set: whatever the block holds and wherever it
+goes, the cost is the seek plus the latency, and those do not depend on how
+much you then read.</p></div>
+
+<details class="prob"><summary data-label="Exercise 11.4">Your friend Jim runs
+a private database business. He is asking you for advice about some decisions
+he has to make. For each of the following scenarios, state your advice and
+<strong>explain</strong> it clearly. (Do not be equivocal.)
+<p>(a) Jim is unhappy because his disks are too slow. A vendor is offering a
+technology break-through: a disk controller whose processor speed, measured in
+instructions per second, exceeds the speed of the controllers currently in use
+by over 100. If Jim's typical disk costs <code>x</code> dollars, how much
+should Jim pay for this new controller?<br>
+(b) Jim has acquired exceedingly comprehensive archives containing libraries of
+old manuscripts, totaling several terabytes of data. A small number of research
+institutions world-wide are very interested in these archives, and are willing
+to pay Jim handsomely for providing a reliable access to the data. Typically,
+an interested researcher accesses one or very few manuscripts at a time, and
+looks at the manuscript(s) for a long time. The researchers habitually work at
+all hours of day and night, on holidays, etc. Which storage devices should Jim
+employ?</p></summary>
+<div class="sol">
+<p><strong>(a) Zero.</strong> Disk access time is heavily dominated by seek
+time and rotational latency. The delay caused by the controller while it is
+processing a transfer is already negligible, so making it a hundred times
+smaller than negligible changes nothing a user could measure.</p>
+<p>This is factor 3 of the table above, and the question is a test of whether
+you believe the table. A hundredfold improvement in a quantity that is
+<code>&asymp; 0</code> is still <code>&asymp; 0</code>; the two factors that
+are not <code>&asymp; 0</code> are mechanical and the new controller does not
+touch them.</p>
+<p><strong>(b) Juke-boxes</strong> &mdash; racks of optical disks with robotic
+arms, which mount disks on request. That is tertiary storage, the bottom level
+of &sect;11.1's pyramid, and the scenario has been built so that every one of
+its drawbacks is harmless here. Only a few researchers are expected to be
+active at any time, so contention for the drives is unlikely. The expected
+long contact time &mdash; a researcher reads one manuscript for a long while
+&mdash; means the delay of several seconds required for the robot to fetch a
+disk is acceptable to the client. And excluding human operators renders the
+solution insensitive to the timing of requests, which matters because the
+researchers work at all hours.</p>
+<p><strong>Read the scenario for the three facts that make tertiary storage
+work.</strong> Several terabytes rules out keeping it in memory; few concurrent
+users and long sessions make a hundred-second access time tolerable; round-the-clock
+use rules out anything needing a person. Change any one of the three &mdash;
+make it thousands of users, or short lookups &mdash; and the answer changes to
+disk.</p>
+</div></details>
+
+<h2 id="size"><span class="secnum">11.3</span>How big is a file, and how long to read it</h2>
+
+<div class="box worked"><span class="bt">Four lines, in this order</span>
+<pre>&#8467;  =  &#8467;&#8321; + &#8467;&#8322; + &hellip; + &#8467;&#8345;        the length of one record
+F  =  &#8467; &middot; T                     the length of the file in bytes
+B  =  F / b  =  T&#8467; / b          the length of the file in blocks
+t  =  B &middot; t&#8203;<sub>b</sub>                   the sequential scan time</pre>
+<p><strong>Lecture 18's worked example.</strong> A stored file of fixed-length
+records with four fields of 16, 16, 32 and 64 bytes; 16 billion records; block
+size 16 kilobytes; block access time about <code>1/128</code> s. Round
+everything up to a power of two first:</p>
+<pre>&#8467;   =  16 + 16 + 32 + 64  =  128   =  2&#8311; B
+T   =  16 billion  =  2&#8308; &middot; 10&#8313;  &asymp;  2&#8308; &middot; 2&#179;&#8304;  =  2&#179;&#8308; records
+b   =  16 KB  =  2&#8308; &middot; 2&#185;&#8304;  =  2&#185;&#8308; B
+t&#8203;<sub>b</sub>  =  1/128 s  =  2&#8315;&#8311; s
+
+F   =  &#8467; &middot; T  =  2&#8311; &middot; 2&#179;&#8308;  =  2&#8308;&#185; B
+B   =  F / b  =  2&#8308;&#185; / 2&#185;&#8308;  =  2&#178;&#8311; blocks
+
+t   =  B &middot; t&#8203;<sub>b</sub>  =  2&#178;&#8311; &middot; 2&#8315;&#8311;  =  2&#178;&#8304; s  &asymp;  10&#8310; s  &asymp;  12 days</pre>
+<p><strong>Twelve days to read one file once</strong>, and nothing in that
+calculation is pessimistic: it assumes the records are fixed-length, the file
+is contiguous, and every block costs the same. A table two terabytes in size
+cannot be scanned, and that one sentence is the reason indexes exist.</p>
+<p><strong>Memorise <code>2<sup>20</sup> s &asymp; 12 days</code>.</strong>
+It turns up on this page four times, and it lets you read an exponent straight
+off as a human quantity: <code>2<sup>22</sup> s</code> is four times that,
+about seven weeks.</p>
+<p>Two habits worth forming now. <strong>Round up, never down</strong> &mdash;
+16 billion becomes <code>2<sup>34</sup></code>, not
+<code>2<sup>33</sup></code>, and the answer is an upper bound. And
+<strong>never multiply anything out</strong>: every line above is addition and
+subtraction of exponents, and an answer written as <code>2<sup>20</sup> s</code>
+is more useful than the same answer written as 1,048,576.</p></div>
+
+<details class="prob"><summary data-label="Exercise 11.5">Refer to the
+<strong>Research Lab</strong> database of Set 3, whose <code>employee</code>
+table is declared
+<pre>employee (empId   VARCHAR(32),
+          name    VARCHAR(40),
+          address VARCHAR(40),
+          bornDate DATE,
+          salary  NUMBER)</pre>
+Assume all tables are stored as files of fixed-length records, so that every
+character occupies one byte, every numeric item occupies 8 bytes, every date
+item occupies 8 bytes, and the storage occupied by an entire record is simply
+the sum of the sizes of the individual items in that record. The block size is
+16 kilobytes and the block access time is approximately <code>1/128</code>
+seconds. Eight gigabytes of core memory are available. Assume that the file
+<code>employee</code>, at its maximum intended size, accommodates about
+32 million employees, and that the file is always at this maximum size.
+<p>(a) Describe an adequate procedure that the database engine should perform
+in order to execute the following query, and estimate the worst-case running
+time of the procedure you propose.
+<pre>SELECT * FROM employee;</pre>
+(b) Do you find the execution time of the query considered in part (a) to be
+satisfactory? Explain your answer.</p></summary>
+<div class="sol">
+<p><strong>(a) Sequential scan</strong>, since the entire table must be
+returned as the query result. There is nothing to look up and nothing to skip;
+every block has to come across.</p>
+<pre>&#8467;   =  32 + 40 + 40 + 8 + 8  =  128  =  2&#8311; B
+T   =  32 million  =  2&#8309; &middot; 10&#8310;  &asymp;  2&#8309; &middot; 2&#178;&#8304;  =  2&#178;&#8309; records
+b   =  16 KB  =  2&#185;&#8308; B
+t&#8203;<sub>b</sub>  =  1/128 s  =  2&#8315;&#8311; s
+
+B   =  &#8467; &middot; T / b  =  2&#8311;&#8314;&#178;&#8309;&#8315;&#185;&#8308;  =  2&#185;&#8312; blocks
+
+t   =  B &middot; t&#8203;<sub>b</sub>  =  2&#185;&#8312; &middot; 2&#8315;&#8311;  =  2&#185;&#185; s  &asymp;  34 minutes</pre>
+<p><strong>(b) Yes</strong> &mdash; however long it feels. The query cannot be
+made faster, because it spends its time transferring the required result: the
+entire table. It is the <em>size of the result</em>, rather than the procedure
+employed to construct it, that requires such running time.</p>
+<p><strong>This is the one case where a half-hour answer is the right
+answer</strong>, and it is worth being able to say why. Every other slow query
+on this page is slow because of how it was executed, and can be improved by
+executing it differently. <code>SELECT *</code> on a whole table has no
+&ldquo;differently&rdquo;: four gigabytes have to move, and no index, sort or
+algorithm changes that. If the execution time is unacceptable, the query is
+what has to change.</p>
+<p><strong>The eight gigabytes of memory are not used</strong>, and will not be
+until &sect;11.5. Being given a number you do not need is normal in these
+questions &mdash; the parts of a problem share one setup.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.6">Refer to the
+<strong>Mail-Order Bookstore</strong> database, whose <code>customer</code>
+table is declared
+<pre>customer (emailC VARCHAR(36),
+          nameC  VARCHAR(24),
+          dept   CHAR(4))</pre>
+Assume that every character occupies a single byte on disk, while every decimal
+or date occupies 11 bytes, and that there are no other hidden storage costs in
+any tuple or table. Block size is equal to 2 kilobytes, and block access time
+is equal to <code>1/512</code> seconds.
+<p>(a) Assuming that the Bookstore plans to enlist as customer every person on
+the planet, and that the population of Earth is estimated at about 8 billion
+people, calculate the maximum number of blocks that the table
+<code>customer</code> may occupy. (Assume that no customer will show up more
+than once under different email addresses.)<br>
+(b) Assuming that the Bookstore has reached its goal and has 8 billion
+customers, calculate the worst-case time to look up customer(s) by name.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong></p>
+<pre>&#8467;  =  36 + 24 + 4  =  64  =  2&#8310; B
+T  =  8 billion  =  2&#179; &middot; 10&#8313;  &asymp;  2&#179; &middot; 2&#179;&#8304;  =  2&#179;&#179; tuples
+b  =  2 KB  =  2&#185;&#185; B
+
+B  =  T&#8467; / b  =  2&#179;&#179;&#8314;&#8310;&#8315;&#185;&#185;  =  2&#178;&#8312; blocks</pre>
+<p>Which is half a terabyte &mdash; <code>2<sup>39</sup></code> bytes &mdash;
+for a table of three short fields, because there are eight billion of them.</p>
+<p><strong>(b) Sequential search is required</strong>, since there is no index
+on <code>name</code> and the file is not ordered on it, so in the worst case
+every block of the data file has to be read:</p>
+<pre>t&#8203;<sub>b</sub>  =  1/512 s  =  2&#8315;&#8313; s
+
+t   =  B &middot; t&#8203;<sub>b</sub>  =  2&#178;&#8312; &middot; 2&#8315;&#8313;  =  2&#185;&#8313; s  &asymp;  6 days</pre>
+<p><strong>Six days to answer one lookup</strong>, and the lookup is the
+commonest thing a bookstore does. Compare &sect;11.4: the same file, if it were
+sorted on the field being searched, answers the same question in under a tenth
+of a second. That ratio &mdash; six days against a tenth of a second &mdash; is
+the entire argument for ordering a file, and for the indexes that come after
+this set.</p>
+<p><strong>Worst case means the record is not there</strong>, or is in the last
+block. A sequential search that finds its record early stops early; a
+sequential search that fails reads everything. When a question says
+&ldquo;worst-case&rdquo; it is asking for the second.</p>
+</div></details>
+
+
+<h2 id="search"><span class="secnum">11.4</span>Searching a file</h2>
+
+<div class="box worked"><span class="bt">Two procedures, and how to choose</span>
+<p>Given a file and a field to search on, there are exactly two procedures
+available before indexes are introduced, and the schema decides which one you
+are allowed to propose.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Procedure</th><th>Allowed when</th><th>Worst-case cost</th></tr></thead>
+<tbody>
+<tr><td>sequential search</td><td>always</td><td><code>B &middot; t<sub>b</sub></code></td></tr>
+<tr><td>binary search</td><td>the file is <em>sorted on the search field</em></td><td><code>(lg B + 1) &middot; t<sub>b</sub></code></td></tr>
+</tbody></table></div>
+<p><strong>Binary search counts blocks, not records.</strong> Lecture 18 first
+wrote the cost as <code>(lg T + 1) t<sub>b</sub></code> and Lecture 19
+corrected it: you halve the file by reading a <em>block</em> at a time, so the
+<code>N</code> in <code>lg N</code> is <code>B</code>, not <code>T</code>.
+Since <code>T</code> is larger than <code>B</code> &mdash; many records fit in
+a block &mdash; the first version overcharges you, by about
+<code>lg(T/B)</code> block accesses.</p>
+<p><strong>On Lecture 19's file</strong>, with
+<code>B = 2<sup>30</sup></code> and
+<code>t<sub>b</sub> = 2<sup>&minus;8</sup></code> s:</p>
+<pre>sequential:  B &middot; t&#8203;<sub>b</sub>           =  2&#179;&#8304; &middot; 2&#8315;&#8312;        =  2&#178;&#178; s  &asymp;  48 days
+binary:      (lg B + 1) &middot; t&#8203;<sub>b</sub>  =  (30 + 1) &middot; 2&#8315;&#8312;  &lt;  2&#8309; &middot; 2&#8315;&#8312;  =  1/8 s</pre>
+<p>Forty-eight days against an eighth of a second, on the same file, with the
+same hardware. The only difference is that the second file is sorted on the
+field being searched &mdash; and &sect;11.5 is about what sorting it costs.</p>
+<div class="box note"><span class="bt">A note on the <code>+ 1</code></span>
+<p>The lecture writes <code>(lg B + 1) t<sub>b</sub></code> and the problem
+book writes <code>(lg B) t<sub>b</sub></code>. The difference is one block
+access out of twenty or thirty &mdash; the final read of the block that holds
+the record. Either is accepted; this page follows the lecture and reports the
+book's figure where the two differ, which is never by more than a few
+milliseconds.</p></div></div>
+
+<div class="box note"><span class="bt">The question is always &ldquo;is there a route in?&rdquo;</span>
+<p>When a problem says &ldquo;describe an adequate procedure to search file
+<code>X</code> for records where field <code>f</code> equals&hellip;&rdquo;, it
+is testing one decision, and the answer has three possible forms:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>If</th><th>Then</th></tr></thead>
+<tbody>
+<tr><td>the file is ordered on <code>f</code></td><td>binary search, <code>(lg B + 1) t<sub>b</sub></code></td></tr>
+<tr><td>there is an index on <code>f</code></td><td>descend the index, then one data access &mdash; Set 12</td></tr>
+<tr><td>neither</td><td>sequential search, <code>B &middot; t<sub>b</sub></code></td></tr>
+</tbody></table></div>
+<p>Say which case you are in and why, before any arithmetic. An answer that
+computes the right number for the wrong procedure gets no credit, and an answer
+that proposes binary search on an unsorted file is wrong even if every figure
+in it is right.</p></div>
+
+<details class="prob"><summary data-label="Exercise 11.7">Refer to the
+<strong>Research Lab</strong> database. Block size is equal to 64 kilobytes,
+and block access time is equal to <code>1/256</code> seconds. 64 gigabytes of
+core memory are available. The database must be able to store data for about
+8 billion employees, 32 billion projects, 1 billion funding agencies,
+128 billion assignments (of employees to projects), and about 256 billion
+funding contracts (between projects and agencies). Assume that the database is
+populated to this maximum size, and that the length of the record of the file
+<code>agency</code> is equal to 256 bytes. Round up sizes and counts of fields
+and records to the nearest power of 2.
+<p>(a) Name the field (field sequence) on which the file <code>agency</code> is
+ordered. If this file is not ordered, state it.<br>
+(b) Describe an adequate procedure to search the file <code>agency</code> for
+all records where the value of the field <code>name</code> is equal to
+<code>ACTOR</code>, and estimate the worst-case running time of the procedure
+you propose.<br>
+(c) Assume that a sorted copy of the file <code>agency</code> exists, sorted on
+<code>name</code>. Describe an adequate procedure to search it for all records
+where <code>name</code> is equal to <code>FUNNY MONEY</code>, and estimate the
+worst-case running time.</p></summary>
+<div class="sol">
+<p><strong>(a) <code>agenId</code></strong> &mdash; the primary key, which is
+the field the data file is ordered on.</p>
+<p><strong>(b) Sequential search</strong>, since there is no index on
+<code>name</code> and the file is not ordered on it.</p>
+<pre>&#8467;   =  256  =  2&#8312; B
+T   =  1 billion  &asymp;  2&#179;&#8304; records
+b   =  64 KB  =  2&#8310; &middot; 2&#185;&#8304;  =  2&#185;&#8310; B
+t&#8203;<sub>b</sub>  =  1/256 s  =  2&#8315;&#8312; s
+
+B   =  T&#8467; / b  =  2&#179;&#8304;&#8314;&#8312;&#8315;&#185;&#8310;  =  2&#178;&#178; blocks
+
+t   =  B &middot; t&#8203;<sub>b</sub>  =  2&#178;&#178; &middot; 2&#8315;&#8312;  =  2&#185;&#8308; s  &asymp;  4.5 hours</pre>
+<p><strong>(c) Binary search against the sorted copy.</strong></p>
+<pre>t  =  (lg B + 1) &middot; t&#8203;<sub>b</sub>  =  23 &middot; 2&#8315;&#8312;  &asymp;  90 ms
+
+                 (the book writes  lg B &middot; t&#8203;<sub>b</sub>  =  22 &middot; 2&#8315;&#8312;  &lt;  88 ms)</pre>
+<p><strong>Four and a half hours against ninety milliseconds</strong>, a factor
+of about 180,000, and the whole of the difference is the word
+&ldquo;sorted&rdquo; in part (c). Note what part (a) is doing in the question:
+it establishes that the file is ordered on <code>agenId</code>, which is
+<em>not</em> the field part (b) searches on, and that is what forces the
+sequential answer. Being ordered is not enough &mdash; it has to be ordered on
+the right field.</p>
+<p><strong>Four of the five numbers in the setup are unused.</strong> Employees,
+projects, assignments and contracts never enter the calculation, because the
+question is about <code>agency</code>. Finding the three numbers that matter
+&mdash; <code>&#8467;</code>, <code>T</code>, <code>b</code> &mdash; and
+ignoring the rest is half the exercise.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.8">Refer to the
+<strong>Professor Payroll</strong> database of Sets 5, 7 and 10. Each table has
+a primary index, and there are no other indices. Tables are stored as
+contiguous files of fixed-length records, so that the space occupied by any
+record is the sum of the stored sizes of its individual fields, with no other
+hidden costs. Assume that the maximum capacity of this database allows about
+128 million professors, and that the database is now filled to its capacity.
+Block size is equal to 32 kilobytes, block transfer time is equal to
+<code>1/256</code> seconds, and 8 gigabytes of primary memory are available.
+Field lengths are
+<pre>socSecNum  16 B      salary     4 B
+firstName  16 B      rank       4 B
+lastName   16 B      wizardID   8 B</pre>
+Round up sizes and counts of fields and records to the nearest power of 2.
+<p>(a) Describe an applicable procedure to search the file
+<code>professor</code> for all records where the value of the field
+<code>wizardID</code> is equal to <code>AsdFghJK</code>, and estimate the
+worst-case running time of the procedure you propose.<br>
+(b) Assume that a sorted copy of the file <code>professor</code> exists, sorted
+on <code>wizardID</code>. Describe an adequate procedure to search it for all
+records where <code>wizardID</code> is equal to <code>P04ZXPqw</code>, and
+estimate the worst-case running time.</p></summary>
+<div class="sol">
+<p><strong>(a) Sequential search</strong>, since the table
+<code>professor</code> has no index on the field <code>wizardID</code> &mdash;
+its only index is the primary one, on <code>socSecNum</code>.</p>
+<pre>&#8467;   =  16 + 16 + 16 + 4 + 4 + 8  =  64  =  2&#8310; B
+T   =  128 million  =  2&#8311; &middot; 2&#178;&#8304;  =  2&#178;&#8311; records
+b   =  32 KB  =  2&#8309; &middot; 2&#185;&#8304;  =  2&#185;&#8309; B
+t&#8203;<sub>b</sub>  =  1/256 s  =  2&#8315;&#8312; s
+
+B   =  T&#8467; / b  =  2&#178;&#8311;&#8314;&#8310;&#8315;&#185;&#8309;  =  2&#185;&#8312; blocks
+
+t   =  B &middot; t&#8203;<sub>b</sub>  =  2&#185;&#8312; &middot; 2&#8315;&#8312;  =  2&#185;&#8304; s  &asymp;  17 minutes</pre>
+<p><strong>(b) Binary search against the sorted copy.</strong></p>
+<pre>t  =  (lg B + 1) &middot; t&#8203;<sub>b</sub>  =  19 &middot; 2&#8315;&#8312;  &asymp;  74 ms
+
+                 (the book writes  lg B &middot; t&#8203;<sub>b</sub>  =  18 &middot; 2&#8315;&#8312;  &lt;  72 ms)</pre>
+<p><strong>&ldquo;Each table has a primary index, and there are no other
+indices&rdquo; is the sentence that answers part (a)</strong>, and it is placed
+at the top of the setup where it is easy to skim past. A primary index is on
+the ordering field, which is the primary key &mdash; <code>socSecNum</code>.
+Searching on anything else means reading the file.</p>
+<p><strong>Seventeen minutes is not a long time, and that is the point of
+comparing this exercise with Exercise 11.6.</strong> Same procedure, same
+formula; 2<sup>18</sup> blocks here against 2<sup>28</sup> there, so seventeen
+minutes here against six days there. The cost of a sequential scan is linear in
+the size of the file, and files get big.</p>
+</div></details>
+
+
+<h2 id="sort"><span class="secnum">11.5</span>Sorting a file that does not fit in memory</h2>
+
+<p>&sect;11.4 ended on a promise: a sorted file answers a lookup in
+milliseconds instead of days. Lecture 19 asks what the sorting costs, and the
+first answer is: more than the file is worth.</p>
+
+<div class="box worked"><span class="bt">Merge sort, and why it is hopeless here</span>
+<p>Merge sort builds sorted runs by repeated pairwise merging:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>After</th><th>There are</th><th>each of size</th></tr></thead>
+<tbody>
+<tr><td>round 0</td><td><code>N</code> sorted sequences</td><td>1</td></tr>
+<tr><td>round 1</td><td><code>N/2</code> sorted sequences</td><td>2</td></tr>
+<tr><td>round 2</td><td><code>N/4</code> sorted sequences</td><td>4</td></tr>
+<tr><td>round <code>i</code></td><td><code>N/2<sup>i</sup></code> sorted sequences</td><td><code>2<sup>i</sup></code></td></tr>
+<tr><td>the last round</td><td>1 sorted sequence</td><td><code>N</code></td></tr>
+</tbody></table></div>
+<p>How many rounds? Solve <code>N / 2<sup>r</sup> = 1</code>, so
+<code>N = 2<sup>r</sup></code> and <code>r = lg N</code>. Each round touches
+every element, so the running time is <code>N lg N</code> &mdash; which is
+optimal for sorting, and irrelevant, because the elements are on a disk. Every
+element is read once and written once per round:</p>
+<pre>t  =  N &middot; lg N &middot; t&#8203;<sub>b</sub> &middot; 2</pre>
+<p><strong>On Lecture 19's file</strong>, with
+<code>N = T = 64 billion = 2<sup>36</sup></code> records and
+<code>t<sub>b</sub> = 2<sup>&minus;8</sup></code> s:</p>
+<pre>t  =  2&#179;&#8310; &middot; lg 2&#179;&#8310; &middot; 2&#8315;&#8312; &middot; 2
+   =  2&#179;&#8310; &middot; 36 &middot; 2&#8315;&#8312; &middot; 2
+   &gt;  2&#179;&#8310; &middot; 32 &middot; 2&#8315;&#8312; &middot; 2        since 36 &gt; 32 = 2&#8309;
+   =  2&#179;&#8310;&#8314;&#8309;&#8315;&#8312;&#8314;&#185;  =  2&#179;&#8308; s
+   =  2&#185;&#178; &middot; 2&#178;&#8304; s  &asymp;  4000 &times; 12 days  &asymp;  500 years</pre>
+<p><strong>Five hundred years.</strong> The algorithm is asymptotically optimal
+and the answer is useless, which is the clearest demonstration on this page
+that counting operations is the wrong model once the data is on a disk. What
+<code>N lg N</code> fails to notice is that main memory exists and is free:
+merge sort moves every element across the wire <code>lg N</code> times, when
+most of that work could have been done in memory.</p></div>
+
+<div class="box worked"><span class="bt">Multiway merge sort</span>
+<p>Two rounds of a different shape. <code>B</code> is the file in blocks,
+<code>M</code> is memory in blocks.</p>
+<p><strong>Round 1 &mdash; make sorted runs.</strong> Divide the data into
+partitions that fit into memory, and sort each one with an in-memory sort. That
+sorting is free, in the sense that counts here: it moves no blocks. What it
+costs is one read and one write of the whole file.</p>
+<pre>after round 1:  &lceil;B / M&rceil; sorted runs, each of M blocks
+cost:           2 &middot; B &middot; t&#8203;<sub>b</sub>      (the file in, the file out)</pre>
+<p><strong>Round 2 and after &mdash; merge <code>M</code> runs at once.</strong>
+Hold one block of each run in memory, plus one buffer block for the output.
+Repeatedly extract the smallest element among the fronts of the runs &mdash; a
+heap does this efficiently &mdash; and append it to the buffer. The buffer is
+flushed to disk only when it is full, and a memory block is replenished from
+its run only when it is empty, so again the round costs one read and one write
+of the file.</p>
+<pre>after round 2:  B / M&#178; sorted runs, each of M&#178; blocks
+after round 3:  B / M&#179; sorted runs, each of M&#179; blocks
+      &vellip;
+after round R:  1 sorted run of B blocks</pre>
+<p><strong>How many rounds?</strong> Each round multiplies the run size by
+<code>M</code>, so <code>M<sup>R</sup> &ge; B</code> and</p>
+<pre>R  =  &lceil;log&#8347; B&rceil;  =  &lceil; lg B / lg M &rceil;</pre>
+<p>Every round costs <code>2 &middot; B &middot; t<sub>b</sub></code> &mdash;
+one scan in, one scan out &mdash; so:</p>
+<pre>t  =  2 &middot; B &middot; t&#8203;<sub>b</sub> &middot; R   =   2 &times; R &times; (scan time)</pre>
+<p><strong>On the same file</strong>, with <code>B = 2<sup>30</sup></code>
+blocks of <code>2<sup>12</sup></code> bytes and <code>M = 4 GB</code>:</p>
+<pre>M  =  4 GB / b  =  2&#178; &middot; 2&#179;&#8304; / 2&#185;&#178;  =  2&#178;&#8304; blocks
+R  =  &lceil; lg B / lg M &rceil;  =  &lceil; 30 / 20 &rceil;  =  2
+
+t  =  2 &middot; R &middot; (scan time)  =  2 &middot; 2 &middot; 48 days  &asymp;  192 days</pre>
+<p><strong>Five hundred years becomes six months</strong>, a speedup of about a
+thousand, and the file and the hardware are unchanged. Everything was bought by
+noticing that memory holds <code>2<sup>20</sup></code> blocks and that merge
+sort was using two of them.</p>
+<p><strong>The whole cost is in <code>R</code>, and <code>R</code> is tiny.</strong>
+<code>lg M</code> is twenty or more on any real machine, and <code>lg B</code>
+is rarely above forty, so <code>R</code> is almost always 1, 2 or 3. Which
+gives the rule worth carrying out of this set: <strong>sorting a file costs
+about two or four scans of it</strong> &mdash; and if the file fits in memory,
+<code>R = 1</code> and it costs exactly two.</p></div>
+
+<details class="prob"><summary data-label="Exercise 11.9">
+<p>(a) A file occupies <code>K</code> blocks of the secondary storage, while
+the main memory has <code>M</code> blocks. Give an estimate of the cost of
+sorting the file by an adequate algorithm. Explain your answer briefly.<br>
+(b) A file occupies <code>K</code> blocks of the secondary storage, while the
+main memory has <code>M</code> blocks. A talented administrator has installed a
+new main memory module, increasing its total size to <code>2M</code> blocks.
+Give an estimate of the resulting relative speedup in the cost of sorting the
+file. Explain your answer briefly.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> Multiway merge sort completes in about
+<code>log<sub>M</sub> K</code> rounds, in each round transferring the
+<code>K</code> data blocks once into memory and once out of it. The number of
+block accesses is therefore</p>
+<pre>2K &middot; log&#8347; K</pre>
+<p><strong>(b)</strong> By part (a), the ratio of the old and the new sorting
+times is</p>
+<pre>  2K &middot; log&#8347; K          log&#8347; K
+------------------  =  --------------  =  log&#8347; 2M  =  1 + 1 / lg M  &asymp;  1
+ 2K &middot; log&#8322;&#8347; K        log&#8322;&#8347; K</pre>
+<p><strong>The speedup is negligible for practical purposes.</strong> For a
+memory of 1 gigabyte with a block size of 10 kilobytes we have
+<code>M &asymp; 10<sup>5</sup></code>, so <code>lg M &gt; 15</code> and the
+improvement is under 7%.</p>
+<p><strong>Why doubling the memory buys almost nothing</strong> is worth saying
+in words, because the result is counter-intuitive. Memory enters the cost only
+inside a logarithm, and only as the <em>base</em> of one. Doubling
+<code>M</code> adds 1 to <code>lg M</code>, and <code>lg M</code> is already
+fifteen or twenty, so the number of rounds hardly moves &mdash; and since
+<code>R</code> is a ceiling, usually it does not move at all. To halve the
+sorting time you would have to <em>square</em> the memory, not double it.</p>
+<p><strong>Note the change of variable.</strong> This question writes
+<code>K</code> where the lecture writes <code>B</code>; the formula
+<code>2K log<sub>M</sub> K</code> is the lecture's
+<code>2 &middot; B &middot; t<sub>b</sub> &middot; R</code> counted in block
+accesses rather than in seconds, with the <code>t<sub>b</sub></code> left
+off.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.10">Your friend Jim
+occasionally sorts mailing lists for <code>GLOBAL ALERT</code>, a local
+advertising company. A typical mailing list is about 50 gigabytes long. Jim's
+assistant has carefully implemented the quicksort algorithm on the server,
+which has one gigabyte of main memory. Jim is very unhappy, as the sorting time
+appears to be much worse than that of his competitor.
+<p>(a) What should Jim do? State your advice and explain it clearly.<br>
+(b) Which storage devices should Jim employ for this sorting task? Precisely,
+the lists have to be brought in from <code>GLOBAL ALERT</code>, sorted, and
+returned to <code>GLOBAL ALERT</code>.</p></summary>
+<div class="sol">
+<p><strong>(a) Jim should eliminate quicksort</strong> and implement multiway
+merge sort. Quicksort is an in-memory algorithm: run against a file far larger
+than memory, its expected running time is
+<code>&Omega;(lg N &middot; B)</code> block transfers, where <code>N</code> is
+the number of items sorted and <code>B</code> the number of blocks in the file.
+Multiway merge sort completes in
+<code>2(log<sub>M</sub> K &middot; K)</code> block transfers in the worst
+case, so the expected speedup is at least</p>
+<pre>  lg N
+---------
+log&#8347; K</pre>
+<p>Put numbers to the denominator. Even for a small block size, say a
+kilobyte, a 50-gigabyte file is about <code>5 &middot; 10<sup>7</sup></code>
+blocks and a gigabyte of memory is about <code>10<sup>6</sup></code> blocks, so</p>
+<pre>log&#8347; K  &asymp;  log&#8321;&#8320;&#8310; (5 &middot; 10&#8311;)  &lt;  2</pre>
+<p>while <code>lg N</code> for a file of tens of millions of records is around
+25 or 30. <strong>The speedup is about an order of magnitude</strong>, and
+costs nothing but the algorithm.</p>
+<p><strong>(b)</strong> The lists should be brought in and taken back on a
+<strong>tape</strong> &mdash; conveniently, even one tape cassette may suffice.
+The tape should be the source for the first phase of the multiway merge sort,
+with the intermediate results written to <strong>disks</strong>. Finally, the
+second phase of the multiway merge sort should write back to the tape.</p>
+<p><strong>Each level of the hierarchy is used for what it is good at.</strong>
+Tape is cheap, portable and sequential &mdash; perfect for carrying 50
+gigabytes across town and for feeding a sequential first pass, and useless for
+anything that needs to jump around. The merge phase does jump around, between
+<code>M</code> runs at once, so it needs disk. And the sorting inside each run
+happens in memory. One task, three levels, chosen by access pattern rather than
+by speed.</p>
+<p><strong>Why quicksort was the wrong choice and not just a slow one.</strong>
+Quicksort's partitioning step walks the data from both ends inwards, which is
+the one access pattern a block-oriented device punishes hardest: consecutive
+comparisons land in blocks far apart, so almost every comparison costs a block
+access. The right question about an algorithm here is not how many comparisons
+it does but how many <em>blocks</em> it touches, and merge sort &mdash; which
+reads and writes in long sequential runs &mdash; wins that question even
+though it loses the comparison count.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.11">Refer again to the
+<strong>Research Lab</strong> database of Exercise 11.7, with the same
+assumptions: block size 64 kilobytes, block access time <code>1/256</code>
+seconds, 64 gigabytes of core memory, 1 billion funding agencies, and a record
+of the file <code>agency</code> 256 bytes long.
+<p>Describe an adequate procedure to sort the file <code>agency</code>
+according to the field <code>name</code>, and estimate the worst-case running
+time of the procedure you propose.</p></summary>
+<div class="sol">
+<p><strong>Multiway merge sort.</strong> From Exercise 11.7,
+<code>B = 2<sup>22</sup></code> blocks and
+<code>t<sub>b</sub> = 2<sup>&minus;8</sup></code> s.</p>
+<pre>M  =  64 GB / b  =  2&#8310; &middot; 2&#179;&#8304; / 2&#185;&#8310;  =  2&#179;&#8310;&#8315;&#185;&#8310;  =  2&#178;&#8304; blocks
+
+R  =  &lceil; lg B / lg M &rceil;  =  &lceil; 22 / 20 &rceil;  =  2
+
+t  =  2 &middot; R &middot; B &middot; t&#8203;<sub>b</sub>  =  2 &middot; 2 &middot; 2&#178;&#178; &middot; 2&#8315;&#8312;  =  2&#185;&#8310; s  &asymp;  18 hours</pre>
+<p><strong>Two rounds, and only just.</strong> <code>lg B</code> is 22 and
+<code>lg M</code> is 20, so the ratio is 1.1 and the ceiling takes it to 2 —
+the file is a mere four times too big to sort in a single pass. Had the file
+been <code>2<sup>20</sup></code> blocks instead of
+<code>2<sup>22</sup></code>, <code>R</code> would be 1 and the sort would take
+nine hours instead of eighteen. That cliff edge, where one round becomes two,
+is where the whole cost of the sort sits.</p>
+<p><strong>Compare the three figures for this one file:</strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th>Operation</th><th>Cost</th><th>&asymp;</th></tr></thead>
+<tbody>
+<tr><td>sequential search (Ex 11.7b)</td><td><code>B t<sub>b</sub> = 2<sup>14</sup> s</code></td><td>4.5 hours</td></tr>
+<tr><td>multiway merge sort</td><td><code>2RB t<sub>b</sub> = 2<sup>16</sup> s</code></td><td>18 hours</td></tr>
+<tr><td>binary search, once sorted (Ex 11.7c)</td><td><code>(lg B + 1) t<sub>b</sub></code></td><td>90 ms</td></tr>
+</tbody></table></div>
+<p>Sorting costs four scans and buys lookups that cost nothing. Sort once if
+you will search more than four times &mdash; which is the argument for building
+an index, made here in arithmetic rather than in words.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 11.12">Refer again to the
+<strong>Professor Payroll</strong> database of Exercise 11.8, with the same
+assumptions: 128 million professors, block size 32 kilobytes, block transfer
+time <code>1/256</code> seconds, 8 gigabytes of primary memory, and the field
+lengths given there.
+<p>Describe an adequate procedure to sort the file <code>professor</code>
+according to the field <code>wizardID</code>, and estimate the worst-case
+running time of the procedure you propose.</p></summary>
+<div class="sol">
+<p><strong>Multiway merge sort.</strong> From Exercise 11.8,
+<code>B = 2<sup>18</sup></code> blocks and
+<code>t<sub>b</sub> = 2<sup>&minus;8</sup></code> s.</p>
+<pre>M  =  8 GB / b  =  2&#179; &middot; 2&#179;&#8304; / 2&#185;&#8309;  =  2&#179;&#179;&#8315;&#185;&#8309;  =  2&#185;&#8312; blocks  =  B
+
+R  =  &lceil; lg B / lg M &rceil;  =  &lceil; 18 / 18 &rceil;  =  1
+
+t  =  2 &middot; R &middot; B &middot; t&#8203;<sub>b</sub>  =  2 &middot; 1 &middot; 2&#185;&#8312; &middot; 2&#8315;&#8312;  =  2&#185;&#185; s  &asymp;  34 minutes</pre>
+<p><strong>The file fits in primary memory exactly</strong> &mdash;
+<code>M = B = 2<sup>18</sup></code> blocks &mdash; so the multiway merge sort
+has only one round: the file is read in, sorted in memory, and written out.
+There is nothing to merge.</p>
+<p><strong>Two scans, and no algorithm at all.</strong> When <code>R = 1</code>
+the &ldquo;sort&rdquo; is just the first phase of &sect;11.5's round 1, and the
+in-memory sorting between the read and the write is free by this page's
+accounting. So the cost of sorting a file that fits in memory is exactly twice
+the cost of reading it &mdash; 34 minutes against the 17 of Exercise 11.8(a),
+which is the arithmetic confirming it.</p>
+<p><strong>Watch the ceiling.</strong> <code>&lceil;18/18&rceil;</code> is 1,
+but <code>&lceil;19/18&rceil;</code> is 2. One more bit of file &mdash; a file
+twice this size &mdash; doubles the sort time, because it forces a second
+round. Nothing in between: <code>R</code> is an integer, so the cost of sorting
+goes up in steps, not smoothly.</p>
+</div></details>
+
+<div class="box note"><span class="bt">Where this set ends up</span>
+<p>Every answer on this page came out of the same four lines, and the
+differences between them are differences in one exponent:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Operation</th><th>Cost</th><th>Needs</th></tr></thead>
+<tbody>
+<tr><td>read the whole file</td><td><code>B &middot; t<sub>b</sub></code></td><td>nothing</td></tr>
+<tr><td>find one record, unsorted</td><td><code>B &middot; t<sub>b</sub></code></td><td>nothing</td></tr>
+<tr><td>find one record, sorted on that field</td><td><code>(lg B + 1) &middot; t<sub>b</sub></code></td><td>the file sorted on that field</td></tr>
+<tr><td>sort the file</td><td><code>2 &middot; R &middot; B &middot; t<sub>b</sub></code>, <code>R = &lceil;lg B / lg M&rceil;</code></td><td>memory</td></tr>
+<tr><td>sort it when it fits in memory</td><td><code>2 &middot; B &middot; t<sub>b</sub></code></td><td><code>M &ge; B</code></td></tr>
+</tbody></table></div>
+<p>Rows two and three are the set in miniature: the same question, answered in
+days or in milliseconds depending on one property of the file. Row four is the
+price of that property, and it is about four scans &mdash; cheap if you will
+ask more than four questions, and the reason every real database maintains
+sorted access paths it was never asked for.</p>
+<p>What this set has not covered is how to get row three's speed without paying
+row four's price on every field you might search: an auxiliary structure that
+is sorted even though the data file is not. That is the index, and it is the
+next set &mdash; dense and sparse, primary and secondary, and the B-tree that
+implements them.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-datalog.html"><span>Previous</span>Set 10. Datalog</a>
+      <a class="next" href="ex-midterm.html"><span>Next</span>Midterm review</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
