@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set 12 — Indexes and B-trees</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/notes.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html">CSCI 331</a>
+  <span class="crumb">Set 12 &middot; Indexes</span>
+  <nav class="topnav">
+    <a href="ex-storage.html">&larr; Prev</a>
+    <a href="index.html">Contents</a>
+    <a href="ex-midterm.html">Next &rarr;</a>
+    <button class="iconbtn" id="themebtn" type="button" title="Light / dark">&#9686;</button>
+  </nav>
+</div></header>
+<div class="wrap">
+  <aside class="toc"><p class="toc-title">On this page</p><ol>
+    <li><a href="#why"><span class="t">12.1</span>Why an index</a></li>
+    <li><a href="#kinds"><span class="t">12.2</span>The three kinds</a></li>
+    <li><a href="#btree"><span class="t">12.3</span>From the BST to the B-tree</a></li>
+    <li><a href="#depth"><span class="t">12.4</span>How deep, and how long</a></li>
+    <li><a href="#ex"><span class="t">12.5</span>Exercises</a></li>
+  </ol></aside>
+  <main>
+
+<div class="chhead">
+  <span class="chpart">Exercise set 12 &middot; Lectures 20 and 21</span>
+  <span class="chnum">Indexes</span>
+  <h1>Index files and B-trees</h1>
+  <p class="chsum">Set 11 ended with a file that answers a lookup in six days
+  unless it happens to be sorted on the field you are looking up. This set is
+  the way out: a small second file, sorted on whatever field you like, with a
+  pointer back into the first. Ten exercises from the problem book, every one
+  of them the same six lines of arithmetic applied to a different index.</p>
+</div>
+
+<p>Nothing here is new machinery. An index is a file, with records, occupying
+blocks, searched the same way any file is searched &mdash; so every formula of
+Set 11 applies to it unchanged. What is new is that the file is small, and that
+you get to choose what it is sorted on.</p>
+
+<h2 id="why"><span class="secnum">12.1</span>Why an index, and what one is</h2>
+
+<div class="box worked"><span class="bt">The problem, and the wrong fix</span>
+<p>When a file is sorted on one of its fields, the other fields are not sorted.
+So how do you search when the field you are searching on is unsorted?</p>
+<p><strong>The obvious answer is to keep several copies of the data, each
+sorted on a different field.</strong> It is wrong on three counts: it is
+expensive in time, expensive in space, and &mdash; the one that actually
+disqualifies it &mdash; the copies are hard to keep consistent with one
+another. That is redundancy, which Sets 9 and 10 spent their time removing, and
+it leads to the same place: a database that says two contradictory things.</p>
+<p><strong>The right answer is an indexing structure.</strong> An index is used
+to speed up the retrieval of records in response to certain search conditions
+&mdash; except when the file is very small, in which case it can simply be read
+into memory. The guarantee it gives is worth stating precisely:</p>
+<p><strong>An index guarantees that no data block is fetched unless it is
+relevant.</strong></p>
+<p>Not &ldquo;fetches fewer blocks&rdquo; &mdash; fetches <em>no irrelevant
+block at all</em>. Sequential search reads 2<sup>28</sup> blocks to find one
+record and 2<sup>28</sup> &minus; 1 of them are irrelevant; that is the waste
+the index removes.</p></div>
+
+<div class="box worked"><span class="bt">An index is a file with two fields</span>
+<div class="fig" style="--figmax:36rem">
+<svg viewBox="0 0 660 300" role="img" aria-label="An index file of index-field and block-pointer pairs, with arrows into the blocks of a data file">
+  <g class="wire">
+    <rect x="30" y="56" width="170" height="200"/>
+    <path d="M115 56 L115 256"/>
+    <path d="M30 86 L200 86"/>
+    <path d="M30 116 L200 116"/><path d="M30 146 L200 146"/>
+    <path d="M30 226 L200 226"/>
+  </g>
+  <g class="lbl" text-anchor="middle" font-size="13">
+    <text x="72" y="76">index (A)</text><text x="158" y="76">pointer</text>
+    <text x="72" y="107">1</text><text x="158" y="107">[1]</text>
+    <text x="72" y="137">17</text><text x="158" y="137">[2]</text>
+    <text x="72" y="167">33</text><text x="158" y="167">[3]</text>
+    <text x="72" y="198">&#8942;</text><text x="158" y="198">&#8942;</text>
+    <text x="72" y="247">161</text><text x="158" y="247">[B]</text>
+  </g>
+  <g class="lbl" text-anchor="middle" font-size="12">
+    <text x="115" y="40">the index file</text>
+    <text x="470" y="40">the data file</text>
+    <text x="115" y="278">8 B</text><text x="115" y="294">+ &#8968;lg B&#8969; bits</text>
+  </g>
+
+  <g class="wire">
+    <rect x="390" y="56" width="160" height="42"/>
+    <rect x="390" y="110" width="160" height="42"/>
+    <rect x="390" y="164" width="160" height="42"/>
+    <rect x="390" y="218" width="160" height="42"/>
+    <path d="M452 56 L452 98"/><path d="M452 110 L452 152"/>
+    <path d="M452 164 L452 206"/><path d="M452 218 L452 260"/>
+  </g>
+  <g class="lbl" font-size="12">
+    <text x="562" y="82">[1]</text><text x="562" y="136">[2]</text>
+    <text x="562" y="190">[3]</text><text x="562" y="244">[B]</text>
+    <text x="421" y="82" text-anchor="middle">1&#8211;16</text><text x="421" y="136" text-anchor="middle">17&#8211;32</text>
+    <text x="421" y="190" text-anchor="middle">33&#8211;48</text><text x="421" y="244" text-anchor="middle">&#8942;</text>
+  </g>
+  <g class="wire">
+    <path d="M200 101 C300 101 300 77 390 77"/>
+    <path d="M200 131 C300 131 300 131 390 131"/>
+    <path d="M200 161 C300 161 300 185 390 185"/>
+    <path d="M200 241 C320 241 320 239 390 239"/>
+  </g>
+</svg>
+<figcaption>One index record per data block &mdash; a <b>sparse</b> index. The
+pointer is a logical block address, not a record address.</figcaption>
+</div>
+<p>An index is a file that has exactly two fields: the <strong>index
+field</strong> and a <strong>block pointer</strong>. The pointer holds the
+logical address of the data block that contains the index field of a given
+value.</p>
+<p><strong>How long is a pointer?</strong> <code>k</code> bits distinguish
+<code>2<sup>k</sup></code> things, so addressing <code>B</code> blocks needs</p>
+<pre>&#8968;lg B&#8969; bits</pre>
+<p>and nothing more. <strong>Lecture 20's example:</strong> a file of
+<code>2<sup>28</sup></code> blocks with an 8-byte index field.
+<code>lg B = 28</code> bits, which is under 4 bytes, so</p>
+<pre>&#8467;<sub>P</sub>  =  8 + 4  =  12 B</pre>
+<p><strong>Round the pointer up to a whole number of bytes, then round the
+record up to a power of two if the arithmetic wants it.</strong> The problem
+book does both and says so; 12 bytes becomes <code>16 = 2<sup>4</sup></code>
+in most of the exercises below, and stays 12 in none of them. Where a record
+length is not a power of two &mdash; Exercise 12.5 has one &mdash; the formulas
+are unchanged and only the arithmetic gets uglier.</p></div>
+
+
+<h2 id="kinds"><span class="secnum">12.2</span>The three kinds, and sparse against dense</h2>
+
+<div class="box worked"><span class="bt">Which index you are allowed to build</span>
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Kind</th><th>Built on</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>primary index</strong></td><td>the <em>ordering key field</em> of an ordered file of records</td></tr>
+<tr><td>2</td><td><strong>clustering index</strong></td><td>the ordering field, when several records in the file can share one value of it</td></tr>
+<tr><td>3</td><td><strong>secondary index</strong></td><td>any <em>nonordering</em> field of a file</td></tr>
+</tbody></table></div>
+<p>Two questions settle which one you are looking at, and they are independent:
+<strong>is the file sorted on this field?</strong> and <strong>is this field a
+key?</strong></p>
+<div class="tablewrap"><table>
+<thead><tr><th></th><th>field is a key</th><th>field is not a key</th></tr></thead>
+<tbody>
+<tr><td><strong>file sorted on it</strong></td><td>primary</td><td>clustering</td></tr>
+<tr><td><strong>file not sorted on it</strong></td><td>secondary</td><td>secondary, through a bucket</td></tr>
+</tbody></table></div>
+<p>A file has at most one ordering field, so it has <strong>at most one primary
+or clustering index and any number of secondary ones</strong>. That asymmetry
+is the whole reason the secondary index exists, and it is where the cost
+lies.</p></div>
+
+<div class="box worked"><span class="bt">Sparse and dense &mdash; and the two counting rules</span>
+<div class="tablewrap"><table>
+<thead><tr><th>Index is</th><th>When it holds</th></tr></thead>
+<tbody>
+<tr><td><strong>sparse</strong></td><td>one index record for each data <em>block</em></td></tr>
+<tr><td><strong>dense</strong></td><td>one index record for each data <em>record</em></td></tr>
+</tbody></table></div>
+<p><strong>A primary index can be sparse and a secondary index cannot.</strong>
+The reason is the sorting. If the data file is sorted on the index field, the
+first value in each block tells you everything about that block, so one pointer
+per block suffices. If it is not sorted, a value could be anywhere, and every
+record needs its own pointer.</p>
+<p>That gives the two rules Lecture 21 states, and they decide every exercise
+on this page before any arithmetic starts:</p>
+<pre>primary index:    one pointer per block    &rarr;   T<sub>P</sub>  =  B<sub>F</sub>
+secondary index:  one pointer per record   &rarr;   T<sub>S</sub>  =  T<sub>F</sub></pre>
+<p>Since a block holds many records, <code>T<sub>S</sub></code> is larger than
+<code>T<sub>P</sub></code> by that factor &mdash; often a hundred or a thousand.
+<strong>A secondary index is bigger than a primary one on the same file</strong>,
+even when its index field is shorter, and that extra size is what makes its
+B-tree a level or two deeper.</p>
+<div class="fig" style="--figmax:36rem">
+<svg viewBox="0 0 660 270" role="img" aria-label="A sparse primary index pointing at blocks, and a dense secondary index pointing at records">
+  <g class="wire">
+    <rect x="24" y="48" width="118" height="128"/>
+    <path d="M100 48 L100 176"/>
+    <path d="M24 80 L142 80"/><path d="M24 112 L142 112"/><path d="M24 144 L142 144"/>
+  </g>
+  <g class="lbl" text-anchor="middle" font-size="12">
+    <text x="83" y="38">P (K) &mdash; sparse</text>
+    <text x="62" y="70">1</text><text x="62" y="102">16</text>
+    <text x="62" y="134">40</text><text x="62" y="166">&#8942;</text>
+  </g>
+  <g class="wire">
+    <rect x="24" y="200" width="118" height="56"/>
+    <path d="M100 200 L100 256"/>
+    <path d="M24 228 L142 228"/>
+  </g>
+  <g class="lbl" text-anchor="middle" font-size="12">
+    <text x="83" y="192">S (A) &mdash; dense</text>
+    <text x="62" y="220">1</text><text x="62" y="248">3</text>
+  </g>
+
+  <g class="wire">
+    <rect x="380" y="42" width="150" height="56"/>
+    <path d="M380 70 L530 70"/><path d="M424 42 L424 98"/>
+    <rect x="380" y="118" width="150" height="56"/>
+    <path d="M380 146 L530 146"/><path d="M424 118 L424 174"/>
+    <rect x="380" y="194" width="150" height="56"/>
+    <path d="M380 222 L530 222"/><path d="M424 194 L424 250"/>
+  </g>
+  <g class="lbl" font-size="12">
+    <text x="392" y="62">1</text><text x="436" y="62">3</text>
+    <text x="392" y="90">&#8942;</text>
+    <text x="392" y="138">16</text><text x="436" y="138">1</text>
+    <text x="392" y="166">&#8942;</text>
+    <text x="392" y="214">40</text><text x="436" y="214">5</text>
+    <text x="392" y="242">&#8942;</text>
+    <text x="544" y="70">[1]</text><text x="544" y="146">[2]</text><text x="544" y="222">[3]</text>
+    <text x="392" y="32">K</text><text x="436" y="32">A</text>
+    <text x="478" y="32">data file</text>
+  </g>
+  <g class="wire">
+    <path d="M142 66 C250 66 270 56 380 56"/>
+    <path d="M142 98 C250 98 270 132 380 132"/>
+    <path d="M142 130 C250 130 270 208 380 208"/>
+    <path d="M142 216 C230 216 250 62 380 62" stroke-dasharray="4 3"/>
+    <path d="M142 244 C250 244 260 212 380 236" stroke-dasharray="4 3"/>
+  </g>
+</svg>
+<figcaption>Solid: the sparse primary index on the ordering key <code>K</code>,
+one arrow per block. Dashed: the dense secondary index on <code>A</code>, one
+arrow per record, landing wherever that value happens to sit.</figcaption>
+</div></div>
+
+<div class="box note"><span class="bt">When the index field is not a key</span>
+<p>A secondary index on a field that is not a key cannot have one pointer per
+index value, because one value may occur in many records. Lecture 21's answer
+is an <strong>intermediate block</strong>: the index record points at a block of
+pointers, and that block points at the data records. A clustering index does
+the same thing more cheaply, because the file <em>is</em> sorted on the field,
+so all the matching records sit together and one pointer to the first of them
+is enough.</p>
+<p>Every index in the exercises below is on a key, so the intermediate block
+never appears in the arithmetic. Know that it exists, and know why: a question
+that says &ldquo;assume that this field is an alternate key&rdquo; &mdash; as
+Exercises 12.8 and 12.9 do &mdash; is saying it so that you may leave the
+bucket out.</p></div>
+
+<details class="prob"><summary data-label="Exercise 12.1">
+<p>(a) In estimates of the cost of database accesses, which operations are
+counted, and why?<br>
+(b) Explain the difference between a dense index and a sparse index.<br>
+(c) Explain the difference between a primary index and a secondary index.<br>
+(d) What is a bit map index?<br>
+(e) What is a secondary index?</p></summary>
+<div class="sol">
+<p><strong>(a) Block accesses to the secondary storage are counted</strong>,
+as their duration exceeds by several orders of magnitude the time required to
+perform any in-memory operation. That is the ratio of &sect;11.1 &mdash; about
+<code>10<sup>5</sup></code> &mdash; and it is why everything on this page is
+measured in <code>t<sub>b</sub></code> and nothing in instructions.</p>
+<p><strong>(b)</strong> A dense index has an index entry for each record in the
+data file. A sparse index normally has one index entry for each block of the
+data file, which may contain several data records.</p>
+<p><strong>(c)</strong> An index is primary if its index field is the ordering
+field of the data file; otherwise it is secondary.</p>
+<p><strong>(d)</strong> A bit-map index is an array indexed by a row id, which
+contains a short bit-string encoding of the value of the indexing field for
+that row.</p>
+<p><strong>(e)</strong> A secondary index is an index on a non-ordering
+field.</p>
+<p><strong>The two definitions that get confused are (b) and (c)</strong>, and
+they are not the same distinction. Dense/sparse is about how many entries the
+index has; primary/secondary is about which field it is on. They are linked in
+one direction only: a sparse index has to be primary or clustering, because
+only a sorted field lets one entry speak for a whole block. The converse fails
+&mdash; a primary index may be dense, with one entry per record, and &sect;12.4
+will show that costs a level of B-tree for nothing.</p>
+</div></details>
+
+
+<h2 id="btree"><span class="secnum">12.3</span>From the binary search tree to the B-tree</h2>
+
+<div class="box note"><span class="bt">Why the obvious tree is the wrong one</span>
+<p>A <strong>binary search tree</strong> has one property, stated twice:</p>
+<ul>
+<li>the value at any node is greater than any value in the subtree rooted at
+its left child;</li>
+<li>the value at any node is smaller than any value in the subtree rooted at
+its right child.</li>
+</ul>
+<p>Search time is the height of the tree, which is <code>lg n</code> at best
+&mdash; a balanced tree &mdash; and <code>n</code> at worst, when the values
+arrive already sorted and the tree degenerates into a list. The classical fix
+is to rebalance as you go, which gives the AVL tree.</p>
+<p><strong>And it is still the wrong structure here</strong>, for the reason
+&sect;11.2 gave: the unit of transfer is a block. A binary node holds one value
+and two pointers &mdash; a few dozen bytes &mdash; so a tree of
+<code>2<sup>22</sup></code> values costs 22 block accesses, each of which
+fetches a 4-kilobyte block in order to read twelve bytes of it. The structure
+wastes 99.7% of every transfer it makes.</p></div>
+
+<div class="box worked"><span class="bt">The B-tree</span>
+<p>A <strong>B-tree</strong> is a balanced search tree whose nodes fit into a
+data block. Two properties:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>#</th><th>Property</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>all leaves are at the same level</td></tr>
+<tr><td>2</td><td>every internal node is at least half full</td></tr>
+</tbody></table></div>
+<p>Each node holds <code>n</code> values and <code>n + 1</code> pointers, laid
+out alternately, with the subtrees interleaved between the values:</p>
+<div class="fig" style="--figmax:38rem">
+<svg viewBox="0 0 632 160" role="img" aria-label="A B-tree node: n values and n plus one pointers, each pointer leading to a subtree">
+  <g class="wire">
+    <rect x="30" y="40" width="52" height="30"/>
+    <rect x="82" y="40" width="52" height="30"/>
+    <rect x="134" y="40" width="52" height="30"/>
+    <rect x="186" y="40" width="52" height="30"/>
+    <rect x="238" y="40" width="52" height="30"/>
+    <rect x="290" y="40" width="52" height="30"/>
+    <rect x="342" y="40" width="52" height="30"/>
+    <rect x="394" y="40" width="52" height="30"/>
+    <rect x="446" y="40" width="52" height="30"/>
+    <rect x="498" y="40" width="52" height="30"/>
+    <rect x="550" y="40" width="52" height="30"/>
+    <path d="M56.0 96 L30.0 142 L82.0 142 Z"/>
+    <path d="M56.0 70 L56.0 96"/>
+    <path d="M160.0 96 L134.0 142 L186.0 142 Z"/>
+    <path d="M160.0 70 L160.0 96"/>
+    <path d="M264.0 96 L238.0 142 L290.0 142 Z"/>
+    <path d="M264.0 70 L264.0 96"/>
+    <path d="M368.0 96 L342.0 142 L394.0 142 Z"/>
+    <path d="M368.0 70 L368.0 96"/>
+    <path d="M472.0 96 L446.0 142 L498.0 142 Z"/>
+    <path d="M472.0 70 L472.0 96"/>
+    <path d="M576.0 96 L550.0 142 L602.0 142 Z"/>
+    <path d="M576.0 70 L576.0 96"/>
+  </g>
+  <g class="lbl">
+    <text x="56" y="60" font-size="13" text-anchor="middle">P<tspan font-size="10" dy="4">0</tspan></text>
+    <text x="108" y="60" font-size="13" text-anchor="middle">V<tspan font-size="10" dy="4">1</tspan></text>
+    <text x="160" y="60" font-size="13" text-anchor="middle">P<tspan font-size="10" dy="4">1</tspan></text>
+    <text x="212" y="60" font-size="13" text-anchor="middle">V<tspan font-size="10" dy="4">2</tspan></text>
+    <text x="264" y="60" font-size="13" text-anchor="middle">P<tspan font-size="10" dy="4">2</tspan></text>
+    <text x="316" y="60" font-size="13" text-anchor="middle">V<tspan font-size="10" dy="4">3</tspan></text>
+    <text x="368" y="60" font-size="13" text-anchor="middle">P<tspan font-size="10" dy="4">3</tspan></text>
+    <text x="420" y="60" font-size="13" text-anchor="middle">&hellip;</text>
+    <text x="472" y="60" font-size="13" text-anchor="middle">P<tspan font-size="10" dy="4">n&minus;1</tspan></text>
+    <text x="524" y="60" font-size="13" text-anchor="middle">V<tspan font-size="10" dy="4">n</tspan></text>
+    <text x="576" y="60" font-size="13" text-anchor="middle">P<tspan font-size="10" dy="4">n</tspan></text>
+    <text x="56.0" y="132" font-size="12" text-anchor="middle">T<tspan font-size="10" dy="4">0</tspan></text>
+    <text x="160.0" y="132" font-size="12" text-anchor="middle">T<tspan font-size="10" dy="4">1</tspan></text>
+    <text x="264.0" y="132" font-size="12" text-anchor="middle">T<tspan font-size="10" dy="4">2</tspan></text>
+    <text x="368.0" y="132" font-size="12" text-anchor="middle">T<tspan font-size="10" dy="4">3</tspan></text>
+    <text x="472.0" y="132" font-size="12" text-anchor="middle">T<tspan font-size="10" dy="4">n&minus;1</tspan></text>
+    <text x="576.0" y="132" font-size="12" text-anchor="middle">T<tspan font-size="10" dy="4">n</tspan></text>
+  </g>
+</svg>
+<figcaption>A node of a B-tree, and the ordering it enforces.</figcaption>
+</div>
+<pre>T&#8320;  &lt;  V&#8321;  &lt;  T&#8321;  &lt;  V&#8322;  &lt;  T&#8322;  &lt;  V&#8323;  &lt;  T&#8323;  &lt;  &hellip;  &lt;  T&#8345;&#8331;&#8321;  &lt;  V&#8345;  &lt;  T&#8345;</pre>
+<p><strong>Property 1 is what makes the depth a single number</strong> &mdash;
+every search costs exactly the height, never less and never more. Property 2 is
+what bounds that height: a node that is at least half full has at least half
+the maximum number of children, so the tree cannot be made tall by sparse
+nodes. Together they are the whole of &sect;12.4's formula.</p></div>
+
+<div class="box worked"><span class="bt">Lecture 20's example: a B-tree with 3 keys and 4 pointers</span>
+<p>Every internal node here holds at most 3 values and 4 pointers, and by
+property 2 must have at least 2 children. Insert <code>A</code> through
+<code>I</code> in order:</p>
+<div class="fig" style="--figmax:40rem">
+<svg viewBox="0 0 660 350" role="img" aria-label="Four snapshots of a B-tree with three keys and four pointers per node, as A to I are inserted">
+  <g class="wire">
+    <rect x="126.0" y="42.0" width="78.0" height="24"/>
+    <path d="M152.0 42.0 L152.0 66.0"/>
+    <path d="M178.0 42.0 L178.0 66.0"/>
+    <rect x="478.0" y="42.0" width="34.0" height="24"/>
+    <rect x="435.0" y="128.0" width="34.0" height="24"/>
+    <path d="M478.0 66.0 L452.0 128.0"/>
+    <rect x="499.0" y="128.0" width="78.0" height="24"/>
+    <path d="M525.0 128.0 L525.0 152.0"/>
+    <path d="M551.0 128.0 L551.0 152.0"/>
+    <path d="M512.0 66.0 L538.0 128.0"/>
+    <rect x="139.0" y="232.0" width="52.0" height="24"/>
+    <path d="M165.0 232.0 L165.0 256.0"/>
+    <rect x="62.0" y="318.0" width="34.0" height="24"/>
+    <path d="M139.0 256.0 L79.0 318.0"/>
+    <rect x="148.0" y="318.0" width="34.0" height="24"/>
+    <path d="M165.0 256.0 L165.0 318.0"/>
+    <rect x="212.0" y="318.0" width="78.0" height="24"/>
+    <path d="M238.0 318.0 L238.0 342.0"/>
+    <path d="M264.0 318.0 L264.0 342.0"/>
+    <path d="M191.0 256.0 L251.0 318.0"/>
+    <rect x="456.0" y="232.0" width="78.0" height="24"/>
+    <path d="M482.0 232.0 L482.0 256.0"/>
+    <path d="M508.0 232.0 L508.0 256.0"/>
+    <rect x="369.2" y="318.0" width="34.0" height="24"/>
+    <path d="M456.0 256.0 L386.2 318.0"/>
+    <rect x="441.8" y="318.0" width="34.0" height="24"/>
+    <path d="M482.0 256.0 L458.8 318.0"/>
+    <rect x="514.2" y="318.0" width="34.0" height="24"/>
+    <path d="M508.0 256.0 L531.2 318.0"/>
+    <rect x="564.8" y="318.0" width="78.0" height="24"/>
+    <path d="M590.8 318.0 L590.8 342.0"/>
+    <path d="M616.8 318.0 L616.8 342.0"/>
+    <path d="M534.0 256.0 L603.8 318.0"/>
+  </g>
+  <g class="lbl">
+    <text x="165" y="16" font-size="12" text-anchor="middle">after A, B, C</text>
+    <text x="139.0" y="58.5" font-size="13" text-anchor="middle">A</text>
+    <text x="165.0" y="58.5" font-size="13" text-anchor="middle">B</text>
+    <text x="191.0" y="58.5" font-size="13" text-anchor="middle">C</text>
+    <text x="495" y="16" font-size="12" text-anchor="middle">add D, E — the node splits</text>
+    <text x="495.0" y="58.5" font-size="13" text-anchor="middle">B</text>
+    <text x="452.0" y="144.5" font-size="13" text-anchor="middle">A</text>
+    <text x="512.0" y="144.5" font-size="13" text-anchor="middle">C</text>
+    <text x="538.0" y="144.5" font-size="13" text-anchor="middle">D</text>
+    <text x="564.0" y="144.5" font-size="13" text-anchor="middle">E</text>
+    <text x="165" y="206" font-size="12" text-anchor="middle">add F, G</text>
+    <text x="152.0" y="248.5" font-size="13" text-anchor="middle">B</text>
+    <text x="178.0" y="248.5" font-size="13" text-anchor="middle">D</text>
+    <text x="79.0" y="334.5" font-size="13" text-anchor="middle">A</text>
+    <text x="165.0" y="334.5" font-size="13" text-anchor="middle">C</text>
+    <text x="225.0" y="334.5" font-size="13" text-anchor="middle">E</text>
+    <text x="251.0" y="334.5" font-size="13" text-anchor="middle">F</text>
+    <text x="277.0" y="334.5" font-size="13" text-anchor="middle">G</text>
+    <text x="495" y="206" font-size="12" text-anchor="middle">add H, I</text>
+    <text x="469.0" y="248.5" font-size="13" text-anchor="middle">B</text>
+    <text x="495.0" y="248.5" font-size="13" text-anchor="middle">D</text>
+    <text x="521.0" y="248.5" font-size="13" text-anchor="middle">F</text>
+    <text x="386.2" y="334.5" font-size="13" text-anchor="middle">A</text>
+    <text x="458.8" y="334.5" font-size="13" text-anchor="middle">C</text>
+    <text x="531.2" y="334.5" font-size="13" text-anchor="middle">E</text>
+    <text x="577.8" y="334.5" font-size="13" text-anchor="middle">G</text>
+    <text x="603.8" y="334.5" font-size="13" text-anchor="middle">H</text>
+    <text x="629.8" y="334.5" font-size="13" text-anchor="middle">I</text>
+  </g>
+</svg>
+<figcaption>Inserting A to I. A node that would hold a fourth value splits;
+its middle value moves up into the parent.</figcaption>
+</div>
+<p><strong>The tree grows at the root, not at the leaves</strong>, and that is
+how property 1 survives. When a leaf overflows it splits into two leaves at the
+same level and pushes one value up; the only way the height ever increases is
+when that push reaches a full root and splits it. So the leaves all stay level
+by construction, for free.</p>
+<p><strong>Notice that the keys arrive in sorted order</strong> &mdash;
+<code>A</code>, then <code>B</code>, then <code>C</code> &mdash; the case that
+degenerates a binary search tree into a list. The B-tree is three levels deep
+after nine of them, and would be three levels deep after nine million.</p></div>
+
+<h2 id="depth"><span class="secnum">12.4</span>How deep, and how long</h2>
+
+<div class="box worked"><span class="bt">Six lines, in this order</span>
+<p>Everything in &sect;12.5 is this, with different numbers. <code>B<sub>F</sub></code>
+and <code>T<sub>F</sub></code> are the data file's blocks and records, from
+Set 11; <code>b</code> is the block size.</p>
+<pre>&#8467;<sub>i</sub>  =  index field  +  block pointer           round up
+
+T<sub>i</sub>  =  B<sub>F</sub>   for a primary index
+     =  T<sub>F</sub>   for a secondary index
+
+B<sub>i</sub>  =  T<sub>i</sub> &middot; &#8467;<sub>i</sub> / b                           the index in blocks
+
+&Delta;<sub>max</sub>  =  b / &#8467;<sub>i</sub>                            pointers per full node
+&Delta;<sub>min</sub>  =  &Delta;<sub>max</sub> / 2                           at least half full
+
+h<sub>max</sub>  =  &#8968; lg B<sub>i</sub> / lg &Delta;<sub>min</sub> &#8969;                 the depth of the B-tree
+
+t    =  (h<sub>max</sub> + 1) &middot; t&#8203;<sub>b</sub>                    descend, then one data access</pre>
+<p><strong>The <code>+ 1</code> is the data block.</strong> The B-tree
+delivers a pointer, not a record; one more access turns the pointer into the
+row. Leave it out and every answer is short by one block access.</p>
+<p><strong>The depth formula is the multiway-merge formula of &sect;11.5 wearing
+a different hat.</strong> There, <code>R = &lceil;lg B / lg M&rceil;</code>
+counted how many times you can multiply a run by <code>M</code> before it
+covers the file; here, <code>h = &lceil;lg B<sub>i</sub> / lg &Delta;<sub>min</sub>&rceil;</code>
+counts how many times you can multiply a subtree by <code>&Delta;</code> before
+it covers the index. Both are &ldquo;how many factors of <em>x</em> fit into
+<em>y</em>&rdquo;, and both are tiny &mdash; 2, 3 or 5 in every exercise
+below.</p></div>
+
+<div class="box worked"><span class="bt">Lecture 21's worked example, four ways</span>
+<p>The file of &sect;11.5: four fields of 8, 8, 16 and 32 bytes, 64 billion
+records, 4-kilobyte blocks, block access time <code>1/256</code> s.</p>
+<pre>&#8467;   =  8 + 8 + 16 + 32  =  64  =  2&#8310; B
+T   =  64 billion  =  2&#179;&#8310; records
+b   =  4 KB  =  2&#185;&#178; B                 t&#8203;<sub>b</sub>  =  2&#8315;&#8312; s
+
+B<sub>F</sub>  =  T&#8467; / b  =  2&#179;&#8310;&#8314;&#8310;&#8315;&#185;&#178;  =  2&#179;&#8304; blocks</pre>
+<p><strong>Without an index</strong>, if the file happens to be sorted on the
+field you want:</p>
+<pre>binary search on F:   (lg B<sub>F</sub> + 1) &middot; t&#8203;<sub>b</sub>  =  31 &middot; 2&#8315;&#8312;  &lt;  2&#8309; &middot; 2&#8315;&#8312;  =  1/8 s</pre>
+<p><strong>With a primary B-tree index <code>P</code> on the ordering key
+<code>A</code></strong> &mdash; 8 bytes, plus a pointer that must address
+<code>2<sup>30</sup></code> blocks and so needs 30 bits, under 4 bytes:</p>
+<pre>&#8467;<sub>P</sub>    =  8 + 4  =  12  &le;  16  =  2&#8308; B
+T<sub>P</sub>    =  B<sub>F</sub>  =  2&#179;&#8304;                    one index record per data block
+B<sub>P</sub>    =  T<sub>P</sub> &middot; &#8467;<sub>P</sub> / b  =  2&#179;&#8304;&#8314;&#8308;&#8315;&#185;&#178;  =  2&#178;&#178; blocks
+
+&Delta;<sub>max</sub>  =  b / &#8467;<sub>P</sub>  =  2&#185;&#178; / 2&#8308;  =  2&#8312;         &Delta;<sub>min</sub>  =  2&#8311;
+h<sub>max</sub>  =  &#8968; 22 / 7 &#8969;  =  4
+
+t     =  (4 + 1) &middot; t&#8203;<sub>b</sub>  =  5 &middot; 2&#8315;&#8312;  &asymp;  20 ms</pre>
+<p><strong>The index is a twohundredandfiftysixth of the file</strong> &mdash;
+<code>2<sup>22</sup></code> blocks against <code>2<sup>30</sup></code> &mdash;
+because each index record stands for a whole data block and is a quarter the
+length of a data record. That ratio is where all the speed comes from, and it
+is why the formula starts at <code>T<sub>P</sub> = B<sub>F</sub></code>.</p>
+<p><strong>And the index can be sorted on a field the data file is not.</strong>
+Lecture 21 makes the point by costing what it takes to sort an index on
+<code>B</code>, the second field, which is unordered in the data file. The
+index has one record per data record &mdash; it is secondary, so
+<code>T<sub>i</sub> = T<sub>F</sub> = 2<sup>36</sup></code> &mdash; and with
+<code>&#8467;<sub>i</sub> = 2<sup>4</sup></code> that is
+<code>2<sup>28</sup></code> blocks. With 4 gigabytes of memory,
+<code>M = 2<sup>20</sup></code> blocks and
+<code>R = &lceil;28/20&rceil; = 2</code>, so</p>
+<pre>t  =  2 &middot; R &middot; B<sub>i</sub> &middot; t&#8203;<sub>b</sub>  =  2 &middot; 2 &middot; 2&#178;&#8312; &middot; 2&#8315;&#8312;  =  2&#178;&#178; s  &asymp;  48 days</pre>
+<p>which is Set 11's arithmetic, applied to the index instead of the file
+&mdash; and it is 48 days instead of the 192 the data file itself would cost,
+because the index is four times smaller.</p>
+<div class="box note"><span class="bt">The four procedures, ranked</span>
+<p>Every search question on this page has one of these four answers, and the
+job is to say which case you are in before computing anything:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Procedure</th><th>Allowed when</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>sequential search</td><td>always</td><td><code>B<sub>F</sub> &middot; t<sub>b</sub></code></td></tr>
+<tr><td>binary search on <code>F</code></td><td>the file is sorted on the field</td><td><code>(lg B<sub>F</sub> + 1) &middot; t<sub>b</sub></code></td></tr>
+<tr><td>binary search on the index</td><td>there is an index on the field, stored as a sequential file</td><td><code>(lg B<sub><sub>i</sub></sub> + 1) &middot; t<sub>b</sub></code></td></tr>
+<tr><td>descend the B-tree</td><td>there is an index on the field, implemented as a B-tree</td><td><code>(h<sub>max</sub> + 1) &middot; t<sub>b</sub></code></td></tr>
+</tbody></table></div>
+<p>Rows three and four are the same index, stored two ways, and Lecture 21
+costs both on its second example: <code>(17 + 1) &middot; 2<sup>&minus;6</sup>
+&asymp; 280 ms</code> against <code>(3 + 1) &middot; 2<sup>&minus;6</sup> &asymp;
+63 ms</code>. <strong>The B-tree is not faster because it is a tree; it is
+faster because its fan-out is <code>2<sup>8</sup></code> and binary search's is
+2.</strong> Halving 2<sup>17</sup> blocks takes 17 steps; dividing them by
+2<sup>8</sup> takes 3.</p></div></div>
+
+
+<h2 id="ex"><span class="secnum">12.5</span>Exercises</h2>
+
+<p>Nine exercises on three databases. Each of the last six gives you a data
+file and an index and asks for the same six lines; the differences between them
+are worth more attention than the arithmetic, because they are what the
+questions are really testing.</p>
+
+<details class="prob"><summary data-label="Exercise 12.2">
+<p>(a) A file occupies <code>K</code> blocks of the secondary storage and has a
+B-tree index on field <code>F</code> with <code>p</code> pointers per index
+record. Give an estimate of the cost of locating a record by its index field
+<code>F</code>. Explain your answer briefly.<br>
+(b) A talented administrator has invented a way to pack <code>2p</code>
+pointers in an index record. Give an estimate of the resulting relative speedup
+in the cost of locating a record by its index field <code>F</code>. Explain
+your answer briefly.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> It is safe to assume that an individual record of the
+index file occupies an entire block. Hence there cannot be more than
+<code>p</code> data records per block &mdash; in fact this is probably a
+considerable over-estimate, as a data record is probably much longer than an
+index entry. We arrive at a total of no more than <code>Kp</code> data records,
+yielding an index depth of <code>log<sub>p</sub> Kp</code>. Allowing one access
+for the data record itself, we obtain an upper bound:</p>
+<pre>1 + log<sub>P</sub> Kp  =  1 + log<sub>P</sub> p + log<sub>P</sub> K  =  2 + log<sub>P</sub> K</pre>
+<p><strong>(b)</strong> By the answer to (a), the ratio of the old and the new
+access times is</p>
+<pre> 2 + log<sub>P</sub> Kp        log<sub>P</sub> Kp
+---------------  &asymp;  -------------  =  log<sub>P</sub> 2p  =  log<sub>P</sub> p + log<sub>P</sub> 2  =  1 + 1/lg p  &asymp;  1
+2 + log&#8322;<sub>P</sub> Kp       log&#8322;<sub>P</sub> Kp</pre>
+<p><strong>Even for modest values of <code>p</code></strong> &mdash; say
+<code>p = 128 = 2<sup>7</sup></code> &mdash; the estimated decrease in access
+time is less than 15%.</p>
+<p><strong>This is the same answer as Exercise 11.9, and for the same
+reason.</strong> There, doubling the memory bought almost nothing because
+memory enters the sorting cost only as the base of a logarithm. Here, doubling
+the fan-out buys almost nothing because fan-out enters the search cost only as
+the base of a logarithm. In both cases the quantity you are improving is
+already raised to a power that has made it enormous, and doubling it adds one
+to the exponent.</p>
+<p><strong>What this does <em>not</em> say is that fan-out does not
+matter.</strong> Going from <code>p = 2</code> &mdash; a binary tree &mdash; to
+<code>p = 256</code> divides the depth by 8, which is the whole of
+&sect;12.3's argument. Going from 256 to 512 divides it by 9/8. The first
+doubling is free and the eighth is worthless; the formula
+<code>1 + 1/lg p</code> says exactly where the curve flattens.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.3">Refer to the
+<strong>Research Lab</strong> database. Block size is equal to 64 kilobytes,
+and block access time is equal to <code>1/256</code> seconds. 64 gigabytes of
+core memory are available. The database must be able to store data for about
+8 billion employees, 32 billion projects, 1 billion funding agencies,
+128 billion assignments and about 256 billion funding contracts; assume it is
+populated to this maximum size. Assume that the length of the field
+<code>projId</code> is equal to 8 bytes, while the length of the record of the
+file <code>project</code> is equal to 64 bytes. Let <code>P</code> be the
+primary index of table <code>project</code>. Round up sizes and counts of
+fields and records to the nearest power of 2.
+<p>(a) Calculate the number of blocks occupied by the file
+<code>project</code>.<br>
+(b) Name the field (field sequence) on which the index <code>P</code> is
+built.<br>
+(c) Estimate the number of records of the file <code>P</code>.<br>
+(d) Estimate the record length of the file <code>P</code>.<br>
+(e) Estimate the number of blocks occupied by the file <code>P</code>.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong></p>
+<pre>&#8467;  =  64  =  2&#8310; B
+T  =  32 billion  =  2&#8309; &middot; 10&#8313;  &asymp;  2&#8309; &middot; 2&#179;&#8304;  =  2&#179;&#8309; records
+b  =  64 KB  =  2&#8310; &middot; 2&#185;&#8304;  =  2&#185;&#8310; B
+
+B  =  T&#8467; / b  =  2&#179;&#8309;&#8314;&#8310;&#8315;&#185;&#8310;  =  2&#178;&#8309; blocks</pre>
+<p><strong>(b) <code>projId</code></strong> &mdash; a primary index is built on
+the ordering key field, and <code>projId</code> is the primary key of
+<code>project</code>.</p>
+<p><strong>(c) <code>T<sub>P</sub> = B = 2<sup>25</sup></code>.</strong> This
+is the first rule of &sect;12.2: a primary index has one record per data
+<em>block</em>, so its record count is the data file's <em>block</em> count.
+Writing <code>T<sub>P</sub> = T</code> here &mdash; one record per data record
+&mdash; would multiply the index by <code>2<sup>10</sup></code> and every
+answer after it.</p>
+<p><strong>(d)</strong> The record length is the sum of the lengths of the key
+<code>projId</code> and a block pointer. Since there are
+<code>2<sup>25</sup></code> blocks, 4 bytes (32 bits) are sufficient for the
+block pointer:</p>
+<pre>&#8467;<sub>P</sub>  =  8 + 4  =  12        and, rounding up to a power of 2,   &#8467;<sub>P</sub>  =  16  =  2&#8308; B</pre>
+<p><strong>(e)</strong></p>
+<pre>B<sub>P</sub>  =  T<sub>P</sub> &#8467;<sub>P</sub> / b  =  2&#178;&#8309;&#8314;&#8308;&#8315;&#185;&#8310;  =  2&#179;&#179; blocks</pre>
+<p><strong>The index is a four-thousandth of the file</strong> &mdash;
+<code>2<sup>13</sup></code> blocks against <code>2<sup>25</sup></code> &mdash;
+and that is where the speed in Exercise 12.4 comes from. Half a megabyte of
+index stands in for two terabytes of data.</p>
+<p><strong>Four of the five record counts in the setup are not used.</strong>
+Employees, agencies, assignments and contracts are there to be ignored; the
+question is about <code>project</code>. As in Set 11, finding the three numbers
+that matter is half the work.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.4">Continue with the
+<strong>Research Lab</strong> database and the index <code>P</code> of
+Exercise 12.3.
+<p>(a) Estimate the maximum number of pointers per node of the B-tree that
+implements the index <code>P</code>.<br>
+(b) Estimate the minimum number of pointers per node of that B-tree.<br>
+(c) Calculate the maximum depth of the B-tree that implements
+<code>P</code>.<br>
+(d) Describe an adequate procedure to search the file <code>project</code> for
+all records where the value of the field <code>projId</code> is equal to
+<code>99887766554433</code>, and estimate the worst-case running time of the
+procedure that you propose.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> A node fills one block, and each pointer comes with its
+index record:</p>
+<pre>&Delta;<sub>max</sub>  =  b / &#8467;<sub>P</sub>  =  2&#185;&#8310; / 2&#8308;  =  2&#185;&#178;</pre>
+<p><strong>(b)</strong> By property 2 of &sect;12.3, every internal node is at
+least half full:</p>
+<pre>&Delta;<sub>min</sub>  =  &frac12; &middot; &Delta;<sub>max</sub>  =  2&#185;&#178;&#8315;&#185;  =  2&#185;&#185;</pre>
+<p><strong>(c)</strong> The worst case is the tree in which every node is only
+half full, so the depth is taken against <code>&Delta;<sub>min</sub></code>:</p>
+<pre>h<sub>max</sub>  =  &#8968; lg B<sub>P</sub> / lg &Delta;<sub>min</sub> &#8969;  =  &#8968; 13 / 11 &#8969;  =  2</pre>
+<p><strong>(d) Descend the B-tree of the primary index <code>P</code>, followed
+by one data access.</strong></p>
+<pre>t  =  (h<sub>max</sub> + 1) &middot; t&#8203;<sub>b</sub>  =  (2 + 1) &middot; 2&#8315;&#8312;  =  12 &middot; 2&#8315;&#185;&#8304;  &lt;  12 ms</pre>
+<p><strong>Two levels for two terabytes.</strong> A node holds
+<code>2<sup>11</sup></code> pointers even when half empty, so two levels reach
+<code>2<sup>22</sup></code> blocks and the index is only
+<code>2<sup>13</sup></code>. The tree is nowhere near full, and that is normal:
+the depth jumps in whole steps and almost every real index sits well inside a
+step.</p>
+<p><strong>Compare the three ways of answering (d).</strong> Sequential search
+would cost <code>B &middot; t<sub>b</sub> = 2<sup>25</sup> &middot;
+2<sup>&minus;8</sup> = 2<sup>17</sup> s</code>, about a day and a half. Binary
+search on the sorted data file would cost <code>(25 + 1) &middot;
+2<sup>&minus;8</sup> &asymp; 102 ms</code>. The B-tree costs 12. Each step down
+that list costs a structure that has to be built and maintained, and buys about
+an order of magnitude.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.5">Refer to the
+<strong>Mail-Order Bookstore</strong> database, whose <code>customer</code>
+table is declared
+<pre>customer (emailC VARCHAR(36),
+          nameC  VARCHAR(24),
+          dept   CHAR(4))</pre>
+Assume that every character occupies a single byte on disk, while every decimal
+or date occupies 11 bytes. Block size is equal to 2 kilobytes, and block access
+time is equal to <code>1/512</code> seconds. The Bookstore has reached its goal
+and has 8 billion customers, so that the table <code>customer</code> occupies
+<code>B = 2<sup>28</sup></code> blocks (Exercise 11.6).
+<p>(a) Explain the record structure and find the record size of the primary
+index for the table <code>customer</code>.<br>
+(b) Calculate the number of blocks occupied by that primary index.<br>
+(c) Assuming the index is implemented as a B-tree, calculate the depth of this
+B-tree.<br>
+(d) Calculate the worst-case time to look up a customer by email
+address.</p></summary>
+<div class="sol">
+<p><strong>(a)</strong> Every primary-index record consists of an index field
+<code>emailC</code> and a block pointer. The block pointer must address
+<code>2<sup>28</sup></code> blocks, so it needs at least 28 bits, which rounds
+up to 4 bytes. The <code>emailC</code> field is 36 bytes long. Hence</p>
+<pre>&#8467;<sub>P</sub>  =  36 + 4  =  40 B</pre>
+<p><strong>(b)</strong> One index record per data block:</p>
+<pre>T<sub>P</sub>  =  B  =  2&#178;&#8312;
+
+B<sub>P</sub>  =  T<sub>P</sub> &#8467;<sub>P</sub> / b  =  2&#178;&#8312; &middot; 5 &middot; 2&#179; / 2&#185;&#185;  =  5 &middot; 2&#178;&#8304; blocks</pre>
+<p><strong>(c)</strong> The worst-case depth corresponds to all nodes being
+only half full, so the number of index records per block is</p>
+<pre>&Delta;  =  &#8968; &frac12; &middot; b / &#8467;<sub>P</sub> &#8969;  =  &#8968; &frac12; &middot; 2&#185;&#185; / (5 &middot; 2&#179;) &#8969;  =  &#8968; 2&#8311; / 5 &#8969;  =  26
+
+h  =  &#8968; lg B<sub>P</sub> / lg &Delta; &#8969;  =  &#8968; 22.32 / 4.70 &#8969;  =  &#8968; 4.75 &#8969;  =  5</pre>
+<p><strong>(d)</strong> <code>h</code> block accesses to navigate the index,
+plus one access to the data file, at <code>t<sub>b</sub> = 2<sup>&minus;9</sup></code>
+seconds:</p>
+<pre>t  =  (h + 1) &middot; t&#8203;<sub>b</sub>  =  6 &middot; 2&#8315;&#8313;  =  6/512 s  &lt;  12 ms</pre>
+<div class="box warn"><span class="bt">A note on the printed answer</span>
+<p>Neither <code>&#8467;<sub>P</sub></code> nor <code>B<sub>P</sub></code> is a
+power of two here, so the exponents cannot simply be added and the book brackets
+the logarithms instead of evaluating them. It bounds
+<code>lg B<sub>P</sub></code> between 22 and 23 and <code>lg &Delta;</code>
+between 4 and 5, which gives</p>
+<pre>h  &le;  &#8968; 23 / 4 &#8969;  =  6        h  &ge;  &#8968; 22 / 5 &#8969;  =  5</pre>
+<p>and takes the conservative end, <code>h = 6</code>, for a lookup time of
+<code>7 &middot; 2<sup>&minus;9</sup> &lt; 14 ms</code>. The exact ceiling is 5,
+as computed above, so the two answers differ by one block access &mdash; under
+2 ms. Either is creditable if the working is shown; what is not creditable is
+an answer that quietly treats 40 as 32 or 64 and reports a power of two.</p></div>
+<p><strong>This is the one exercise on the page where the numbers are
+ugly</strong>, and it is worth doing for that reason. The six lines of
+&sect;12.4 do not assume anything is a power of two; the powers of two are a
+convenience of the other questions, not a property of the method.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.6">Continue with the
+<strong>Mail-Order Bookstore</strong> database and the same assumptions.
+<p>(a) With no index on <code>nameC</code>, calculate the worst-case time to
+look up customer(s) by name.<br>
+(b) Assume that a secondary index on the field <code>nameC</code> is built for
+table <code>customer</code>, implemented as a B-tree. Explain the record
+structure and find the record size of this index.<br>
+(c) Calculate the depth of the B-tree described in part (b).<br>
+(d) Calculate the worst-case time to look up a customer by name, given that
+index.<br>
+(e) Write the SQL code to create the index described in part (b).</p></summary>
+<div class="sol">
+<p><strong>(a) Sequential search is required</strong>, which in the worst case
+entails reading every block of the data file &mdash; this is Exercise 11.6(b):</p>
+<pre>t&#8345;  =  B &middot; t&#8203;<sub>b</sub>  =  2&#178;&#8312; &middot; 2&#8315;&#8313;  =  2&#185;&#8313; s</pre>
+<p>which is just over 6 days.</p>
+<p><strong>(b)</strong> Each index record consists of an index field
+<code>nameC</code> (24 bytes) and a block pointer. The pointer must have at
+least <code>lg B = 28</code> bits, which again rounds up to 4 bytes:</p>
+<pre>&#8467;&#8345;  =  24 + 4  =  28        rounded up to a power of 2,   &#8467;&#8345;  =  32  =  2&#8309; B</pre>
+<p><strong>(c)</strong> The file is <em>not</em> sorted on <code>nameC</code>,
+so this index is secondary and therefore dense &mdash; one record per data
+record:</p>
+<pre>T&#8345;  =  T  =  2&#179;&#179;
+B&#8345;  =  T&#8345; &#8467;&#8345; / b  =  2&#179;&#179;&#8314;&#8309;&#8315;&#185;&#185;  =  2&#178;&#8311; blocks
+
+&Delta;  =  &#8968; &frac12; &middot; b / &#8467;&#8345; &#8969;  =  &#8968; &frac12; &middot; 2&#185;&#185; / 2&#8309; &#8969;  =  2&#8309;  =  32
+
+h&#8345;  =  &#8968; lg B&#8345; / lg &Delta; &#8969;  =  &#8968; 27 / 5 &#8969;  =  6</pre>
+<p><strong>(d)</strong></p>
+<pre>t&#8345;  =  (h&#8345; + 1) &middot; t&#8203;<sub>b</sub>  =  7 &middot; 2&#8315;&#8313;  =  7/512 s  &lt;  14 ms</pre>
+<p><strong>(e)</strong></p>
+<pre>CREATE INDEX customer_name_idx ON customer (nameC);</pre>
+<p><strong>Six days against fourteen milliseconds</strong> &mdash; a factor of
+about forty million, for an index that occupies <code>2<sup>27</sup></code>
+blocks, half the size of the data file. That is the trade this whole set is
+about, and part (e) is the reminder that in practice it costs one line.</p>
+<p><strong>This index is half the size of the table it indexes</strong>, where
+the primary index of Exercise 12.5 was a fiftieth. Both facts come from the
+same rule: <code>T<sub>P</sub> = B</code> but <code>T<sub>S</sub> = T</code>,
+and there are 32 customer records to a block. A secondary index is never
+cheap.</p>
+<div class="box note"><span class="bt">Two notes on the printed answer</span>
+<p>The book bounds the depth by the number of index <em>records</em> rather
+than index <em>blocks</em> &mdash; <code>lg T / lg &Delta; = 33/5 &lt; 7</code>
+&mdash; giving <code>h = 7</code> and a lookup under 16 ms. Lecture 21's
+formula is <code>h<sub>max</sub> = log<sub>&Delta;min</sub> B<sub>index</sub></code>,
+which is what is used above and which the book itself uses in Problems 52, 58,
+59 and 60. The difference is one block access, and it is the same one: the
+record count overcounts by exactly the records-per-block factor.</p>
+<p>The book's DDL also reads <code>on customer (name)</code>, but Appendix B.20
+declares the column <code>nameC</code>. The statement above uses the declared
+name, so it will actually run.</p></div>
+</div></details>
+
+
+<details class="prob"><summary data-label="Exercise 12.7">Refer to the
+<strong>Professor Payroll</strong> database, with the assumptions of
+Exercise 11.8: about 128 million professors, block size 32 kilobytes, block
+transfer time <code>1/256</code> seconds, 8 gigabytes of primary memory, and
+field lengths
+<pre>socSecNum  16 B      salary     4 B
+firstName  16 B      rank       4 B
+lastName   16 B      wizardID   8 B</pre>
+so that <code>&#8467; = 64 = 2<sup>6</sup></code> and
+<code>B = 2<sup>18</sup></code> blocks. Assume now that an additional B-tree
+index <code>S</code> is built, against table <code>professor</code>, on the
+field <code>wizardID</code>, and assume (in this problem only) that
+<code>wizardID</code> is an alternate key of table <code>professor</code>.
+Round up sizes and counts to the nearest power of 2.
+<p>(a) Is the index <code>S</code> primary or secondary?<br>
+(b) Estimate the number of records of the file <code>S</code>.<br>
+(c) Estimate the record length of the file <code>S</code>.<br>
+(d) Estimate the number of blocks occupied by the file <code>S</code>.<br>
+(e) Estimate the maximum and the minimum number of pointers per node of the
+B-tree that implements <code>S</code>.<br>
+(f) Calculate the maximum depth of that B-tree.<br>
+(g) Describe an adequate procedure to search the file <code>professor</code>
+for all records where the value of the field <code>wizardID</code> is equal to
+<code>98765432</code>, and estimate the worst-case running time.</p></summary>
+<div class="sol">
+<p><strong>(a) Secondary.</strong> The data file is not sorted on the index
+field <code>wizardID</code>, but on the primary key
+<code>socSecNum</code>.</p>
+<p><strong>(b) <code>T<sub>S</sub> = T = 128 &middot; 2<sup>20</sup> =
+2<sup>27</sup></code></strong> &mdash; one index record per data
+<em>record</em>, by the second rule of &sect;12.2.</p>
+<p><strong>(c)</strong> The record length is the sum of the lengths of the
+index field <code>wizardID</code> and a block pointer. Since
+<code>wizardID</code> is an alternate key, the length of the block pointer need
+not exceed the length of the field itself:</p>
+<pre>&#8467;<sub>S</sub>  =  8 + 8  =  16  =  2&#8308; B</pre>
+<p><strong>(d)</strong></p>
+<pre>B<sub>S</sub>  =  T<sub>S</sub> &#8467;<sub>S</sub> / b  =  2&#178;&#8311;&#8314;&#8308;&#8315;&#185;&#8309;  =  2&#185;&#8310; blocks</pre>
+<p><strong>(e)</strong></p>
+<pre>&Delta;<sub>max</sub>  =  b / &#8467;<sub>S</sub>  =  2&#185;&#8309;&#8315;&#8308;  =  2&#185;&#185;        &Delta;<sub>min</sub>  =  &frac12; &middot; &Delta;<sub>max</sub>  =  2&#185;&#8304;</pre>
+<p><strong>(f)</strong></p>
+<pre>h<sub>max</sub>  =  &#8968; lg B<sub>S</sub> / lg &Delta;<sub>min</sub> &#8969;  =  &#8968; 16 / 10 &#8969;  =  2</pre>
+<p><strong>(g) Descend the B-tree of the secondary index <code>S</code>,
+followed by one data access.</strong></p>
+<pre>t  =  (h<sub>max</sub> + 1) &middot; t&#8203;<sub>b</sub>  =  (2 + 1) &middot; 2&#8315;&#8312;  =  12 &middot; 2&#8315;&#185;&#8304;  &lt;  12 ms</pre>
+<p><strong>Exercise 11.8 asked exactly this question without the index</strong>
+and the answer was a sequential scan of 17 minutes. The index turns 17 minutes
+into 12 milliseconds, and the index costs <code>2<sup>16</sup></code> blocks
+&mdash; a quarter of the data file. That is this set in one comparison.</p>
+<p><strong>&ldquo;Assume <code>wizardID</code> is an alternate key&rdquo; is
+doing two separate jobs</strong> in this question. It makes the index a
+<em>dense secondary index on a key</em>, so each value needs exactly one
+pointer and the intermediate block of &sect;12.2 is not required. And it lets
+part (c) size the pointer by the field rather than by
+<code>&lceil;lg B&rceil;</code>, which here gives 8 bytes rather than 3. Both
+are the question telling you what to leave out.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.8">Refer again to the
+<strong>Professor Payroll</strong> database, with the field lengths of
+Exercise 12.7. Assume now that the maximum capacity of this database allows
+about 1 billion professors, and that the database is filled to its capacity.
+Block size is equal to 32 kilobytes, block transfer time is equal to
+<code>1/128</code> seconds, and 8 gigabytes of primary memory are available.
+Let <code>P</code> be the primary index of the table <code>professor</code>.
+Round up sizes and counts to the nearest power of 2.
+<p>(a) Which field is the index field of the index <code>P</code>?<br>
+(b) Estimate the number of records of the file <code>P</code>.<br>
+(c) Estimate the record length of the file <code>P</code>.<br>
+(d) Estimate the number of blocks occupied by the file <code>P</code>.<br>
+(e) Estimate the maximum and minimum number of pointers per node of the B-tree
+that implements <code>P</code>, and calculate its maximum depth.<br>
+(f) Describe an adequate procedure to search the file <code>professor</code>
+for all records where <code>wizardID</code> is equal to <code>98765432</code>,
+and estimate the worst-case running time.<br>
+(g) The same, for all records where <code>socSecNum</code> is equal to
+<code>23456789</code>.</p></summary>
+<div class="sol">
+<p><strong>(a) <code>socSecNum</code></strong>, the primary key, which is the
+field the data file is ordered on.</p>
+<p><strong>(b)</strong> First the data file:</p>
+<pre>&#8467;  =  16 + 16 + 16 + 4 + 4 + 8  =  64  =  2&#8310; B
+T  =  1 billion  &asymp;  2&#179;&#8304; records
+b  =  32 KB  =  2&#8309; &middot; 2&#185;&#8304;  =  2&#185;&#8309; B
+
+B  =  T&#8467; / b  =  2&#179;&#8304;&#8314;&#8310;&#8315;&#185;&#8309;  =  2&#178;&#185; blocks</pre>
+<p>and then the index, one record per data block:</p>
+<pre>T<sub>P</sub>  =  B  =  2&#178;&#185;</pre>
+<p><strong>(c)</strong> The record length is the sum of the lengths of the key
+<code>socSecNum</code> and a block pointer. Since there are
+<code>2<sup>21</sup></code> blocks, 3 bytes (24 bits) are sufficient for the
+block pointer:</p>
+<pre>&#8467;<sub>P</sub>  =  16 + 3  =  19        rounded up to a power of 2,   &#8467;<sub>P</sub>  =  32  =  2&#8309; B</pre>
+<p><strong>(d)</strong></p>
+<pre>B<sub>P</sub>  =  T<sub>P</sub> &#8467;<sub>P</sub> / b  =  2&#178;&#185;&#8314;&#8309;&#8315;&#185;&#8309;  =  2&#185;&#185; blocks</pre>
+<p><strong>(e)</strong></p>
+<pre>&Delta;<sub>max</sub>  =  b / &#8467;<sub>P</sub>  =  2&#185;&#8309;&#8315;&#8309;  =  2&#185;&#8304;        &Delta;<sub>min</sub>  =  2&#8313;
+
+h<sub>max</sub>  =  &#8968; lg B<sub>P</sub> / lg &Delta;<sub>min</sub> &#8969;  =  &#8968; 11 / 9 &#8969;  =  2</pre>
+<p><strong>(f) Sequential search of the data file</strong>, since there is no
+index on <code>wizardID</code> and the file is not ordered on it:</p>
+<pre>t  =  B &middot; t&#8203;<sub>b</sub>  =  2&#178;&#185; &middot; 2&#8315;&#8311;  =  2&#185;&#8308; s  &gt;  4 hours</pre>
+<p><strong>(g) Descend the B-tree of the primary index <code>P</code>,
+followed by one data access:</strong></p>
+<pre>t  =  (h<sub>max</sub> + 1) &middot; t&#8203;<sub>b</sub>  =  (2 + 1) &middot; 2&#8315;&#8311;  =  24 &middot; 2&#8315;&#185;&#8304;  &lt;  24 ms</pre>
+<p><strong>Parts (f) and (g) are the same file, the same size, the same
+hardware, and the same question about one record.</strong> Four hours against
+24 milliseconds, and the only difference is which field is named. An index
+makes exactly one field fast; every other field is as slow as it ever was, and
+that is why a schema ends up with several indexes and why each of them has to
+be paid for.</p>
+<p><strong>The pointer is 3 bytes here and 4 in Exercise 12.3</strong>, because
+this file has <code>2<sup>21</sup></code> blocks and that one had
+<code>2<sup>25</sup></code>. Size the pointer from <code>&lceil;lg B&rceil;</code>
+every time; it is the one quantity in the six lines that depends on the answer
+to an earlier line.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.9">Refer again to the
+<strong>Professor Payroll</strong> database, with the field lengths of
+Exercise 12.7. Assume now that the maximum capacity of this database allows
+about 4 billion professors, and that it is filled to capacity. Block size is
+equal to 16 kilobytes, block transfer time is equal to <code>1/256</code>
+seconds, and 16 gigabytes of primary memory are available. In this problem
+only, assume that <code>wizardID</code> is an alternate key of table
+<code>professor</code>, and that a B-tree index <code>W</code> is built for
+table <code>professor</code> on the field <code>wizardID</code>.
+<p>(a) Is the index <code>W</code> primary or secondary?<br>
+(b) Estimate the number of records, the record length, and the number of blocks
+of the file <code>W</code>.<br>
+(c) Estimate the maximum and minimum number of pointers per node of the B-tree
+that implements <code>W</code>, and calculate its maximum depth.<br>
+(d) Describe an adequate procedure to search the file <code>professor</code>
+for all records where <code>wizardID</code> is equal to <code>98765432</code>,
+and estimate the worst-case running time.<br>
+(e) The same, for all records where <code>salary</code> is equal to
+<code>123456</code>.</p></summary>
+<div class="sol">
+<p><strong>(a) Secondary</strong>, and not clustering, since table
+<code>professor</code> is ordered on its primary key <code>socSecNum</code>,
+hence not on <code>wizardID</code>.</p>
+<p><strong>(b)</strong></p>
+<pre>T<sub>W</sub>  =  T  =  4 &middot; 2&#179;&#8304;  =  2&#179;&#178;              one index record per data record
+
+&#8467;<sub>W</sub>  =  8 + 8  =  16  =  2&#8308; B                wizardID is an alternate key
+
+b   =  16 KB  =  2&#8308; &middot; 2&#185;&#8304;  =  2&#185;&#8308; B
+
+B<sub>W</sub>  =  T<sub>W</sub> &#8467;<sub>W</sub> / b  =  2&#179;&#178;&#8314;&#8308;&#8315;&#185;&#8308;  =  2&#178;&#178; blocks</pre>
+<p><strong>(c)</strong></p>
+<pre>&Delta;<sub>max</sub>  =  b / &#8467;<sub>W</sub>  =  2&#185;&#8308;&#8315;&#8308;  =  2&#185;&#8304;        &Delta;<sub>min</sub>  =  2&#8313;
+
+h<sub>max</sub>  =  &#8968; lg B<sub>W</sub> / lg &Delta;<sub>min</sub> &#8969;  =  &#8968; 22 / 9 &#8969;  =  3</pre>
+<p><strong>(d) Descend the B-tree of the secondary index <code>W</code>,
+followed by one data access:</strong></p>
+<pre>t  =  (3 + 1) &middot; t&#8203;<sub>b</sub>  =  4 &middot; 2&#8315;&#8312;  =  16 &middot; 2&#8315;&#185;&#8304;  &lt;  16 ms</pre>
+<p><strong>(e) Sequential search</strong>, since there is no index on
+<code>salary</code>:</p>
+<pre>B  =  T&#8467; / b  =  2&#179;&#178;&#8314;&#8310;&#8315;&#185;&#8308;  =  2&#178;&#8308; blocks
+
+t  =  B &middot; t&#8203;<sub>b</sub>  =  2&#178;&#8308; &middot; 2&#8315;&#8312;  =  2&#185;&#8310; s  &asymp;  18 hours</pre>
+<p><strong>Three levels here, two in Exercise 12.7</strong>, and the index is
+on the same field of the same table. The file is 32 times bigger
+(<code>2<sup>32</sup></code> records against <code>2<sup>27</sup></code>) and
+the blocks are half the size, so <code>B<sub>W</sub></code> is
+<code>2<sup>22</sup></code> against <code>2<sup>16</sup></code> while
+<code>&Delta;<sub>min</sub></code> falls from <code>2<sup>10</sup></code> to
+<code>2<sup>9</sup></code>. <strong>Depth grows like the logarithm of the file
+divided by the logarithm of the fan-out</strong>, so a thirty-twofold file costs
+one extra level, and a billionfold file would cost three.</p>
+<p><strong>Smaller blocks make the tree deeper, twice over.</strong> Halving
+<code>b</code> doubles <code>B<sub>W</sub></code> and halves
+<code>&Delta;<sub>max</sub></code>, so it adds 1 to the numerator and subtracts
+1 from the denominator of the depth formula. It is the only quantity in the six
+lines that pushes in both directions at once.</p>
+</div></details>
+
+<details class="prob"><summary data-label="Exercise 12.10">Consider a stored
+file <code>F</code>, which consists of fixed-length records. The block size is
+equal to 4 kilobytes, and the block access time is approximately
+<code>1/64</code> seconds. File <code>F</code> occupies 256 gigabytes of
+storage space but is expected to grow. Two gigabytes of core memory are
+available. The record structure of the file is: the primary-key field
+<code>K</code> whose length is equal to 6 bytes, and two additional fields:
+field <code>A</code> whose length is equal to 122 bytes, and field
+<code>B</code> whose length is equal to 128 bytes. The file <code>F</code> has
+a primary index <code>P</code>.
+<p>Describe an adequate procedure to sort the file <code>F</code> according to
+the field <code>A</code>, estimate the running time of the procedure that you
+propose, and explain your analysis.</p></summary>
+<div class="sol">
+<p><strong>Multiway merge sort</strong> &mdash; the primary index
+<code>P</code> is on <code>K</code> and is of no use for ordering by
+<code>A</code>. The file size is given directly, so the block count comes
+straight from it:</p>
+<pre>b   =  4 KB  =  2&#178; &middot; 2&#185;&#8304;  =  2&#185;&#178; B
+t&#8203;<sub>b</sub>  =  1/64 s  =  2&#8315;&#8310; s
+
+B<sub>F</sub>  =  256 GB / b  =  2&#8312; &middot; 2&#179;&#8304; / 2&#185;&#178;  =  2&#178;&#8310; blocks
+
+M   =  2 GB / b  =  2&#179;&#185; / 2&#185;&#178;  =  2&#185;&#8313; blocks
+R   =  &#8968; lg B<sub>F</sub> / lg M &#8969;  =  &#8968; 26 / 19 &#8969;  =  2 rounds
+
+t   =  2 &middot; R &middot; B<sub>F</sub> &middot; t&#8203;<sub>b</sub>  =  4 &middot; 2&#178;&#8310; &middot; 2&#8315;&#8310;  =  2&#178;&#178; s</pre>
+<p>which is between 40 and 50 days. Each of the two rounds reads and writes the
+entire file once, which is the <code>4 &middot; B<sub>F</sub> &middot;
+t<sub>b</sub></code> the book writes.</p>
+<p><strong>The record structure is given and is not used.</strong>
+<code>6 + 122 + 128 = 256</code> bytes per record would let you compute
+<code>T</code>, which the question never asks for &mdash; the size of
+<code>F</code> arrives in gigabytes, so <code>B<sub>F</sub></code> is a
+division and nothing else. Reaching for <code>&#8467;</code> and
+<code>T</code> out of habit is how a four-line answer becomes an eight-line one
+with a rounding error in it.</p>
+<p><strong>And the index is given and is not used either.</strong> That is the
+point of mentioning it: a primary index on <code>K</code> says the file is
+sorted on <code>K</code>, which tells you nothing whatever about
+<code>A</code>. The only thing it rules out is the cheap answer &mdash; the
+file is already sorted, so there is nothing to do &mdash; and it rules it out
+for the wrong field.</p>
+<p><strong>This is Set 11's exercise with Set 12's furniture around it</strong>,
+and it is here as the reminder that an index does not make a sort cheaper. It
+makes one kind of lookup cheaper. Sorting still costs
+<code>2 &middot; R</code> scans, every time.</p>
+</div></details>
+
+<div class="box note"><span class="bt">Where this set ends up</span>
+<p>Six lines, applied nine times. The only decisions in any of them are the
+three at the top:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Decide</th><th>By asking</th><th>Consequence</th></tr></thead>
+<tbody>
+<tr><td>primary or secondary</td><td>is the data file sorted on this field?</td><td><code>T<sub><sub>i</sub></sub> = B<sub>F</sub></code> or <code>T<sub><sub>i</sub></sub> = T<sub>F</sub></code></td></tr>
+<tr><td>pointer length</td><td>how many blocks must it address?</td><td><code>&lceil;lg B<sub>F</sub>&rceil;</code> bits, rounded up to bytes</td></tr>
+<tr><td>which procedure</td><td>is there an index on <em>this</em> field?</td><td>B-tree, binary search, or a scan</td></tr>
+</tbody></table></div>
+<p>Everything after that is division. And the three answers that matter, on a
+file of a billion records, line up like this:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Procedure</th><th>Blocks touched</th><th>On Exercise 12.8's file</th></tr></thead>
+<tbody>
+<tr><td>sequential scan</td><td><code>B<sub>F</sub></code></td><td>2<sup>21</sup> &mdash; over 4 hours</td></tr>
+<tr><td>binary search on a sorted <code>F</code></td><td><code>lg B<sub>F</sub> + 1</code></td><td>22 &mdash; about 170 ms</td></tr>
+<tr><td>descend a B-tree index</td><td><code>h<sub>max</sub> + 1</code></td><td>3 &mdash; under 24 ms</td></tr>
+</tbody></table></div>
+<p>The first two columns are the whole course from here backwards: Set 11
+bought the second row by sorting the file, at a cost of four scans, and for one
+field only. Set 12 buys the third row by building a small sorted file beside
+the big unsorted one, for as many fields as you are willing to pay for.</p>
+<p>What this set has not asked: what an insertion costs once all those indexes
+exist, or how the B-tree is kept balanced when records are deleted rather than
+added. Every index that makes a read faster makes a write slower, and
+&sect;12.3's split was only half the story.</p></div>
+
+    <nav class="pagenav">
+      <a class="prev" href="ex-storage.html"><span>Previous</span>Set 11. Storage structures</a>
+      <a class="next" href="ex-midterm.html"><span>Next</span>Midterm review</a>
+    </nav>
+    <footer class="site">
+      <em>Database Systems</em> &middot; CSCI 331, Queens College CUNY.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
